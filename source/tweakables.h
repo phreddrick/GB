@@ -277,7 +277,7 @@
 #define SIGBLOCKS (SIGHUP|SIGTERM|SIGINT|SIGQUIT|SIGSTOP|SIGTSTP)
 				/* signals to block... */
 
-#define Bzero(x)  bzero( (char *)&(x), sizeof(x) )
+#define Bzero(x)  memset( (void *)&(x), 0, sizeof(x) )
 #define Malloc(x) (x *)malloc( sizeof(x) )
 
 

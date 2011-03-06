@@ -5,12 +5,14 @@
  * enrol.c -- initializes to owner one sector and planet. 
  */
 
-#include "GB_copyright.h"
+#include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
-#include <strings.h>
+#include <string.h>
 #include <curses.h>
 #include <errno.h>
+
+#include "GB_copyright.h"
 #define EXTERN
 #include "vars.h"
 #include "ships.h"
@@ -293,7 +295,7 @@ main()
     printf(" Number of sexes: %d (min req'd for colonization)\n",Race->number_sexes);
 
     printf("\n\nLook OK(y/n)\?");
-    if(gets(str)==NULL)
+    if(fgets(str, 99, stdin)==NULL)
       exit(1);
   } while (str[0] != 'y');
 

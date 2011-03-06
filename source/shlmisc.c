@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <string.h>
 
 char *Ship(shiptype *s);
 void grant(int, int, int);

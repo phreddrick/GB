@@ -3,6 +3,8 @@
  * smq@ucscb.ucsc.edu, mods by people in GB_copyright.h.
  * Restrictions in GB_copyright.h.
  */
+#include <stdlib.h>
+#include <string.h>
 #include <signal.h>
 #include "GB_copyright.h"
 
@@ -29,19 +31,7 @@ int planet_translate[N_HOME_PLANET_TYPES] =  {0, 6, 7, 5, 2, 3, 4} ;
 
 
 
-#ifdef __STDC__
-void srandom(int seed) ;
-long random(void) ;
-
-int getpid(void) ;
-
 void modify_print_loop(int level) ;
-
-
- 
-#else
-#define const
-#endif
 
 void notify(who, gov, msg)
      int who, gov;

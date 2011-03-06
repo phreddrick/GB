@@ -5,6 +5,7 @@
  * fire.c -- fire at ship or planet from ship or planet
  */
 
+#include <string.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"
@@ -43,7 +44,7 @@ void fire(int Playernum, int Governor, int APcount, int cew) /* ship vs ship */
   int strength, maxstrength, retal, damage;
 
   /* for telegramming and retaliating */
-  bzero( (char *)Nuked, sizeof(Nuked) );
+  memset( (void *)Nuked, 0, sizeof(Nuked) );
 
   if(argn < 3) {
     notify(Playernum, Governor, "Syntax: 'fire <ship> <target> [<strength>]'.\n");

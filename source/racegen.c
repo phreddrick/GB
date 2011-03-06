@@ -74,12 +74,19 @@
                  non-enroll, non-server racegen.
 */
 
-#include <varargs.h>
+#include <stdarg.h>
 #include <math.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+
+/**************
+ * Definitions for data types and such used in the program.
+ */
+#include "racegen.h"
+
 
 #ifdef PRIV			/* Extra stuff for privileged racegen */
 
@@ -90,6 +97,7 @@
 #define SERV_HOST_ADDR "janis.astro.nwu.edu"
 
 #endif
+
 
 int fd;
 int isserver = 0;
@@ -115,13 +123,13 @@ main (argc, argv)
 	if (port == 0)
 	  {
 	    printf ("Syntax: racegen [-s [port]]\n");
-	    exit (0);
+	    exit (1);
 	  }
       }
     else
       {
 	printf ("Syntax: racegen [-s [port]]\n");
-	exit ();
+	exit (1);
       }
 
   if (isserver)
@@ -135,7 +143,7 @@ main (argc, argv)
 	  fprintf (stderr, "server: can't open stream socket");
 	  exit (0);
 	}
-      bzero ((char *) &serv_addr, sizeof (serv_addr));
+      memset ((char *) &serv_addr, 0, sizeof (serv_addr));
       serv_addr.sin_family = AF_INET;
       serv_addr.sin_addr.s_addr = htonl (INADDR_ANY);
       serv_addr.sin_port = htons (port);
@@ -180,12 +188,6 @@ main (argc, argv)
   do_racegen ();
 #endif
 }
-
-/**************
- * Definitions for data types and such used in the program.
- */
-#include "racegen.h"
-
 
 attribute attr[N_ATTRIBUTES] =
 {
@@ -647,7 +649,7 @@ critique_modification ()
   race.rejection[0] = '\0';
   nerrors = critique_to_file (stdout, 0, IS_PLAYER);
   if (nerrors)
-    bcopy (&last, &race, sizeof (struct x));
+    memcpy (&last, &race, sizeof (struct x));
   else
     changed = altered = 1;
   race.status = (nerrors == 0) ? STATUS_BALANCED : STATUS_UNBALANCED;
@@ -666,7 +668,7 @@ initialize ()
 {
   int i;
 
-  bzero (&race, sizeof (race));
+  memset (&race, 0, sizeof (race));
   for (i = FIRST_ATTRIBUTE; i <= LAST_ATTRIBUTE; i++)
     race.attr[i] = attr[i].init;
   race.race_type = R_NORMAL;
@@ -678,7 +680,7 @@ initialize ()
   strcpy (race.address, "Unknown");
   strcpy (race.password, "XXXX");
   normal ();
-  bcopy (&race, &last, sizeof (struct x));
+  memcpy (&race, &last, sizeof (struct x));
   cost_of_race ();
   for (i = FIRST_ATTRIBUTE; i <= LAST_ATTRIBUTE; i++)
     attr[i].l_fudge += -cost.attr[i];
@@ -970,7 +972,7 @@ load (argc, argv)
   char c[64];
   int i;
 
-  bcopy (&race, &last, sizeof (struct x));
+  memcpy (&race, &last, sizeof (struct x));
   if (altered)
     {
       i = Dialogue ("This race has been altered; load anyway?", "yes", "no", 0);
@@ -984,7 +986,7 @@ load (argc, argv)
   if (load_from_filename (c))
     {
       printf ("Load from file \"%s\" failed.\n", c);
-      bcopy (&last, &race, sizeof (struct x));
+      memcpy (&last, &race, sizeof (struct x));
     }
   else
     {
@@ -1012,7 +1014,7 @@ modify (argc, argv)
     }
   j = strlen (argv[1]);
 
-  bcopy (&race, &last, sizeof (struct x));
+  memcpy (&race, &last, sizeof (struct x));
 
   /*
    * Check for attribute modification: */
@@ -1080,7 +1082,7 @@ modify (argc, argv)
 	  {
 	    if (i == H_JOVIAN)
 	      {
-		bzero (race.compat, sizeof (race.compat));
+		memset (race.compat, 0, sizeof (race.compat));
 		race.compat[S_GAS] = 100.0;
 	      }
 	    else if (race.home_planet_type == H_JOVIAN)
@@ -1299,7 +1301,7 @@ send2 (argc, argv)
   FILE *f;
   char sys[64];
 
-  bcopy (&race, &last, sizeof (struct x));
+  memcpy (&race, &last, sizeof (struct x));
   if (critique_to_file (stdout, 1, IS_PLAYER))
     return;
 
@@ -1341,9 +1343,7 @@ send2 (argc, argv)
 }
 
 int 
-Dialogue (prompt, va_alist)
-     char *prompt;
-     va_dcl
+Dialogue (char *prompt, ...)
 {
   va_list ap;
   char input[512];
@@ -1352,7 +1352,7 @@ Dialogue (prompt, va_alist)
   int init = 0;
   char *argv[16];
   printf (prompt);
-  va_start (ap);
+  va_start (ap, prompt);
   while ((carg = va_arg (ap, char *)) != 0)
     {
       if (!init)
@@ -1374,9 +1374,9 @@ Dialogue (prompt, va_alist)
   while (1)
     {
       if (isserver)
-	gets (input);
+	fgets (input, 511, stdin);
       else
-	fgets (input, 512, stdin);
+	fgets (input, 511, stdin);
 
       if (argc == 0)
 	return -1;
@@ -1530,9 +1530,9 @@ modify_print_loop (level)
 #endif
       fflush (stdout);
       if (isserver)
-	com = gets (buf);
+	com = fgets (buf, 511, stdin);
       else
-	com = fgets (buf, 512, stdin);
+	com = fgets (buf, 511, stdin);
       buf[strlen (buf) - 1] = '\0';
 
       for (i = 0; i < 4; i++)

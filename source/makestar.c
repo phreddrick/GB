@@ -12,6 +12,8 @@ G.O.D. [1] > ammonia melts at -78C
 G.O.D. [1] > boils at -33
 #endif
 
+#include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "GB_copyright.h"
 #define EXTERN
@@ -244,7 +246,7 @@ startype *Makestar(FILE *planetdata, FILE *sectordata)
 
   /* get names, positions of stars first */
   Star = ALLOCATE(startype) ;
-  bzero(Star, sizeof(startype)) ;
+  memset(Star, 0, sizeof(startype)) ;
   Star->gravity = int_rand(0, int_rand(0,300)) + 
     int_rand(0, 300) + int_rand(100,400) + int_rand(0, 9) / 10.0 ;
   Star->temperature = round_rand(Star->gravity/100.0) ;

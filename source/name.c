@@ -11,7 +11,8 @@
 */
 #include <ctype.h>
 #include <signal.h>
-#include <strings.h>
+/*#include <strings.h>*/
+#include <string.h>
 #include <time.h>
 #include <math.h>
 

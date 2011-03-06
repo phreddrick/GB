@@ -6,13 +6,15 @@
  * Restrictions in GB_copyright.h.
  */
 
+#include <math.h>
+#include <string.h>
+#include <stdlib.h>
 #include "GB_copyright.h"
 #define EXTERN
 #include "vars.h"
 #include "ships.h"
 #include "races.h"
 #include "power.h"	/* (for power) */
-#include <math.h>
 
 #undef malloc
 #undef realloc
@@ -46,7 +48,7 @@ int printstarinfo = 0 ;
 
 static int occupied[100][100];
 
-void main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
   FILE *stardata, *planetdata, *sectordata ;
   char str[200] ;
@@ -195,13 +197,13 @@ void main(int argc, char *argv[])
 
   { 
   struct power p[MAXPLAYERS];
-  bzero((char *)p, sizeof(p));
+  memset((char *)p, 0, sizeof(p));
   InitFile(POWFL, p, sizeof(p)) ;
   }
   
   { 
   struct block p[MAXPLAYERS];
-  bzero((char *)p, sizeof(p));
+  memset((char *)p, 0, sizeof(p));
   InitFile(BLOCKDATAFL, p, sizeof(p)) ;
   }
   

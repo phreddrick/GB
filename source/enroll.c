@@ -6,6 +6,7 @@
  * 
  * Anybody who does alter this program, please take credit!
  */
+#include <string.h>
 #include "racegen.h"
 
 #define DEFAULT_ENROLLMENT_FILENAME "enroll.saves"
@@ -146,7 +147,7 @@ int enroll(argc, argv)
   if (g == NULL)
     printf("Unable to open failures file \"%s\".\n", argv[1]) ;
   fclose(g) ;
-  bcopy(&race, &last, sizeof(struct x)) ;
+  memcpy(&race, &last, sizeof(struct x)) ;
 
   /*
    * race.address will be unequal to TO in the instance that this is a

@@ -16,7 +16,7 @@
 #include "buffers.h"
 #include <math.h>
 #include <signal.h>
-#include <strings.h>
+#include <string.h>
 
 extern int Defensedata[];
 

@@ -8,6 +8,7 @@
  *    closed).  write routines close and thus unlock that area.
  *
  */
+#include <stdlib.h>
 #include <strings.h>
 #include <signal.h>
 #include <errno.h>
@@ -24,10 +25,6 @@
 #include "buffers.h"
 
 int commoddata, pdata, racedata, sectdata, shdata, stdata;
-
-extern int errno;
-int sys_nerr;
-extern char *sys_errlist[];
 
 void close_file(int);
 void open_data_files(void);

@@ -10,7 +10,7 @@
 #include <ctype.h>
 #include <signal.h>
 #include <math.h>
-#include <strings.h>
+#include <string.h>
 
 #include "GB_copyright.h"
 #define EXTERN extern

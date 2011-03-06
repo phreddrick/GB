@@ -16,7 +16,7 @@
 #include "buffers.h"
 #include <signal.h>
 #include <math.h>
-#include <strings.h>
+#include <string.h>
 
 void dock(int, int, int, int);
 #include "GB_server.p"

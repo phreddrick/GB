@@ -30,6 +30,8 @@
 #include "TinyMUD_copyright.h" 
 /* Copyright for the original TinyMUD interface which was used for the networking */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/time.h>
@@ -44,7 +46,7 @@
 #include <netdb.h>
 
 #include <curses.h>
-#include <strings.h>
+/*#include <strings.h> */
 #include <pwd.h>
 
 #include <sys/uio.h>
@@ -196,7 +198,7 @@ void remove_sh_star(shiptype *);
 void remove_sh_plan(shiptype *);
 void remove_sh_ship(shiptype *, shiptype *);
 double GetComplexity(int);
-int ShipCompare(int *, int *);
+int ShipCompare(const void *, const void *);
 void SortShips(void);
 void warn_race(int, char *);
 void warn(int, int, char *);
@@ -260,7 +262,7 @@ char Dessymbols[] = {
     CHAR_SEA, CHAR_LAND, CHAR_MOUNT, CHAR_GAS, CHAR_ICE, CHAR_FOREST,
     CHAR_DESERT, CHAR_PLATED, CHAR_WASTED};
 
-void main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   int i;
   struct stat	stbuf;
@@ -1792,6 +1794,7 @@ void kill_ship(int Playernum, shiptype *ship)
 
     /* keep track of where these VN's were shot up */
 
+#if BOGUS_CODE
     if (Sdata.VN_index1[Playernum-1] == -1)
       /* there's no star in the first index */
       Sdata.VN_index1[Playernum-1] = ship->storbits;
@@ -1799,6 +1802,7 @@ void kill_ship(int Playernum, shiptype *ship)
       /* there's no star in the second index */
       Sdata.VN_index2[Playernum-1] = ship->storbits;
     else {
+#endif
       /* pick an index to supplant */
       if (random()&01)
         Sdata.VN_index1[Playernum-1] = ship->storbits;
@@ -1806,7 +1810,9 @@ void kill_ship(int Playernum, shiptype *ship)
         Sdata.VN_index2[Playernum-1] = ship->storbits;
     }
     putsdata(&Sdata);
+#if BOGUS_CODE
   }
+#endif
 
   if(ship->type==OTYPE_TOXWC && ship->whatorbits==LEVEL_PLAN) {
     getplanet(&planet, (int)ship->storbits, (int)ship->pnumorbits);
@@ -2009,8 +2015,10 @@ double GetComplexity(int ship)
   return complexity(&s);
 }
 
-int ShipCompare(int *s1, int *s2)
+int ShipCompare(const void *ship1, const void *ship2)
 {
+  int *s1 = (int *) ship1;
+  int *s2 = (int *) ship2;
   return (int)(GetComplexity(*s1) - GetComplexity(*s2));
 }
 

@@ -15,6 +15,7 @@
 #include "races.h"
 #include "power.h"
 #include "buffers.h"
+#include <string.h>
 #include <curses.h>
 
 racetype *Race;
@@ -63,7 +64,7 @@ void show_map(int Playernum, int Governor, int snum, int pnum, planettype *p,
    char shiplocs[MAX_X][MAX_Y];
    hugestr output;
 
-   bzero((char *)shiplocs, sizeof(shiplocs));
+   memset((char *)shiplocs, 0, sizeof(shiplocs));
 
    Race = races[Playernum-1];
    getsmap(Smap, p);

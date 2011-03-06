@@ -9,7 +9,7 @@
 
 #include <errno.h>
 #include <time.h>
-#include <strings.h>
+#include <string.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"

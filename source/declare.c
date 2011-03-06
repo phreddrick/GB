@@ -12,6 +12,7 @@
 #include "races.h"
 #include "power.h"
 #include "buffers.h"
+#include <string.h>
 #include <signal.h>
 #include <ctype.h>
 

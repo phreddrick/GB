@@ -6,6 +6,7 @@
  * Bombard() -- ship bombards planet
  */
 
+#include <string.h>
 #define EXTERN extern
 #include "vars.h"
 #include "ships.h"
@@ -34,7 +35,7 @@ int i, sh;
 int ok;
 
 /* for telegramming */
-bzero((char *)Nuked, sizeof(Nuked));
+memset((char *)Nuked, 0, sizeof(Nuked));
 
 /* check to see if PDNs are present */
 ok = 1;

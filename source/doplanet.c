@@ -7,7 +7,8 @@ int Sectormappos;
  */
 
 #include <math.h>
-/*#include <malloc.h>*/
+#include <string.h>
+#include <stdlib.h>
 
 #include "GB_copyright.h"
 #define EXTERN extern
@@ -103,15 +104,15 @@ Sectormappos = planet->sectormappos;
 
 getsmap(Smap,planet);
 PermuteSects(planet);
-bzero((char *)Sectinfo, sizeof(Sectinfo) );
+memset((char *)Sectinfo, 0, sizeof(Sectinfo) );
 
-bzero((char *)avg_mob, sizeof(avg_mob) );
-bzero((char *)sects_gained, sizeof(sects_gained) );
-bzero((char *)sects_lost, sizeof(sects_lost) );
-bzero((char *)prod_res, sizeof(prod_res) );
-bzero((char *)prod_fuel, sizeof(prod_fuel) );
-bzero((char *)prod_destruct, sizeof(prod_destruct) );
-bzero((char *)prod_crystals, sizeof(prod_crystals) );
+memset((char *)avg_mob, 0, sizeof(avg_mob) );
+memset((char *)sects_gained, 0, sizeof(sects_gained) );
+memset((char *)sects_lost, 0, sizeof(sects_lost) );
+memset((char *)prod_res, 0, sizeof(prod_res) );
+memset((char *)prod_fuel, 0, sizeof(prod_fuel) );
+memset((char *)prod_destruct, 0, sizeof(prod_destruct) );
+memset((char *)prod_crystals, 0, sizeof(prod_crystals) );
 
 tot_resdep = prod_eff= prod_mob = tot_captured = 0;
 Claims = 0;
@@ -587,10 +588,10 @@ for (i=1; i<=Num_races; i++)
 	    shiptype *s2; 
 	    reg int t;
 	    ++Num_ships;
-	    ships = (shiptype **)realloc(ships,
-					 (unsigned)((Num_ships+1)*sizeof(shiptype*)));
+	    ships = (shiptype **)realloc((void*) ships,
+					 (size_t)((Num_ships+1)*sizeof(shiptype*))); 
 	    s2 = ships[Num_ships] = Malloc(shiptype);
-	    bzero((char *)s2,sizeof(shiptype));
+	    memset((char *)s2,0,sizeof(shiptype));
 	    s2->number = Num_ships;
 	    s2->type = OTYPE_TOXWC;
 

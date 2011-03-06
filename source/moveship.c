@@ -7,6 +7,7 @@
  *	also deducts fuel from the ship's stores.
  */
 #include <math.h>
+#include <string.h>
 
 #include "GB_copyright.h"
 #define EXTERN extern

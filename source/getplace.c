@@ -9,6 +9,7 @@
  */
 
 #include <ctype.h>
+#include <string.h>
 
 #include "GB_copyright.h"
 #define EXTERN extern

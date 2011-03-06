@@ -5,6 +5,9 @@
  * doship -- do one ship turn.
  */
 
+#include <math.h>
+#include <string.h>
+
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"
@@ -13,8 +16,6 @@
 #include "doturn.h"
 #include "power.h"
 #include "buffers.h"
-#include <math.h>
-#include <strings.h>
 
 extern long Shipdata[NUMSTYPES][NUMABILS];
 

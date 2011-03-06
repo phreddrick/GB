@@ -6,6 +6,7 @@
  * 
  * Anybody who does alter this program, please take credit!
  */
+#include <stdarg.h>
 #include <stdio.h>
 #define GBVERSION "1.7.3"
 #ifdef VERSION
@@ -48,32 +49,7 @@
 #define END_RECORD_STRING "************>"
 #define min(x, y) (((x) < (y)) ? (x) : (y))
 
-#ifdef __STDC__
-/* double atof(char *nptr) ; */
-/*
-void bcopy(void *src, void *dst, int length) ;
-void bzero(void *b, int length) ;
-
-int fclose(FILE *stream) ;
-int fflush(FILE *stream) ;
-
-int fprintf(FILE *f, const char *format, ...) ;
-int fscanf(FILE *f, const char *format, ...) ;
-int printf(const char *format, ...) ; 
-
-int strncasecmp(const char *s1, const char *s2, int len) ;
-
-*/
-/* void exit(int status) ; */
-int system(const char *string) ;
-
-#else
-double atof() ;
-#define const
-int Dialogue() ;
-#endif
-
-
+int Dialogue( char *, ...);
 
 /**************
  * Attributes, attribute names, and parameters for attribute costs.

@@ -8,6 +8,8 @@
  *  planet_doVN() -- called by doplanet()
  */
 
+#include <stdlib.h>
+#include <string.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"
@@ -190,7 +192,7 @@ void planet_doVN(shiptype *ship, planettype *planet)
 	  ships=(shiptype **)realloc(ships,(Num_ships+1)*sizeof(shiptype*)); 
 	  ships[Num_ships] = (shiptype *)malloc(sizeof(shiptype));
 	  s2 = ships[Num_ships];
-	  bzero((char *)s2,sizeof(shiptype));
+	  memset((char *)s2,0,sizeof(shiptype));
 	  s2->nextship = planet->ships;
 	  planet->ships = Num_ships;
 	  s2->number = Num_ships;

@@ -19,11 +19,6 @@
 #include "files.h"
 #include "buffers.h"
 
-int sys_nerr;
-
-extern char *sys_errlist[];
-extern int errno;
-
 void Fileread(int, char *, int, int);
 void Filewrite(int, char *, int, int);
 

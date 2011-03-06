@@ -226,8 +226,6 @@ EXTERN struct directory Dir[MAXPLAYERS][MAXGOVERNORS+1];
 
 EXTERN sectortype Smap[(MAX_X+1)*(MAX_Y+1) + 1];
 
-extern char *malloc();
-
 EXTERN unsigned char Nuked[MAXPLAYERS];
 EXTERN unsigned long StarsInhab[NUMSTARS];
 EXTERN unsigned long StarsExpl[NUMSTARS];

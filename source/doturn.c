@@ -7,6 +7,8 @@
 
 #include <math.h>
 #include <ctype.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "GB_copyright.h"
 #define EXTERN extern
@@ -63,13 +65,13 @@ struct victstruct {
   
 /* make all 0 for first iteration of doplanet */
 if(update) {
-    bzero((char *)starpopns, sizeof(starpopns));
-    bzero((char *)starnumships, sizeof(starnumships));
-    bzero((char *)Sdatanumships, sizeof(Sdatanumships));
-    bzero((char *)Stinfo, sizeof(Stinfo));
-    bzero((char *)StarsInhab, sizeof(StarsInhab));
-    bzero((char *)Power, sizeof(Power));
-    bzero((char *) inhabited, sizeof(inhabited));
+    memset((char *)starpopns, 0, sizeof(starpopns));
+    memset((char *)starnumships, 0, sizeof(starnumships));
+    memset((char *)Sdatanumships, 0, sizeof(Sdatanumships));
+    memset((char *)Stinfo, 0, sizeof(Stinfo));
+    memset((char *)StarsInhab, 0, sizeof(StarsInhab));
+    memset((char *)Power, 0, sizeof(Power));
+    memset((char *) inhabited, 0, sizeof(inhabited));
 }
 
 Num_ships = Numships();
