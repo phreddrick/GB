@@ -24,9 +24,7 @@
 #include "buffers.h"
 #include "power.h"
 #include "ships.h"
-#ifdef AIX
 #include <time.h>
-#endif
 #include <stdio.h>
 #include <ctype.h>
 #include <strings.h>
