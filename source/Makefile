@@ -5,8 +5,8 @@
 #UV = VER_4_3
 #UV = VER_4_2
 # (the -pipe -g are for development.)
-CC = cc
-#CC = gcc
+#CC = cc
+CC = gcc
 
 CFLAGS = -g
 #CFLAGS = -g -YBSD
