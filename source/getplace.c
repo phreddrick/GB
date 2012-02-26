@@ -8,6 +8,7 @@
  *  testship(ship) -- tests various things for the ship.
  */
 
+#include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
 

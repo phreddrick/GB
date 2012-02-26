@@ -281,8 +281,6 @@
 #define Malloc(x) (x *)malloc( sizeof(x) )
 
 
-#define _STDLIB_H	/* for compiling on NeXt machines */
-
 #define RESOURCE 0  /* for market */
 #define DESTRUCT 1
 #define FUEL	 2
