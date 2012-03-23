@@ -1351,7 +1351,7 @@ Dialogue (char *prompt, ...)
   int len, i, argc = 0;
   int init = 0;
   char *argv[16];
-  printf (prompt);
+  fputs (prompt, stdout);
   va_start (ap, prompt);
   while ((carg = va_arg (ap, char *)) != 0)
     {
