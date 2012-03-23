@@ -174,13 +174,13 @@ if(update) {
 		planets[c->star_to][c->planet_to]->info[c->bidder-1].crystals += c->amount;
 		break;
 	    }
-	    sprintf(buf, "Lot %d purchased from %s [%d] at a cost of %d.\n   %d %s arrived at /%s/%s\n",
+	    sprintf(buf, "Lot %d purchased from %s [%d] at a cost of %ld.\n   %d %s arrived at /%s/%s\n",
 		    i, races[c->owner-1]->name, c->owner,
 		    c->bid, c->amount, Commod[c->type],
 		    Stars[c->star_to]->name,
 		    Stars[c->star_to]->pnames[c->planet_to]);
 	    push_telegram((int)c->bidder, (int)c->bidder_gov, buf);
-	    sprintf(buf, "Lot %d (%d %s) sold to %s [%d] at a cost of %d.\n",
+	    sprintf(buf, "Lot %d (%d %s) sold to %s [%d] at a cost of %ld.\n",
 		    i, c->amount, Commod[c->type],
 		    races[c->bidder-1]->name, c->bidder,
 		    c->bid);

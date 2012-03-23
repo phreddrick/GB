@@ -152,13 +152,13 @@ void governors(int Playernum, int Governor, int APcount)
     if(Governor || argn<3) {	/* the only thing governors can do with this */
 	for(i=0; i<=MAXGOVERNORS; i++) {
 	    if(Governor)
-		sprintf(buf, "%d %-15.15s %8s %10d %s",
+		sprintf(buf, "%d %-15.15s %8s %10ld %s",
 			i, Race->governor[i].name,
 			Race->governor[i].active ? "ACTIVE" : "INACTIVE",
 			Race->governor[i].money,
 			ctime(&Race->governor[i].login));
 	    else
-		sprintf(buf, "%d %-15.15s %-10.10s %8s %10d %s",
+		sprintf(buf, "%d %-15.15s %-10.10s %8s %10ld %s",
 			i, Race->governor[i].name,
 			Race->governor[i].password,
 			Race->governor[i].active ? "ACTIVE" : "INACTIVE",
@@ -270,7 +270,7 @@ void do_revoke(racetype *Race, int gov, int j)
  
     /*  And money too....  */
 
-    sprintf(revoke_buf, "Transferring %d money...\n", Race->governor[gov].money);
+    sprintf(revoke_buf, "Transferring %ld money...\n", Race->governor[gov].money);
     notify(Race->Playernum, 0, revoke_buf);
     Race->governor[j].money = Race->governor[j].money + Race->governor[gov].money;
     Race->governor[gov].money = 0;

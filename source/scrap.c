@@ -86,7 +86,7 @@ while(shipno = do_shiplist(&s, &nextshipno))
 	scrapval = Cost(s)/2 + s->resource;
 
 	if (s->docked) {
-	    sprintf(buf,"%s: original cost: %d\n", Ship(s), Cost(s));
+	    sprintf(buf,"%s: original cost: %ld\n", Ship(s), Cost(s));
 	    notify(Playernum, Governor, buf);
 	    sprintf(buf,"         scrap value%s: %d rp's.\n",
 		    s->resource ? "(with stockpile) " : "", scrapval);

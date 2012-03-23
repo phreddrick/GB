@@ -355,10 +355,10 @@ void insurgency(int Playernum, int Governor, int APcount)
 	  Stars[Dir[Playernum-1][Governor].snum]->name,
 	  eligible, Playernum, them, who);
   strcat(long_buf, buf);
-  sprintf(buf, "\t\t %d morale [%d] vs %d morale [%d]\n",
+  sprintf(buf, "\t\t %ld morale [%d] vs %ld morale [%d]\n",
 	  Race->morale, Playernum, alien->morale, who);
   strcat(long_buf, buf);
-  sprintf(buf, "\t\t %d money against %d population at tax rate %d%%\n",
+  sprintf(buf, "\t\t %d money against %ld population at tax rate %d%%\n",
 	  amount, p->info[who-1].popn, p->info[who-1].tax);
   strcat(long_buf, buf);
   sprintf(buf, "Success chance is %d%%\n", chance);

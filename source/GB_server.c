@@ -29,6 +29,7 @@
 
 #include "TinyMUD_copyright.h" 
 /* Copyright for the original TinyMUD interface which was used for the networking */
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -301,7 +302,7 @@ int main(int argc, char **argv)
   }
   fprintf(stderr, "      Port %d\n", port);
   fprintf(stderr, "      %d minutes between updates\n", update_time);
-  fprintf(stderr, "      %d segments/update\n", segments);
+  fprintf(stderr, "      %ld segments/update\n", segments);
   sprintf(start_buf, "Server started  : %s", ctime(&clk));
 
   next_update_time = clk + (update_time * 60);
@@ -343,8 +344,8 @@ int main(int argc, char **argv)
   sprintf(segment_buf, "Last Segment %2d : %s", nsegments_done,
 	  ctime(&last_segment_time));
 
-  fprintf(stderr, update_buf);
-  fprintf(stderr, segment_buf);
+  fputs(update_buf, stderr);
+  fputs(segment_buf, stderr);
   srandom(getpid());
   fprintf(stderr, "      Next Update %d  : %s",
 	  nupdates_done+1, ctime(&next_update_time));
@@ -783,7 +784,7 @@ char *addrout(long a)
 {
     static char outbuf[1024];
 
-    sprintf (outbuf, "%d.%d.%d.%d", (a >> 24) & 0xff, (a >> 16) & 0xff,
+    sprintf (outbuf, "%ld.%ld.%ld.%ld", (a >> 24) & 0xff, (a >> 16) & 0xff,
 	     (a >> 8) & 0xff, a & 0xff);
     return outbuf;
 }
@@ -1262,7 +1263,7 @@ void check_connect(struct descriptor_data *d, char *message)
 	  sprintf(buf,"Government Center #%d is active.\n", r->Gov_ship);
 	  notify(Playernum, Governor, buf);
       }
-      sprintf(buf, "     Morale: %d\n", r->morale);
+      sprintf(buf, "     Morale: %ld\n", r->morale);
       notify(Playernum, Governor, buf);
       treasury(Playernum, Governor);
   }
@@ -1458,7 +1459,7 @@ void dump_users(struct descriptor_data *e)
 	  if(!r->governor[d->Governor].toggle.invisible ||
 	     e->Playernum==d->Playernum || God) {
 	      sprintf(temp, "\"%s\"", r->governor[d->Governor].name);
-	      sprintf (buf, "%20.20s %20.20s [%2d,%2d] %4ds idle %-4.4s %s %s\n",
+	      sprintf (buf, "%20.20s %20.20s [%2d,%2d] %4lds idle %-4.4s %s %s\n",
 		       r->name, temp,  d->Playernum, d->Governor,
 		       now - d->last_time,
 		       God ? Stars[Dir[d->Playernum-1][d->Governor].snum]->name : "    ",
@@ -1713,7 +1714,7 @@ void GB_schedule(int Playernum, int Governor)
   clk = time(0);
   sprintf(buf, "%d minute update intervals\n", update_time);
   notify(Playernum, Governor, buf);
-  sprintf(buf, "%d movement segments per update\n", segments);
+  sprintf(buf, "%ld movement segments per update\n", segments);
   notify(Playernum, Governor, buf);
   sprintf(buf, "Current time    : %s", ctime(&clk));
   notify(Playernum, Governor, buf);

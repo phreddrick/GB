@@ -142,7 +142,7 @@ void show_map(int Playernum, int Governor, int snum, int pnum, planettype *p,
 	   strcat(temp, "\?\?\?");
        strcat(temp, "\n");
        notify(Playernum, Governor, temp);
-       sprintf(temp, "              Guns : %3d             Mob Points : %d\n",
+       sprintf(temp, "              Guns : %3d             Mob Points : %ld\n",
 	       p->info[Playernum-1].guns,
 	       p->info[Playernum-1].mob_points);
        notify(Playernum, Governor, temp);
@@ -160,17 +160,17 @@ void show_map(int Playernum, int Governor, int snum, int pnum, planettype *p,
 	       p->info[Playernum-1].resource,
 	       p->info[Playernum-1].fuel);
        notify(Playernum, Governor, temp);
-       sprintf(temp, "      Destruct cap : %-9u%18s: %-5u (%u/%u)\n",
+       sprintf(temp, "      Destruct cap : %-9u%18s: %-5lu (%lu/%u)\n",
 	       p->info[Playernum-1].destruct,
 	       Race->Metamorph ? "Tons of biomass" : "Total Population", 
 	       p->info[Playernum-1].popn, p->popn, 
 	       round_rand(.01*(100.-p->conditions[TOXIC])*p->maxpopn) );
        notify(Playernum, Governor, temp);
-       sprintf(temp, "          Crystals : %-9u%18s: %-5u (%u)\n",
+       sprintf(temp, "          Crystals : %-9u%18s: %-5lu (%lu)\n",
 	       p->info[Playernum-1].crystals,
 	       "Ground forces", p->info[Playernum-1].troops, p->troops);
        notify(Playernum, Governor, temp);
-       sprintf(temp, "%d Total Resource Deposits     Tax rate %u%%  New %u%%\n",
+       sprintf(temp, "%ld Total Resource Deposits     Tax rate %u%%  New %u%%\n",
 	       p->total_resources, p->info[Playernum-1].tax,
 	       p->info[Playernum-1].newtax);
        notify(Playernum, Governor, temp);

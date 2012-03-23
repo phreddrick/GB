@@ -56,7 +56,7 @@ sprintf(buf, "%-4.4s %-15.15s %8s\n",
 notify(Playernum, Governor, buf);
 for (i = 0; i < count; i++) {
     if (god)
-	sprintf(buf, "%2d %c [%2d] %-15.15s %5d  %6.2f %3d %s %s\n",
+	sprintf(buf, "%2d %c [%2d] %-15.15s %5ld  %6.2f %3d %s %s\n",
 		i+1, vic[i].Thing ? 'M' : ' ', vic[i].racenum,
 		vic[i].name, vic[i].rawscore,
 		vic[i].tech, vic[i].IQ, races[vic[i].racenum-1]->password,

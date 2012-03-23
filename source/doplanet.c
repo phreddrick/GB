@@ -404,15 +404,15 @@ for (i=1; i<=Num_races; i++) {
 		    planet->conditions[RTEMP], planet->conditions[TEMP]);
 	    strcat(telegram_buf, buf);
 	}
-	sprintf(buf, "Total      Prod: %dr %df %dd\n", prod_res[i-1],
+	sprintf(buf, "Total      Prod: %ldr %ldf %ldd\n", prod_res[i-1],
 		prod_fuel[i-1], prod_destruct[i-1]);
 	strcat(telegram_buf, buf);
 	if(prod_crystals[i-1]) {
-	    sprintf(buf, "    %d crystals found\n", prod_crystals[i-1]);
+	    sprintf(buf, "    %ld crystals found\n", prod_crystals[i-1]);
 	    strcat(telegram_buf, buf);
 	}
 	if(tot_captured) {
-	    sprintf(buf,"%d sectors captured\n", tot_captured);
+	    sprintf(buf,"%ld sectors captured\n", tot_captured);
 	    strcat(telegram_buf, buf);
 	}
 	if (Stars[starnum]->nova_stage) {
@@ -612,7 +612,7 @@ for (i=1; i<=Num_races; i++)
 	    s2->mass = s2->base_mass;
 	    s2->alive = 1;
 	    s2->active = 1;
-	    sprintf(s2->name,"Scum%04d",Num_ships);
+	    sprintf(s2->name,"Scum%04ld",Num_ships);
 
 	    insert_sh_plan(planet, s2);
 

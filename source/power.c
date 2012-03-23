@@ -139,7 +139,7 @@ if (argn == 3 && match(args[1], "player")) {
     notify(Playernum, Governor, buf);
     for(i=1; i<=n; i++)
 	if(Blocks[i-1].VPs) {
-	    sprintf(buf,"%2d %-19.19s%3d", i, Blocks[i-1].name, Power_blocks.members[i-1]);
+	    sprintf(buf,"%2d %-19.19s%3ld", i, Blocks[i-1].name, Power_blocks.members[i-1]);
 	    sprintf(temp, "%5s", Estimate_i((int)(Power_blocks.money[i-1]), Race, i));
 	    strcat(buf, temp);
 	    sprintf(temp, "%5s", Estimate_i((int)(Power_blocks.popn[i-1]), Race, i));

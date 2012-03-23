@@ -134,7 +134,7 @@ survey(int Playernum, int Governor, int APcount, int mode)
 			if (mode) {
 				if (all) {
 					sprintf(buf,
-						"%c %d %d %d %s %s %d %d %d %d %d %d %.2f %d\n",
+						"%c %d %d %d %s %s %d %d %d %ld %ld %d %.2f %d\n",
 						CSP_CLIENT, CSP_SURVEY_INTRO,
 						p->Maxx, p->Maxy, Stars[where.snum]->name,
 						Stars[where.snum]->pnames[where.pnum],
@@ -306,7 +306,7 @@ survey(int Playernum, int Governor, int APcount, int mode)
 				"Crystal sectors", crystal_count);
 			notify(Playernum, Governor, buf);
 			if (LIMITED_RESOURCES) {
-				sprintf(buf, "%29s: %d\n", "Total resource deposits",
+				sprintf(buf, "%29s: %ld\n", "Total resource deposits",
 					p->total_resources);
 				notify(Playernum, Governor, buf);
 			}
@@ -314,7 +314,7 @@ survey(int Playernum, int Governor, int APcount, int mode)
 				Race->Metamorph ? "biomass" : "popltn",
 				Race->Metamorph ? "biomass" : "popltn");
 			notify(Playernum, Governor, buf);
-			sprintf(buf, "%10lu  %14lu %9lu  %7lu%11lu\n",
+			sprintf(buf, "%10u  %14u %9u  %7lu%11lu\n",
 				p->info[Playernum - 1].fuel,
 				p->info[Playernum - 1].resource,
 				p->info[Playernum - 1].destruct,

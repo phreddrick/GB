@@ -598,7 +598,7 @@ void defend(int Playernum, int Governor, int APcount) /* planet vs ship */
   }
 
   if (damage < 0) {
-      sprintf(buf,"Target out of range  %.2f!\n", SYSTEMSIZE);
+      sprintf(buf,"Target out of range  %.2f!\n", (double)SYSTEMSIZE);
       notify(Playernum, Governor, buf);
       free(p);
       free(to);
