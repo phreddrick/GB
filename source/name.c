@@ -204,7 +204,8 @@ void bless(int Playernum, int Governor, int APcount)
     } else if (match(args[2],"planetpopulation")) {
 	planet->info[who-1].popn = atoi(args[3]);
 	planet->popn++;
-	sprintf(buf, "Deity set your population variable to %d at /%s/%s.\n",
+	sprintf(buf, "Deity set your population variable to %ld at /%s/%s.\n",
+		planet->popn,
 		Stars[Dir[Playernum-1][Governor].snum]->name,
 		Stars[Dir[Playernum-1][Governor].snum]->pnames[Dir[Playernum-1][Governor].pnum]);
     } else if (match(args[2],"inhabited")) {
