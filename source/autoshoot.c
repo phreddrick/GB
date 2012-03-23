@@ -6,6 +6,7 @@
  * Bombard() -- ship bombards planet
  */
 
+#include <stdlib.h>
 #include <string.h>
 #define EXTERN extern
 #include "vars.h"

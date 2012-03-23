@@ -8,6 +8,7 @@
 
 #define DISP_DATA 1
 
+#include <stdlib.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"

@@ -9,6 +9,7 @@
  *	Made mods to this prior, but forgot the header. :)
  *	Evan Koffler
  */
+#include <stdlib.h>
 #include <math.h>
 #include <strings.h>
 #include "GB_copyright.h"

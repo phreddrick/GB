@@ -7,7 +7,7 @@
  * 	Reformatted the 'make' command when at Factory scope.
  *	Evan Koffler
  */
-
+#include <stdlib.h>
 #include "GB_copyright.h"
 
 #include <math.h>

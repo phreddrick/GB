@@ -6,6 +6,7 @@
  * July 24th, 1989, John Deragon, cruz@cadman.nyu.edu
  */
 
+#include <stdlib.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"

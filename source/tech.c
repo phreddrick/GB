@@ -5,6 +5,7 @@
  * tech.c -- increase investment in technological development.
  */
 
+#include <stdlib.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"

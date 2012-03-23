@@ -9,6 +9,7 @@
  * prin_ship_orbits() -- prints place ship orbits
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include "GB_copyright.h"
 #define EXTERN extern

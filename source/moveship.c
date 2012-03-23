@@ -6,6 +6,7 @@
  *  moveship -- moves specified ship according to its orders.
  *	also deducts fuel from the ship's stores.
  */
+#include <stdlib.h>
 #include <math.h>
 #include <string.h>
 

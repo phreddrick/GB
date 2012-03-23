@@ -1,5 +1,6 @@
 #include <math.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "GB_copyright.h"
 #define EXTERN extern

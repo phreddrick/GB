@@ -6,6 +6,7 @@
  *  launch.c -- launch or undock a ship (also undock)
  */
 
+#include <stdlib.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"

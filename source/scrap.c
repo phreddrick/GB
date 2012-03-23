@@ -6,6 +6,7 @@
  * scrap.c -- turn a ship to junk
  */
 
+#include <stdlib.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"

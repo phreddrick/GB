@@ -6,6 +6,7 @@
  *  miscellaneous stuff included in the shell
  */
 
+#include <stdlib.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"

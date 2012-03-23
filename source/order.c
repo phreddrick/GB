@@ -6,6 +6,7 @@
  *  order.c -- give orders to ship
  */
 
+#include <stdlib.h>
 #include <curses.h>
 #include <ctype.h>
 #include <signal.h>

@@ -5,6 +5,7 @@
  *
  *  load.c -- load/unload stuff
  */
+#include <stdlib.h>
 #include <signal.h>
 #include <string.h>
 

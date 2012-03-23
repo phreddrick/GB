@@ -9,6 +9,7 @@
 *      You must also be in that system (and inhabiting) to receive announcements.
 * page.c -- send a message to a player requesting his presence in a system. 
 */
+#include <stdlib.h>
 #include <ctype.h>
 #include <signal.h>
 /*#include <strings.h>*/

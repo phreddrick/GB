@@ -6,6 +6,7 @@
  * toxicty.c -- change threshold in toxicity to build a wc.
  */
 
+#include <stdlib.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"

@@ -6,6 +6,7 @@
 **  move.c -- move population and assault aliens on target sector
 */
 
+#include <stdlib.h>
 #include <signal.h>
 #include <math.h>
 #include <string.h>

@@ -5,6 +5,7 @@
  * fire.c -- fire at ship or planet from ship or planet
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include "GB_copyright.h"
 #define EXTERN extern

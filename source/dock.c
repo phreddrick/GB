@@ -7,6 +7,7 @@
 **  and..... assault -- a very un-PC version of dock
 */
 
+#include <stdlib.h>
 #include "GB_copyright.h"
 #define EXTERN extern
 #include "vars.h"

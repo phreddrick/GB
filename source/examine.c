@@ -5,6 +5,7 @@
  *  examine -- check out an object
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include "GB_copyright.h"
 #define EXTERN extern
