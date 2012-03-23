@@ -14,8 +14,11 @@ main(argc,argv)
  char *argv[];
 {
     int pid;
-    
-    (void)sigblock(SIGHUP);	/* ignore signal when owner logs out */
+
+    sigset_t block;   
+    sigemptyset(&block);
+    sigaddset(&block, SIGHUP);
+    sigprocmask(SIG_BLOCK, &block, NULL);
 
     prog = *argv++;		/* remember guardian name */
     fprintf(stderr,"%s: ",prog);

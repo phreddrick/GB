@@ -81,7 +81,9 @@ main()
 {
   int x,y, or;
   int pnum,star=0,found=0,check,vacant,count,i,j,Playernum;
-  int ifd, mask,ppref = -1;
+  int ifd, ppref = -1;
+  sigset_t mask;
+  sigset_t block;
   int s, idx, k;
   char str[100], c;
   char racepass[MAXCOMMSTRSIZE], govpass[MAXCOMMSTRSIZE];
@@ -351,7 +353,14 @@ main()
   printf("Numraces = %d\n", Numraces());
   Playernum = Race->Playernum = Numraces() + 1;
   
-  mask = sigblock(SIGBLOCKS);
+  sigemptyset(&block);
+  sigaddset(&block, SIGHUP);
+  sigaddset(&block, SIGTERM);
+  sigaddset(&block, SIGINT);
+  sigaddset(&block, SIGQUIT);
+  sigaddset(&block, SIGSTOP);
+  sigaddset(&block, SIGTSTP);
+  sigprocmask(SIG_BLOCK, &block, &mask);
   /* build a capital ship to run the government */
   {
     shiptype s;
@@ -459,7 +468,7 @@ main()
   putstar(Stars[star],star);
   close_data_files();
 
-  sigsetmask(mask);
+  sigprocmask(SIG_SETMASK, &mask, NULL);
 
   printf("\nYou are player %d.\n\n",Playernum);
   printf("Your race has been created on sector %d,%d on\n",

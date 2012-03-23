@@ -65,8 +65,9 @@ void init_enroll()
  * Returns 0 if successfully enrolled, or 1 if failure. */
 int enroll_valid_race()
 {
-  int mask, x, y, star, pnum, i, ppref, Playernum ;
+  int x, y, star, pnum, i, ppref, Playernum ;
   int last_star_left, indirect[NUMSTARS] ;
+  sigset_t mask, block;
   sectortype *sect;
   planettype *planet;
   startype *star_arena;
@@ -248,7 +249,14 @@ int enroll_valid_race()
 
   Race->governors = 0;
   
-  mask = sigblock(SIGBLOCKS);
+  sigemptyset(&block);
+  sigaddset(&block, SIGHUP);
+  sigaddset(&block, SIGTERM);
+  sigaddset(&block, SIGINT);
+  sigaddset(&block, SIGQUIT);
+  sigaddset(&block, SIGSTOP);
+  sigaddset(&block, SIGTSTP);
+  sigprocmask(SIG_BLOCK, &block, &mask);
   /* build a capital ship to run the government */
   {
   shiptype s;
@@ -356,7 +364,7 @@ int enroll_valid_race()
   putstar(Stars[star],star);
   close_data_files();
 
-  sigsetmask(mask);
+  sigprocmask(SIG_SETMASK, &mask, NULL);
 
   printf("Player %d (%s) created on sector %d,%d on %s/%s.\n", Playernum, 
 	 race.name, x, y, Stars[star]->name, Stars[star]->pnames[pnum]);
