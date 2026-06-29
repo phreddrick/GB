@@ -1,0 +1,163 @@
+---
+# ConfigMap for Galactic Bloodshed configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gb-config
+  namespace: default
+data:
+  # Universe generation parameters
+  makeuniv-stars: "100"
+  makeuniv-minplanets: "3"
+  makeuniv-maxplanets: "10"
+
+---
+# Persistent Volume Claim for game data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gb-data-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# Deployment for GB server with init container
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gb-server
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gb-server
+  template:
+    metadata:
+      labels:
+        app: gb-server
+    spec:
+      # Init container: generate universe once
+      initContainers:
+      - name: makeuniv
+        image: gb:latest
+        imagePullPolicy: Never  # Use local image (change to Always for registry)
+        args:
+          - "makeuniv"
+          - "-s"
+          - "$(STARS)"
+          - "-l"
+          - "$(MIN_PLANETS)"
+          - "-m"
+          - "$(MAX_PLANETS)"
+          - "-db"
+          - "/data/gb.db"
+          - "-a"  # Auto-load star names
+          - "-b"  # Auto-load planet names
+        env:
+        - name: STARS
+          valueFrom:
+            configMapKeyRef:
+              name: gb-config
+              key: makeuniv-stars
+        - name: MIN_PLANETS
+          valueFrom:
+            configMapKeyRef:
+              name: gb-config
+              key: makeuniv-minplanets
+        - name: MAX_PLANETS
+          valueFrom:
+            configMapKeyRef:
+              name: gb-config
+              key: makeuniv-maxplanets
+        volumeMounts:
+        - name: data
+          mountPath: /data
+
+      # Main container: GB server
+      containers:
+      - name: gb-server
+        image: gb:latest
+        imagePullPolicy: Never  # Use local image (change to Always for registry)
+        command: ["gb-server"]
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: GB_DATA_PATH
+          value: "/data"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /enroll
+            port: http
+          initialDelaySeconds: 2
+          periodSeconds: 5
+        # Resource limits
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: gb-data-pvc
+      
+      # Pod restart policy
+      restartPolicy: Always
+
+---
+# Service to expose GB server
+apiVersion: v1
+kind: Service
+metadata:
+  name: gb-server
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: gb-server
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+
+---
+# Optional: Ingress for HTTP access (if ingress controller is available)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gb-server
+  namespace: default
+spec:
+  rules:
+  - host: gb.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: gb-server
+            port:
+              number: 8080

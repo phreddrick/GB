@@ -1,0 +1,62 @@
+# Ignore version control
+.git
+.gitignore
+
+# Ignore build artifacts
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.exe~
+
+# Ignore dependency directories
+vendor/
+node_modules/
+
+# Ignore IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore data and temporary files
+Data/
+data/
+*.db
+*.db-journal
+*.log
+*.tmp
+
+# Ignore test files
+*_test.go
+**/test/
+
+# Ignore all documentation (not needed in container)
+*.md
+CLAUDE.md
+README.md
+KUBERNETES.md
+
+# Ignore C source code (only need Go binaries)
+source/
+**/*.c
+**/*.p
+**/*.h
+
+# Ignore reference materials
+reference/
+
+# Ignore CI/CD config
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Ignore Kubernetes manifests (build doesn't need them)
+k8s-deployment.yaml
+
+# Ignore any config files that might contain secrets
+*.env
+.env*
+secrets/
