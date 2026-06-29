@@ -8,7 +8,7 @@ package config
 type Config struct {
 	// --- Server networking ---
 	Host    string `json:"host"`
-	Port    int    `json:"port"`    // HTTP/WebSocket port
+	Port    int    `json:"port"`     // HTTP/WebSocket port
 	TLSCert string `json:"tls_cert"` // path to TLS cert file (empty = no TLS)
 	TLSKey  string `json:"tls_key"`
 
@@ -19,10 +19,10 @@ type Config struct {
 	DBPath string `json:"db_path"` // path to bbolt database file
 
 	// --- Data directories ---
-	DataDir  string `json:"data_dir"`  // game data root
-	DocsDir  string `json:"docs_dir"`  // help / docs files
-	TeleDir  string `json:"tele_dir"`  // telegram directory
-	NewsDir  string `json:"news_dir"`  // news files
+	DataDir string `json:"data_dir"` // game data root
+	DocsDir string `json:"docs_dir"` // help / docs files
+	TeleDir string `json:"tele_dir"` // telegram directory
+	NewsDir string `json:"news_dir"` // news files
 
 	// --- Command rate limiting ---
 	CommandTimeMSec  int `json:"command_time_msec"`  // time slice length in ms
@@ -31,50 +31,50 @@ type Config struct {
 	DisconnectTime   int `json:"disconnect_time"`    // max idle seconds before disconnect
 
 	// --- Timing ---
-	DefaultUpdateMinutes      int `json:"default_update_minutes"`       // minutes between full updates
-	DefaultRandomUpdateRange  int `json:"default_random_update_range"`  // random variation in minutes
+	DefaultUpdateMinutes      int `json:"default_update_minutes"`      // minutes between full updates
+	DefaultRandomUpdateRange  int `json:"default_random_update_range"` // random variation in minutes
 	DefaultRandomSegmentRange int `json:"default_random_segment_range"`
 	MovesPerUpdate            int `json:"moves_per_update"` // movement segments per update
 
 	// --- Feature flags (replaces #define in config.h) ---
-	Market        bool `json:"market"`         // commodity market system
-	Victory       bool `json:"victory"`        // victory conditions
-	Defense       bool `json:"defense"`        // planetary gun emplacements
-	Voting        bool `json:"voting"`         // player voting
-	Dissolve      bool `json:"dissolve"`       // allow races to dissolve
-	Monitor       bool `json:"monitor"`        // deity can monitor messages
-	ExternalTrigger  bool   `json:"external_trigger"`   // password-triggered updates
-	UpdatePassword   string `json:"update_password"`    // password for TriggerUpdate
-	SegmentPassword  string `json:"segment_password"`   // password for TriggerSegment
-	AccessCheck   bool `json:"access_check"`   // address authorization
-	Nomads        bool `json:"nomads"`         // nomad race rules
-	PodTerraform  bool `json:"pod_terraform"`  // pods terraform on infection
-	ShowCowards   bool `json:"show_cowards"`   // show invisible player count
+	Market          bool   `json:"market"`           // commodity market system
+	Victory         bool   `json:"victory"`          // victory conditions
+	Defense         bool   `json:"defense"`          // planetary gun emplacements
+	Voting          bool   `json:"voting"`           // player voting
+	Dissolve        bool   `json:"dissolve"`         // allow races to dissolve
+	Monitor         bool   `json:"monitor"`          // deity can monitor messages
+	ExternalTrigger bool   `json:"external_trigger"` // password-triggered updates
+	UpdatePassword  string `json:"update_password"`  // password for TriggerUpdate
+	SegmentPassword string `json:"segment_password"` // password for TriggerSegment
+	AccessCheck     bool   `json:"access_check"`     // address authorization
+	Nomads          bool   `json:"nomads"`           // nomad race rules
+	PodTerraform    bool   `json:"pod_terraform"`    // pods terraform on infection
+	ShowCowards     bool   `json:"show_cowards"`     // show invisible player count
 
 	// --- Game balance (from tweakables.h) ---
-	MoveFactor          float64 `json:"move_factor"`
-	LimitAPs            int     `json:"limit_aps"`        // max APs a player can have
-	MaxCommStrSize      int     `json:"max_comm_str_size"`
-	CommandSize         int     `json:"command_size"`
-	MaxArgs             int     `json:"max_args"`
-	LoginNameSize       int     `json:"login_name_size"`
-	NumTimesToWaitLock  int     `json:"num_times_to_wait_lock"`
+	MoveFactor         float64 `json:"move_factor"`
+	LimitAPs           int     `json:"limit_aps"` // max APs a player can have
+	MaxCommStrSize     int     `json:"max_comm_str_size"`
+	CommandSize        int     `json:"command_size"`
+	MaxArgs            int     `json:"max_args"`
+	LoginNameSize      int     `json:"login_name_size"`
+	NumTimesToWaitLock int     `json:"num_times_to_wait_lock"`
 
 	// Map / planet dimensions
-	UnivSize   float64 `json:"univ_size"`
-	SystemSize float64 `json:"system_size"`
+	UnivSize    float64 `json:"univ_size"`
+	SystemSize  float64 `json:"system_size"`
 	PLOrbitSize float64 `json:"pl_orbit_size"`
-	MaxSectPopn int    `json:"max_sect_popn"`
-	ToxMax      int    `json:"tox_max"`
+	MaxSectPopn int     `json:"max_sect_popn"`
+	ToxMax      int     `json:"tox_max"`
 
 	// Ship physics — mass contributions
-	MassFuel      float64 `json:"mass_fuel"`
-	MassResource  float64 `json:"mass_resource"`
-	MassDestruct  float64 `json:"mass_destruct"`
-	MassArmor     float64 `json:"mass_armor"`
-	MassSize      float64 `json:"mass_size"`
-	MassHanger    float64 `json:"mass_hanger"`
-	MassGuns      float64 `json:"mass_guns"`
+	MassFuel     float64 `json:"mass_fuel"`
+	MassResource float64 `json:"mass_resource"`
+	MassDestruct float64 `json:"mass_destruct"`
+	MassArmor    float64 `json:"mass_armor"`
+	MassSize     float64 `json:"mass_size"`
+	MassHanger   float64 `json:"mass_hanger"`
+	MassGuns     float64 `json:"mass_guns"`
 
 	// Ship build sizing — SIZE_* constants from tweakables.h
 	SizeGuns     float64 `json:"size_guns"`
@@ -94,37 +94,37 @@ type Config struct {
 	HabitatPopRate     float64 `json:"habitat_pop_rate"`
 
 	// Combat
-	SectorDamage       float64 `json:"sector_damage"`
-	ShipDamage         float64 `json:"ship_damage"`
-	FactorDamage       float64 `json:"factor_damage"`
-	FactorDestPlanet   float64 `json:"factor_dest_planet"`
-	PlanFireLim        int     `json:"plan_fire_lim"`
-	MechAttack         float64 `json:"mech_attack"`
+	SectorDamage     float64 `json:"sector_damage"`
+	ShipDamage       float64 `json:"ship_damage"`
+	FactorDamage     float64 `json:"factor_damage"`
+	FactorDestPlanet float64 `json:"factor_dest_planet"`
+	PlanFireLim      int     `json:"plan_fire_lim"`
+	MechAttack       float64 `json:"mech_attack"`
 
 	// Navigation / movement
-	FuelUse             float64 `json:"fuel_use"`
-	HyperDriveFuelUse   float64 `json:"hyper_drive_fuel_use"`
-	HyperDistFactor     float64 `json:"hyper_dist_factor"`
-	HyperDriveReadyCharge int   `json:"hyper_drive_ready_charge"`
-	LaunchGravMassFactor float64 `json:"launch_grav_mass_factor"`
-	LandGravMassFactor  float64 `json:"land_grav_mass_factor"`
-	FuelGasAdd          float64 `json:"fuel_gas_add"`
-	FuelGasAddTanker    float64 `json:"fuel_gas_add_tanker"`
-	FuelGasAddHabitat   float64 `json:"fuel_gas_add_habitat"`
-	FuelGasAddStation   float64 `json:"fuel_gas_add_station"`
-	DistToLand          float64 `json:"dist_to_land"`
-	DistToDock          float64 `json:"dist_to_dock"`
-	StrikeDistanceFactor float64 `json:"strike_distance_factor"`
-	ComplexityFactor    float64 `json:"complexity_factor"`
-	GravFactor          float64 `json:"grav_factor"`
-	PlanetGravConst     float64 `json:"planet_grav_const"`
-	SystemGravConst     float64 `json:"system_grav_const"`
+	FuelUse               float64 `json:"fuel_use"`
+	HyperDriveFuelUse     float64 `json:"hyper_drive_fuel_use"`
+	HyperDistFactor       float64 `json:"hyper_dist_factor"`
+	HyperDriveReadyCharge int     `json:"hyper_drive_ready_charge"`
+	LaunchGravMassFactor  float64 `json:"launch_grav_mass_factor"`
+	LandGravMassFactor    float64 `json:"land_grav_mass_factor"`
+	FuelGasAdd            float64 `json:"fuel_gas_add"`
+	FuelGasAddTanker      float64 `json:"fuel_gas_add_tanker"`
+	FuelGasAddHabitat     float64 `json:"fuel_gas_add_habitat"`
+	FuelGasAddStation     float64 `json:"fuel_gas_add_station"`
+	DistToLand            float64 `json:"dist_to_land"`
+	DistToDock            float64 `json:"dist_to_dock"`
+	StrikeDistanceFactor  float64 `json:"strike_distance_factor"`
+	ComplexityFactor      float64 `json:"complexity_factor"`
+	GravFactor            float64 `json:"grav_factor"`
+	PlanetGravConst       float64 `json:"planet_grav_const"`
+	SystemGravConst       float64 `json:"system_grav_const"`
 
 	// Tech
-	TechInvest float64 `json:"tech_invest"`
-	TechScale  float64 `json:"tech_scale"`
-	TechSeeStability int `json:"tech_see_stability"`
-	TechExplore int      `json:"tech_explore"`
+	TechInvest       float64 `json:"tech_invest"`
+	TechScale        float64 `json:"tech_scale"`
+	TechSeeStability int     `json:"tech_see_stability"`
+	TechExplore      int     `json:"tech_explore"`
 
 	// Population movement
 	PopnMoveScale1 int     `json:"popn_move_scale_1"`
@@ -132,13 +132,13 @@ type Config struct {
 	ShipMoveScale  float64 `json:"ship_move_scale"`
 
 	// Terraforming / environment
-	FuelCostTerra   float64 `json:"fuel_cost_terra"`
-	FuelCostQuarry  float64 `json:"fuel_cost_quarry"`
-	FuelCostPlow    float64 `json:"fuel_cost_plow"`
-	ResCostDome     float64 `json:"res_cost_dome"`
-	ResCostWPlant   float64 `json:"res_cost_wplant"`
-	FuelCostWPlant  float64 `json:"fuel_cost_wplant"`
-	EnvirDamageTox  int     `json:"envir_damage_tox"`
+	FuelCostTerra     float64 `json:"fuel_cost_terra"`
+	FuelCostQuarry    float64 `json:"fuel_cost_quarry"`
+	FuelCostPlow      float64 `json:"fuel_cost_plow"`
+	ResCostDome       float64 `json:"res_cost_dome"`
+	ResCostWPlant     float64 `json:"res_cost_wplant"`
+	FuelCostWPlant    float64 `json:"fuel_cost_wplant"`
+	EnvirDamageTox    int     `json:"envir_damage_tox"`
 	ResourceDepletion float64 `json:"resource_depletion"`
 
 	// Troops / mobilization
@@ -154,28 +154,45 @@ type Config struct {
 	NaturalRepair    int     `json:"natural_repair"`
 
 	// Misc
-	VNResTake      float64 `json:"vn_res_take"`
-	APFactor       float64 `json:"ap_factor"`
-	Dissipate      int     `json:"dissipate"`
-	PodThreshold   int     `json:"pod_threshold"`
-	PodDecay       int     `json:"pod_decay"`
-	SporeSuccessRate int   `json:"spore_success_rate"`
-	MaxGovernors   int     `json:"max_governors"`
-	MesoPopScale   float64 `json:"meso_pop_scale"`
-	IncomeFactor   float64 `json:"income_factor"`
-	InsurgFactor   float64 `json:"insurg_factor"`
-	MerchantLength float64 `json:"merchant_length"`
+	VNResTake        float64 `json:"vn_res_take"`
+	APFactor         float64 `json:"ap_factor"`
+	Dissipate        int     `json:"dissipate"`
+	PodThreshold     int     `json:"pod_threshold"`
+	PodDecay         int     `json:"pod_decay"`
+	SporeSuccessRate int     `json:"spore_success_rate"`
+	MaxGovernors     int     `json:"max_governors"`
+	MesoPopScale     float64 `json:"meso_pop_scale"`
+	IncomeFactor     float64 `json:"income_factor"`
+	InsurgFactor     float64 `json:"insurg_factor"`
+	MerchantLength   float64 `json:"merchant_length"`
+
+	// Planet map dimensions
+	MaxX    int     `json:"max_x"`    // planet grid width
+	MaxY    int     `json:"max_y"`    // planet grid height
+	RatioXY float64 `json:"ratio_xy"` // map aspect ratio (x to y)
 
 	// Victory
 	VictoryPercent int `json:"victory_percent"`
 	VictoryUpdates int `json:"victory_updates"`
+	// Victory point weights (from tweakables.h VICT_* constants)
+	VictSect    int     `json:"vict_sect"`    // sector victory weight
+	VictShip    int     `json:"vict_ship"`    // ship victory weight
+	VictTech    float64 `json:"vict_tech"`    // tech victory weight
+	VictMorale  int     `json:"vict_morale"`  // morale victory weight
+	VictRes     int     `json:"vict_res"`     // resource victory weight
+	VictFuel    int     `json:"vict_fuel"`    // fuel victory weight
+	VictMoney   int     `json:"vict_money"`   // money victory weight
+	VictDivisor int     `json:"vict_divisor"` // total divisor for victory calculation
+
+	// Commodity market
+	UpBid float64 `json:"up_bid"` // bid increment for market
 
 	// Telegram
-	AutoTelegSize  int     `json:"auto_teleg_size"`
-	TelegTransRPCost int   `json:"teleg_trans_rp_cost"`
-	TelegTransAmt  float64 `json:"teleg_trans_amt"`
-	TelegLetters   int     `json:"teleg_letters"`
-	TelegMaxAuto   int     `json:"teleg_max_auto"`
+	AutoTelegSize    int     `json:"auto_teleg_size"`
+	TelegTransRPCost int     `json:"teleg_trans_rp_cost"`
+	TelegTransAmt    float64 `json:"teleg_trans_amt"`
+	TelegLetters     int     `json:"teleg_letters"`
+	TelegMaxAuto     int     `json:"teleg_max_auto"`
 
 	// Universe generation
 	CreatUnivIterat int `json:"creat_univ_iterat"`
@@ -184,14 +201,14 @@ type Config struct {
 // Default returns a Config pre-filled with the original tweakables.h values.
 func Default() *Config {
 	return &Config{
-		Host:    "localhost",
-		Port:    8080,
+		Host:      "localhost",
+		Port:      8080,
 		JWTSecret: "change-me-in-production",
-		DBPath:  "./gb.db",
-		DataDir: "./Data",
-		DocsDir: "./Docs",
-		TeleDir: "./Tele",
-		NewsDir: "./News",
+		DBPath:    "./gb.db",
+		DataDir:   "./Data",
+		DocsDir:   "./Docs",
+		TeleDir:   "./Tele",
+		NewsDir:   "./News",
 
 		CommandTimeMSec:  250,
 		CommandsPerTime:  1,
@@ -208,13 +225,13 @@ func Default() *Config {
 		Voting:  true,
 		Monitor: true,
 
-		MoveFactor:          1,
-		LimitAPs:            255,
-		MaxCommStrSize:      250,
-		CommandSize:         42,
-		MaxArgs:             256,
-		LoginNameSize:       64,
-		NumTimesToWaitLock:  200,
+		MoveFactor:         1,
+		LimitAPs:           255,
+		MaxCommStrSize:     250,
+		CommandSize:        42,
+		MaxArgs:            256,
+		LoginNameSize:      64,
+		NumTimesToWaitLock: 200,
 
 		UnivSize:    150000,
 		SystemSize:  2000,
@@ -252,9 +269,9 @@ func Default() *Config {
 		PlanFireLim:      20,
 		MechAttack:       3.0,
 
-		FuelUse:              0.02,
-		HyperDriveFuelUse:    5.0,
-		HyperDistFactor:      200.0,
+		FuelUse:               0.02,
+		HyperDriveFuelUse:     5.0,
+		HyperDistFactor:       200.0,
 		HyperDriveReadyCharge: 1,
 		LaunchGravMassFactor:  0.18,
 		LandGravMassFactor:    0.0145,
@@ -297,20 +314,34 @@ func Default() *Config {
 		SectorRepairCost: 10,
 		NaturalRepair:    5,
 
-		VNResTake:    0.5,
-		APFactor:     50.0,
-		Dissipate:    80,
-		PodThreshold: 18,
-		PodDecay:     4,
+		VNResTake:        0.5,
+		APFactor:         50.0,
+		Dissipate:        80,
+		PodThreshold:     18,
+		PodDecay:         4,
 		SporeSuccessRate: 25,
-		MaxGovernors: 5,
-		MesoPopScale: 20000.0,
-		IncomeFactor: 0.002,
-		InsurgFactor: 1,
-		MerchantLength: 200000.0,
+		MaxGovernors:     5,
+		MesoPopScale:     20000.0,
+		IncomeFactor:     0.002,
+		InsurgFactor:     1,
+		MerchantLength:   200000.0,
+
+		MaxX:    45,
+		MaxY:    19,
+		RatioXY: 3.70,
 
 		VictoryPercent: 10,
 		VictoryUpdates: 5,
+		VictSect:       1000,
+		VictShip:       333,
+		VictTech:       0.10,
+		VictMorale:     200,
+		VictRes:        100,
+		VictFuel:       15,
+		VictMoney:      5,
+		VictDivisor:    10000,
+
+		UpBid: 0.10,
 
 		AutoTelegSize:    2000,
 		TelegTransRPCost: 5,

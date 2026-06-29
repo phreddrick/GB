@@ -42,17 +42,17 @@ import (
 // --- Cost constants (from tweakables.h) ---
 
 const (
-	gunCost    = 1.00
-	crewCost   = 0.05
-	cargoCost  = 0.05
+	gunCost     = 1.00
+	crewCost    = 0.05
+	cargoCost   = 0.05
 	fuelCostBld = 0.05 // building fuel cost per unit
-	ammoCost   = 0.05
-	speedCost  = 0.50
-	cewCost    = 0.003
-	armorCost  = 3.50
-	hangerCost = 0.50
+	ammoCost    = 0.05
+	speedCost   = 0.50
+	cewCost     = 0.003
+	armorCost   = 3.50
+	hangerCost  = 0.50
 
-	upBid          = 0.10  // minimum bid increment fraction
+	// upBid is now loaded from config.UpBid (was hardcoded to 0.10)
 	merchantLength = 200000.0
 )
 
@@ -2022,7 +2022,7 @@ func (s *State) cmdBid(p, g int, args []string, sess net.Responder) {
 		return
 	}
 
-	minbid := int(float64(c.Bid) * (1.0 + upBid))
+	minbid := int(float64(c.Bid) * (1.0 + s.cfg.UpBid))
 	if bid0 < minbid {
 		sess.Send(fmt.Sprintf("You have to bid more than %d.\n", minbid))
 		return
