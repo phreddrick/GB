@@ -1,0 +1,49 @@
+# Binaries
+gb-server
+gb-client
+makeuniv
+racegen
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Configuration files (user-specific)
+config.json
+
+# Generated data files
+*.db
+*.db-wal
+*.db-shm
+Data/
+data/
+Tele/
+tele/
+News/
+news/
+Docs/
+docs/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+
+# Go-specific
+vendor/
+go.sum.bak
+*.go~
+
+# Build artifacts
+dist/
+build/
+bin/
+
+# Temporary files
+*.tmp
+*.bak
+*.log
