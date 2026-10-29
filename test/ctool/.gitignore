@@ -1,0 +1,3 @@
+# build outputs of the golden fixture generator
+obj/
+gb_golden

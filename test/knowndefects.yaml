@@ -1,0 +1,59 @@
+# Known-defect inventory (expected failures) for the Go port.
+#
+# Policy: docs/testing/known-defects.md. Parsed by go/internal/testutil
+# (restricted YAML: a list of flat key/value mappings, full-line comments).
+#
+# A listed case that FAILS is reported as XFAIL and does not break the build.
+# A listed case that PASSES is reported as XPASS and FAILS the build: remove
+# the entry. An unlisted failure FAILS the build. Nothing is skipped.
+#
+# Fields: id (unique), test (Go test name, or untested: true), package (Go
+# package under go/ whose tests own the entry and validate it in TestMain),
+# expected (CSV of the divergent cases: case,go), finding
+# (code-review id CR-nn, or GD-nn for defects found by the golden tests and
+# described in known-defects.md), reason, phase_to_fix, since (date added).
+
+- id: golden/planet_guns
+  test: TestGolden/planet_guns
+  package: internal/game
+  expected: test/golden/expected/planet_guns.csv
+  finding: CR-26
+  reason: planetGuns returns mob/5 capped at 255; C planet_guns returns MIN(20, points/1000)
+  phase_to_fix: 3c
+  since: 2026-10-28
+
+- id: combat/cew-strength-multiplier
+  test: TestCEWCallSite
+  package: internal/game
+  expected: test/golden/expected/cew_strength_multiplier.csv
+  finding: CR-27
+  reason: shootShipToShip sets hits = cewHit(...) where C shoot_ship_to_ship uses strength*CEW_hit(...); exercised deterministically at the call site in radiation mode (dose equals hits); the reference is the C formula, not a generated fixture
+  phase_to_fix: 3c
+  since: 2026-10-28
+
+- id: golden/compatibility
+  test: TestGolden/compatibility
+  package: internal/game
+  expected: test/golden/expected/compatibility.csv
+  finding: GD-01
+  reason: C stores the temperature term in an int (max.c, reg int add; add = 0.1*(planet TEMP - race TEMP)), truncating it; Go keeps it as a float, so compatibility differs whenever the temperature difference is not a multiple of 10
+  phase_to_fix: 3c
+  since: 2026-10-28
+
+- id: golden/ground_attack/astrength
+  test: TestGolden/ground_attack
+  package: internal/game
+  expected: test/golden/expected/ground_attack.astrength.csv
+  finding: GD-02
+  reason: morale_factor divides by the literal 3.14159565 in C (shlmisc.c, not pi); Go uses math.Pi, so strengths differ by about 2e-6 relative; keeping the corrected constant is a parity-policy decision for ADR-0012
+  phase_to_fix: 3d
+  since: 2026-10-28
+
+- id: golden/ground_attack/dstrength
+  test: TestGolden/ground_attack
+  package: internal/game
+  expected: test/golden/expected/ground_attack.dstrength.csv
+  finding: GD-02
+  reason: same cause as golden/ground_attack/astrength (morale_factor constant)
+  phase_to_fix: 3d
+  since: 2026-10-28
