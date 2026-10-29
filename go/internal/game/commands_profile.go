@@ -8,8 +8,8 @@ import (
 	"math"
 	"strings"
 
-	"github.com/gbgame/gb/internal/model"
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 // ---- cmdToggle -----------------------------------------------------------

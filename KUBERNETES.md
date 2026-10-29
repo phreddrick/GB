@@ -1,3 +1,5 @@
+> **Superseded (2026-10-28).** This guide and `k8s-deployment.yaml` do not work as written: the liveness probe path returns 404, the init container regenerates the universe on every pod start, and the server ignores the data-path variable the manifest sets (`docs/architecture/go-code-review.md`, CR-02, CR-05, CR-06). The supported deployment design is in `docs/architecture/microservices-migration-plan.md` (sections 11 and 12, implemented from Phase 2). Nothing below should be applied to a cluster.
+
 # Kubernetes Deployment Guide for Galactic Bloodshed
 
 ## Overview

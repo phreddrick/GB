@@ -1,0 +1,150 @@
+# Phase 0 CI for the GB Go port (migration plan section 21, PR-B).
+#
+# Strict gates: build, gofmt, go vet, go mod verify/tidy, go test, go test -race,
+# golden fixture reproducibility, golden mutation self-checks, inventory
+# reconciliation against the tests that actually executed, govulncheck, Docker
+# build from the checkout. Baselined gate: golangci-lint findings are compared
+# with the committed baseline by tools/lintdiff (file, linter, message, enclosing
+# declaration and source fingerprint; new and stale findings both fail).
+# Changes to the expected-failure allowances and to the gate tooling need the
+# labels known-defect-added and gate-change-reviewed, applied to the pull
+# request by the repository's sole maintainer as explicit acknowledgments (not
+# independent reviews); label add/remove re-runs the workflow. Pushes to master
+# run technical validation only: the acknowledgment gate applies to pull
+# requests, and merging without one relies on branch protection (UNVERIFIED;
+# docs/testing/known-defects.md). Commit messages are never an acknowledgment.
+# No deployment, no image push, no cluster access, read-only permissions.
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+env:
+  # The reviewed, patched toolchain used for build, tests, race tests and the
+  # vulnerability scan. go.mod keeps `go 1.25.0` as the minimum language
+  # version and `toolchain go1.27.3` as the default toolchain; GOTOOLCHAIN=local
+  # forbids the Go command from switching toolchains silently in CI, so the
+  # scanned standard library is the one the binaries are built with.
+  GO_VERSION: "1.27.3"
+  GOTOOLCHAIN: local
+
+defaults:
+  run:
+    shell: bash # bash -eo pipefail: a failing command in a pipeline fails the step
+
+jobs:
+  go:
+    name: build, test, lint (fresh checkout)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the growth gate compares against the base revision
+
+      - name: Entry points are tracked (CR-01 guard)
+        run: |
+          test "$(git ls-files go/cmd | wc -l)" -eq 4 || { echo "expected 4 tracked files under go/cmd"; git ls-files go/cmd; exit 1; }
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache-dependency-path: go/go.sum
+
+      - name: Toolchain is the pinned one
+        working-directory: go
+        run: |
+          go version
+          go version | grep -q "go${GO_VERSION} " || { echo "unexpected toolchain"; exit 1; }
+          go env GOTOOLCHAIN
+
+      - name: go build
+        working-directory: go
+        run: go build ./...
+
+      - name: gofmt (strict)
+        working-directory: go
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - name: go vet (strict)
+        working-directory: go
+        run: go vet ./...
+
+      - name: go mod verify and tidy check
+        working-directory: go
+        run: |
+          go mod verify
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Golden fixtures reproduce from the C reference
+        working-directory: test/ctool
+        run: make check
+
+      - name: go test and inventory reconciliation (records of what actually executed)
+        env:
+          GB_TEST_SUMMARY: ${{ runner.temp }}/known-defects.txt
+          GB_INVENTORY_RECORDS: ${{ runner.temp }}/inventory-records
+        run: test/scripts/inventory-check.sh 2>&1 | tee "$RUNNER_TEMP/inventory.txt"
+
+      - name: go test -race
+        working-directory: go
+        run: go test -count=1 -race ./...
+
+      - name: Golden mutation self-checks (temporary copies)
+        run: test/scripts/golden-mutations.sh
+
+      - name: govulncheck (strict, same toolchain as the build)
+        working-directory: go
+        run: |
+          go version
+          go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+      - name: Lint gate (golangci-lint v2.15.0 report validated and compared with the baseline)
+        run: test/scripts/lint-gate.sh "$RUNNER_TEMP/lint.json" 2>&1 | tee "$RUNNER_TEMP/lintdiff.txt"
+
+      - name: Acknowledgment gate (pull requests only)
+        env:
+          # pull_request: the exact label names from the event payload as a JSON
+          # array; labeled/unlabeled events re-run this workflow. push: the
+          # script performs technical validation only (no label lookups, no API
+          # calls). Commit messages and trailers are never consulted.
+          PR_LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE_REV: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.sha }}
+        run: test/scripts/growth-gate.sh "$BASE_REV" 2>&1 | tee "$RUNNER_TEMP/growth.txt"
+
+      - name: Known-defect and lint summary
+        if: always()
+        run: |
+          {
+            echo "## Known-defect inventory (golden tests)"
+            echo '```'
+            cat "$RUNNER_TEMP/known-defects.txt" 2>/dev/null || echo "(summary not produced: tests did not reach the golden suite)"
+            echo '```'
+            echo "## Lint gate"
+            echo '```'
+            cat "$RUNNER_TEMP/lintdiff.txt" 2>/dev/null || echo "(lint gate did not run)"
+            echo '```'
+            echo "## Inventory reconciliation"
+            echo '```'
+            grep -E '^inventorycheck:' "$RUNNER_TEMP/inventory.txt" 2>/dev/null || echo "(inventory reconciliation did not run)"
+            echo '```'
+            echo "## Growth and tooling review gate"
+            echo '```'
+            cat "$RUNNER_TEMP/growth.txt" 2>/dev/null || echo "(growth gate did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  docker:
+    name: docker build from checkout (no push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the existing Dockerfile from tracked sources only
+        run: docker build --tag gb:ci .

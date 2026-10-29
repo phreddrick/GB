@@ -1,6 +1,8 @@
 # Galactic Bloodshed - Go Port
 
-A modernized port of the classic multi-player space strategy game **Galactic Bloodshed** to Go, featuring WebSocket networking, embedded database, and idiomatic Go architecture.
+A port of the classic multi-player space strategy game **Galactic Bloodshed** to Go, with WebSocket networking and an embedded (bbolt) database.
+
+> **Status (2026-10-28): incomplete and not playable.** This port builds and starts, but an independent review found that it cannot run a correct game: enrolled races have no home planet, ground assault never captures, combat damage is lost between turns, the admin update endpoint crashes the process, and the Kubernetes manifest in this repository would wipe the universe on every restart. 45 of the 109 original commands have no Go equivalent. See **`docs/architecture/go-code-review.md`** (findings `CR-nn`) and the modernization plan **`docs/architecture/microservices-migration-plan.md`** before relying on anything below. The earlier notes that described the port as finished and deployable are archived under `docs/archive/earlier-model-notes/` and are superseded.
 
 ## Quick Start
 
@@ -173,35 +175,17 @@ go build -ldflags="-s -w" ./cmd/gb-server
 
 ## Implementation Status
 
-The Go port is substantially complete. The following subsystems are **fully or near-fully implemented**:
+The honest status is in `docs/architecture/go-code-review.md` (sections 1, 4 and 5). In short:
 
-### Core Game Engine (100%)
-- ✅ Turn processing and game loop
-- ✅ **Economy/Production system** — sector production, population dynamics, resource aggregation
-- ✅ Ship processing (movement, fuel, damage)
-- ✅ Planet processing (orbital mechanics, toxicity, slavery)
+- **Builds, compiles cleanly, `go vet` clean.** Phase 0 of the migration plan added CI, golden parity tests against the C reference, and a known-defect inventory; see `docs/testing/`.
+- **Command coverage:** 62 verbs are dispatched; the C server has 109 reachable commands. The 45 missing ones include governors, money, power blocks, most reports, `assault`, `undock`, `repair` and the operator commands (review section 4.1). The dispatcher's prefix order also differs from C (`c` fires a CEW instead of changing scope, CR-40).
+- **Known-wrong game logic:** planetary guns (CR-26), CEW damage (CR-27), assault capture (CR-19), turn order and missing turn steps (CR-10 to CR-16), enrollment placement (CR-07), plus GD-01 and GD-02 found by the golden tests (`docs/testing/known-defects.md`).
+- **Persistence:** two sources of truth and non-atomic flushes (CR-11, CR-17, CR-18); a crash mid-flush can leave a mixed-turn database.
+- **Networking:** output is C-formatted text in WebSocket frames; there is **no structured JSON protocol** yet, the prompt is never sent (CR-42), and the default JWT secret is accepted (CR-35).
+- **Kubernetes:** `../KUBERNETES.md`, `../k8s-deployment.yaml` and the root `Dockerfile` are not usable as they stand (CR-01 to CR-06); the plan replaces them in Phase 2.
+- **Tests:** the golden parity suite (`internal/game/golden_test.go`, fixtures from `test/ctool`; ship-design rows cover `shipSize`, `getMass`, `shipCostFromDesign` and `complexityOf` only, not `getshipDefaults` or the whole `Shipdata` table), the CR-27 call-site test, and the tool tests under `tools/`. There are no behavioural, persistence or network tests yet (plan Phase 1 onward).
 
-### Player Commands (90%)
-- ✅ Build/upgrade/sell/bid system
-- ✅ Combat resolution and resolution system
-- ✅ CS (colony/sector) commands
-- ✅ Navigation commands (land, launch, scrap, capture)
-- ✅ Tech examination and declarations
-- ✅ Profile commands (toggle, name, max, survey, map, victory, RST, dock)
-- ✅ Order system (ship orders, routes, merchant shipping)
-- ✅ Telegram/messaging system
-- ✅ Fire/bombardment commands
-- ✅ Power/alliance system
-- ✅ Load/unload/transfer commands
-- ✅ Miscellaneous commands (capital, zoom, orbit, autoreport, mobilize, dissolve, enslave, fuel, analysis, explore)
-
-### Areas Needing Work (10%)
-- ⚠️ Some command stubs remain in `internal/game/commands.go`
-- ⚠️ Voting/democratic system incomplete
-- ⚠️ Advanced deity/admin commands
-- ⚠️ Some esoteric gameplay features from C version
-
-Refer to the C source under `source/` for reference during development.
+Refer to the C source under `source/` as the behavioural reference and to the plan's phases for what comes next. Do not add features before Phase 1's stabilisation work.
 
 ## Troubleshooting
 
@@ -233,9 +217,9 @@ ss -tulpn | grep :8080
 ## Resources
 
 - **Game Logic**: See `source/` directory for the original C implementation
-- **Protocol**: WebSocket messages use JSON encoding
+- **Protocol**: currently raw text frames over WebSocket (a structured JSON API is planned, see the migration plan section 6)
 - **Database Schema**: See `internal/db/keys.go` for bucket names and key structures
 
 ## Contributing
 
-Refer to `CLAUDE.md` in the root directory for detailed architecture and contribution guidelines.
+Refer to `CLAUDE.md` in the root directory for architecture notes, and to `docs/architecture/microservices-migration-plan.md` for the phase currently authorised for implementation. Run `make -C test/ctool check` and `go test ./...` before proposing a change.

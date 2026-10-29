@@ -15,7 +15,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/gbgame/gb/internal/model"
+	"github.com/phreddrick/GB/go/internal/model"
 )
 
 // ---- Helper types --------------------------------------------------------
@@ -1328,21 +1328,25 @@ func getMove(ch byte, x, y int, planet *model.Planet) (int, int, bool) {
 	// Direction characters: 1=SW, 2=S, 3=SE, 4=W, 6=E, 7=NW, 8=N, 9=NE
 	switch ch {
 	case '1':
-		x--; y++
+		x--
+		y++
 	case '2':
 		y++
 	case '3':
-		x++; y++
+		x++
+		y++
 	case '4':
 		x--
 	case '6':
 		x++
 	case '7':
-		x--; y--
+		x--
+		y--
 	case '8':
 		y--
 	case '9':
-		x++; y--
+		x++
+		y--
 	}
 	// Wrap x around planet
 	if x < 0 {

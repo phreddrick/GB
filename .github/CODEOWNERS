@@ -1,0 +1,14 @@
+# Informational ownership map for the Phase 0 review gates (single-maintainer
+# repository: no CODEOWNERS approval is required or possible, since GitHub does
+# not let an author approve their own pull request). Changes under these paths
+# are acknowledged by the maintainer through the gate-change-reviewed /
+# known-defect-added pull-request labels; see docs/testing/known-defects.md.
+/.github/                          @phreddrick
+/go/.golangci.yml                  @phreddrick
+/go/tools/                         @phreddrick
+/go/internal/testutil/             @phreddrick
+/test/scripts/                     @phreddrick
+/test/ctool/                       @phreddrick
+/test/knowndefects.yaml            @phreddrick
+/test/golden/expected/             @phreddrick
+/docs/testing/lint-baseline.txt    @phreddrick

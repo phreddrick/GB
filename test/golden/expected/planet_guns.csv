@@ -1,0 +1,17 @@
+case,go
+points=1000,200
+points=10000,255
+points=100000,255
+points=1001,200
+points=1275,255
+points=1275000,255
+points=1999,255
+points=19999,255
+points=2000,255
+points=20000,255
+points=20001,255
+points=4999,255
+points=5,1
+points=5000,255
+points=50000,255
+points=999,199

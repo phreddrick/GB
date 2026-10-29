@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/gbgame/gb/internal/model"
+	"github.com/phreddrick/GB/go/internal/model"
 )
 
 // ---- Sector defense values -------------------------------------------------

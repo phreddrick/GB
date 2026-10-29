@@ -114,20 +114,20 @@ type Ship struct {
 	Governor  uint8    `json:"governor"`
 	Name      string   `json:"name"`
 	Class     string   `json:"class"`
-	Race      uint8    `json:"race"`       // usually == Owner; differs after revolt
+	Race      uint8    `json:"race"` // usually == Owner; differs after revolt
 	Type      ShipType `json:"type"`
 	WhoKilled int16    `json:"who_killed"` // player who killed this ship
 
 	// Position
-	XPos float64 `json:"x_pos"`
-	YPos float64 `json:"y_pos"`
-	LandX uint8  `json:"land_x"`
-	LandY uint8  `json:"land_y"`
+	XPos  float64 `json:"x_pos"`
+	YPos  float64 `json:"y_pos"`
+	LandX uint8   `json:"land_x"`
+	LandY uint8   `json:"land_y"`
 
 	// Orbit / destination
-	StOrbits   uint8  `json:"st_orbits"`    // star number being orbited
-	PNumOrbits uint8  `json:"pnum_orbits"`  // planet number if orbiting
-	WhatOrbits uint8  `json:"what_orbits"`  // scope level of orbit
+	StOrbits   uint8  `json:"st_orbits"`   // star number being orbited
+	PNumOrbits uint8  `json:"pnum_orbits"` // planet number if orbiting
+	WhatOrbits uint8  `json:"what_orbits"` // scope level of orbit
 	DestStar   uint8  `json:"dest_star"`
 	DestPNum   uint8  `json:"dest_pnum"`
 	WhatDest   uint8  `json:"what_dest"`
@@ -138,16 +138,16 @@ type Ship struct {
 	Ships    uint32 `json:"ships"`     // first ship docked/landed here
 
 	// Physical stats
-	Fuel      float64 `json:"fuel"`
-	Mass      float64 `json:"mass"`
-	BaseMass  float64 `json:"base_mass"`
-	Tech      float64 `json:"tech"`
+	Fuel       float64 `json:"fuel"`
+	Mass       float64 `json:"mass"`
+	BaseMass   float64 `json:"base_mass"`
+	Tech       float64 `json:"tech"`
 	Complexity float64 `json:"complexity"`
-	Armor     uint8   `json:"armor"`
-	Size      uint16  `json:"size"`
-	Damage    uint8   `json:"damage"`
-	Rad       uint8   `json:"rad"`
-	Speed     uint8   `json:"speed"` // current travel speed 0–9
+	Armor      uint8   `json:"armor"`
+	Size       uint16  `json:"size"`
+	Damage     uint8   `json:"damage"`
+	Rad        uint8   `json:"rad"`
+	Speed      uint8   `json:"speed"` // current travel speed 0–9
 
 	// Capacities
 	MaxCrew     uint16 `json:"max_crew"`
@@ -159,19 +159,19 @@ type Ship struct {
 	Hanger      uint16 `json:"hanger"` // hanger space used
 
 	// Cargo
-	Destruct  uint16 `json:"destruct"`
-	Resource  uint16 `json:"resource"`
-	Popn      uint16 `json:"popn"`   // crew
-	Troops    uint16 `json:"troops"` // marines
-	Crystals  uint16 `json:"crystals"`
+	Destruct uint16 `json:"destruct"`
+	Resource uint16 `json:"resource"`
+	Popn     uint16 `json:"popn"`   // crew
+	Troops   uint16 `json:"troops"` // marines
+	Crystals uint16 `json:"crystals"`
 
 	// Weapons
-	Guns      uint8 `json:"guns"`      // active gun system (GunNone/Primary/Secondary)
-	Primary   uint8 `json:"primary"`   // primary gun strength
-	PrimType  uint8 `json:"prim_type"`
-	Secondary uint8 `json:"secondary"` // secondary gun strength
-	SecType   uint8 `json:"sec_type"`
-	Retaliate uint8 `json:"retaliate"`
+	Guns      uint8  `json:"guns"`    // active gun system (GunNone/Primary/Secondary)
+	Primary   uint8  `json:"primary"` // primary gun strength
+	PrimType  uint8  `json:"prim_type"`
+	Secondary uint8  `json:"secondary"` // secondary gun strength
+	SecType   uint8  `json:"sec_type"`
+	Retaliate uint8  `json:"retaliate"`
 	Target    uint16 `json:"target"`
 
 	// Build factory fields
@@ -179,9 +179,9 @@ type Ship struct {
 	BuildCost uint16 `json:"build_cost"`
 
 	// Special systems
-	Mount      uint8           `json:"mount"`       // has crystal mount
+	Mount      uint8           `json:"mount"` // has crystal mount
 	HyperDrive HyperDriveState `json:"hyper_drive"`
-	CEW        uint8           `json:"cew"`         // CEW strength
+	CEW        uint8           `json:"cew"` // CEW strength
 	CEWRange   uint16          `json:"cew_range"`
 	Cloak      uint8           `json:"cloak"`
 	Laser      uint8           `json:"laser"`
@@ -193,9 +193,9 @@ type Ship struct {
 	Alive    bool `json:"alive"`
 	Mode     bool `json:"mode"`
 	Bombard  bool `json:"bombard"`
-	Mounted  bool `json:"mounted"`  // crystal currently mounted
+	Mounted  bool `json:"mounted"` // crystal currently mounted
 	Cloaked  bool `json:"cloaked"`
-	Sheep    bool `json:"sheep"`    // under mind control
+	Sheep    bool `json:"sheep"` // under mind control
 	Docked   bool `json:"docked"`
 	Notified bool `json:"notified"`
 	Examined bool `json:"examined"`
@@ -252,9 +252,9 @@ func (s *Ship) Sight() bool {
 // Place represents a parsed location in the universe hierarchy.
 // Used as the return type for getplace() / cs.c.
 type Place struct {
-	StarNum  uint8
+	StarNum   uint8
 	PlanetNum uint8
-	ShipNo   uint32
-	Level    uint8
-	Err      bool
+	ShipNo    uint32
+	Level     uint8
+	Err       bool
 }

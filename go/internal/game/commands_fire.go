@@ -12,14 +12,15 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/gbgame/gb/internal/model"
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 // cmdFire fires one or more ships at a single target ship.
 //
 // Syntax: fire <ship-spec> <target#> [<strength>]
-//         cew  <ship-spec> <target#>          (CEW variant)
+//
+//	cew  <ship-spec> <target#>          (CEW variant)
 //
 // Mirrors fire() in fire.c.
 func (s *State) cmdFire(p, g int, args []string, sess net.Responder) {

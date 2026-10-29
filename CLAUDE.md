@@ -100,7 +100,10 @@ go build ./...          # build all commands
 go build ./cmd/gb-server   # main server binary
 go build ./cmd/makeuniv    # universe initializer
 go build ./cmd/racegen     # player enrollment
+go test ./...           # golden parity tests (fixtures in ../test/golden/testdata)
 ```
+
+The module path is `github.com/phreddrick/GB/go` (renamed in Phase 0 from `github.com/gbgame/gb`).
 
 ### Package Layout
 
@@ -126,15 +129,15 @@ go build ./cmd/racegen     # player enrollment
 
 ### Port Status
 
-The Go port is a **work in progress**. Many command handlers in `internal/game/commands.go` are stubs that return "not yet implemented". Implemented subsystems include:
+**Read `docs/architecture/go-code-review.md` and `docs/architecture/microservices-migration-plan.md` first.** The Go port is a **work in progress that is not yet a working game**: the independent review of 2026-10-27 found critical defects in enrollment (no home planet), ground combat (assault never captures), turn processing (ships processed after planets, combat damage discarded, market never settles), persistence (two sources of truth, non-atomic flush), the admin endpoint (process panic), and the deployment assets (universe regenerated on every restart). 62 verbs are dispatched versus 109 reachable C commands. Earlier notes claiming the port was finished and deployable are archived under `docs/archive/earlier-model-notes/` and are superseded.
 
-- Build / upgrade / sell / bid (`build.go`)
-- Combat resolution (`combat.go`)
-- CS (colony/sector) commands (`commands_cs.go`)
-- Navigation (`commands_nav.go`)
-- Tech / examine (`commands_tech.go`)
-- Profile commands (`commands_profile.go`)
-- Turn processing (`turn.go`)
-- Planet and ship processing (`planet.go`, `ship.go`)
+Work is organised by the migration plan's phases; only the phase the owner has authorised may be implemented. Phase 0 (foundation) added:
+
+- CI (`.github/workflows/ci.yml`): strict build, gofmt, vet, tests, race, govulncheck, Docker build; `golangci-lint` baselined against `docs/testing/lint-baseline.md` (new findings fail; the 1,132 pre-existing ones are documented, not hidden).
+- Golden parity tests: `test/ctool` compiles the unmodified C functions and writes `test/golden/testdata/*.csv`; `internal/game/golden_test.go` compares the Go functions. Regenerate with `make -C test/ctool fixtures`, verify with `make -C test/ctool check`.
+- Known-defect inventory: `test/knowndefects.yaml`, per-case expected divergences in `test/golden/expected/*.csv`, policy in `docs/testing/known-defects.md`. Every case is classified individually; an unexpected mismatch, a drifted divergence, an unexpected pass (XPASS) or a stale entry fails the build. Changes to the inventory, the expected files or the lint baseline need the pull-request label `known-defect-added`, and changes to the gate tooling need `gate-change-reviewed`; both are acknowledgments applied by the sole maintainer on the pull request, never inferred from commit messages; pushes run technical validation only (`test/scripts/growth-gate.sh`). Self-checks: `test/scripts/golden-mutations.sh`, `test/scripts/lint-gate-selftest.sh`, `test/scripts/gate-approval-selftest.sh`, `test/scripts/inventory-check.sh`.
+- ADRs under `docs/architecture/adr/`.
+
+Rules for agents working here: do not change game rules, the actor loop, persistence or networking outside the authorised phase; cite `CR-nn` / `GD-nn` ids; add inventory entries only with a finding; never modify `source/`.
 
 The C source under `source/` remains the authoritative reference for game logic during the port.

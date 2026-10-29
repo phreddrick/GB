@@ -1,0 +1,13 @@
+dist,cew_range,odds,hits,rng
+0,0,100,1,invariant
+20000,0,0,0,invariant
+1,1,100,1,invariant
+20000,1,0,0,invariant
+100,100,100,1,invariant
+20000,100,0,0,invariant
+250,250,100,1,invariant
+20000,250,0,0,invariant
+500,500,100,1,invariant
+20000,500,0,0,invariant
+1000,1000,100,1,invariant
+20000,1000,0,0,invariant

@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gbgame/gb/internal/model"
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 // shipMaxCrystals returns the maximum crystal cargo capacity of a ship.
@@ -109,8 +109,8 @@ func (s *State) doLoad(p, g int, args []string, sess net.Responder, unloadMode b
 		}
 
 		// Resolve transfer partner: planet or ship.
-		var sh bool    // ship-to-ship
-		var diff bool  // different owner
+		var sh bool   // ship-to-ship
+		var diff bool // different owner
 		var s2 *model.Ship
 		var planet *model.Planet
 

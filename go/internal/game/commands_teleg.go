@@ -11,17 +11,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gbgame/gb/internal/model"
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 // cmdTelegram sends a message to another player (or all players).
 //
 // Syntax (mirrors send_message in name.c):
-//   telegram <player#|name> <message...>
-//   telegram <player#> <governor#> <message...>
-//   telegram * <message...>      — broadcast to all races
-//   telegram star <starname> <message...> — stargram
+//
+//	telegram <player#|name> <message...>
+//	telegram <player#> <governor#> <message...>
+//	telegram * <message...>      — broadcast to all races
+//	telegram star <starname> <message...> — stargram
 //
 // The original C command is "send"; we expose it as "telegram" to match the
 // stub name, and also register "send" as an alias in the dispatch table.
@@ -174,9 +175,10 @@ func (s *State) cmdTelegram(p, g int, args []string, sess net.Responder) {
 // cmdRead displays pending telegrams and / or the news streams.
 //
 // Syntax (mirrors read_messages in name.c):
-//   read              — read pending telegrams (then clear them)
-//   read telegram     — same as above
-//   read news         — read all four news streams from last-read position
+//
+//	read              — read pending telegrams (then clear them)
+//	read telegram     — same as above
+//	read news         — read all four news streams from last-read position
 //
 // The governor's NewsPos cursor in the Race record is updated after reading
 // news so the player only sees new entries next time.
