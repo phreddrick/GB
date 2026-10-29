@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/gbgame/gb/internal/model"
+	"github.com/phreddrick/GB/go/internal/model"
 )
 
 // doUpdate performs a full game update (production, combat, etc.).
@@ -317,14 +317,14 @@ func (s *State) doTurn(update bool) {
 
 		// --- Victory score calculation ---
 		type victCalc struct {
-			numSects  int64
-			shipCost  int64
-			shipTech  int64
-			res       int64
-			des       int64
-			fuel      int64
-			money     int64
-			morale    int64
+			numSects int64
+			shipCost int64
+			shipTech int64
+			res      int64
+			des      int64
+			fuel     int64
+			money    int64
+			morale   int64
 		}
 		vcs := make([]victCalc, model.MaxPlayers)
 
@@ -404,8 +404,8 @@ func (s *State) doTurn(update bool) {
 
 		// --- Per-race post-update ---
 		const (
-			victoryPercent = 10  // from tweakables.h
-			victoryUpdates = 5   // from tweakables.h
+			victoryPercent = 10 // from tweakables.h
+			victoryUpdates = 5  // from tweakables.h
 			mesoPop        = 20000.0
 		)
 		for i := 0; i < len(s.races); i++ {
@@ -745,9 +745,9 @@ func (s *State) governed(r *model.Race) bool {
 // technology discoveries.  Corresponds to make_discoveries() in doturn.c.
 func (s *State) makeDiscoveries(r *model.Race) {
 	type discovery struct {
-		idx      int
-		techReq  float64
-		name     string
+		idx     int
+		techReq float64
+		name    string
 	}
 	discoveries := []discovery{
 		{model.DiscHyperDrive, model.TechHyperDrive, "HYPERDRIVE"},

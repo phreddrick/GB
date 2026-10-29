@@ -7,15 +7,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gbgame/gb/internal/model"
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 // cmdCS implements the "cs" (change scope) command.
 // Usage:
-//   cs              — return to default home scope
-//   cs <place>      — change to a new scope
-//   cs -d <place>   — set the default home scope
+//
+//	cs              — return to default home scope
+//	cs <place>      — change to a new scope
+//	cs -d <place>   — set the default home scope
 func (s *State) cmdCS(p, g int, args []string, sess net.Responder) {
 	race := s.raceByNum(p)
 	if race == nil {

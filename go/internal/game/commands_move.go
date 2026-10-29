@@ -17,8 +17,8 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/gbgame/gb/internal/model"
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 // afvFuelCost matches AFV_FUEL_COST in tweakables.h.
@@ -106,11 +106,11 @@ func groundAttack(
 
 	*astrength = float64(*people) * float64(race.Fighters) * attackMult *
 		(alikes + 1.0) * float64(def1+1) *
-		moraleFactor(float64(race.Morale - alien.Morale))
+		moraleFactor(float64(race.Morale-alien.Morale))
 
 	*dstrength = float64((int(*civ)+int(*mil)*10)*int(alien.Fighters)) *
 		(dlikes + 1.0) * float64(def2+1) *
-		moraleFactor(float64(alien.Morale - race.Morale))
+		moraleFactor(float64(alien.Morale-race.Morale))
 
 	casualtyScale := intMin(*people*int(race.Fighters)*int(attackMult),
 		(int(*civ)+int(*mil)*10)*int(alien.Fighters))
@@ -224,13 +224,13 @@ func (s *State) mechAttackPeople(
 		(float64(ship.Armor) + 1.0) *
 		0.01 * (100.0 - float64(ship.Damage)) *
 		0.01 * (float64(race.Likes[sect.Condition]) + 1.0) *
-		moraleFactor(float64(race.Morale - alien.Morale))
+		moraleFactor(float64(race.Morale-alien.Morale))
 
 	dstrength := float64(10*oldMil*int(alien.Fighters)+oldCiv) *
 		0.01 * float64(alien.Tech) *
 		0.01 * (float64(alien.Likes[sect.Condition]) + 1.0) *
 		(float64(defenseData[sect.Condition]) + 1.0) *
-		moraleFactor(float64(alien.Morale - race.Morale))
+		moraleFactor(float64(alien.Morale-race.Morale))
 
 	ammo := strength
 	if ignore {
@@ -288,13 +288,13 @@ func (s *State) peopleAttackMech(
 		(float64(ship.Armor) + 1.0) *
 		0.01 * (100.0 - float64(ship.Damage)) *
 		0.01 * (float64(alien.Likes[sect.Condition]) + 1.0) *
-		moraleFactor(float64(alien.Morale - race.Morale))
+		moraleFactor(float64(alien.Morale-race.Morale))
 
 	astrength := float64(10*mil*int(race.Fighters)+civ) *
 		0.01 * float64(race.Tech) *
 		0.01 * (float64(race.Likes[sect.Condition]) + 1.0) *
 		(float64(defenseData[sect.Condition]) + 1.0) *
-		moraleFactor(float64(race.Morale - alien.Morale))
+		moraleFactor(float64(race.Morale-alien.Morale))
 
 	ammo := int(math.Log10(astrength+1)) - 1
 	if ammo < 0 {

@@ -9,7 +9,7 @@ import (
 
 	bolt "go.etcd.io/bbolt"
 
-	"github.com/gbgame/gb/internal/model"
+	"github.com/phreddrick/GB/go/internal/model"
 )
 
 // Store is the game's database handle. All game state is persisted here.

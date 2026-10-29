@@ -33,8 +33,8 @@ type PlInfo struct {
 	TechInvest    uint16 `json:"tech_invest"`
 	NumSectsOwned uint16 `json:"num_sects_owned"`
 
-	ComRead  uint8 `json:"com_read"`  // combat readiness / mobilization
-	MobSet   uint8 `json:"mob_set"`   // mobilization target
+	ComRead   uint8 `json:"com_read"`   // combat readiness / mobilization
+	MobSet    uint8 `json:"mob_set"`    // mobilization target
 	ToxThresh uint8 `json:"tox_thresh"` // min toxicity to build waste container
 
 	Explored bool  `json:"explored"`
@@ -102,7 +102,7 @@ type Planet struct {
 	Sectors []Sector `json:"sectors"`
 
 	SlavedTo  uint8 `json:"slaved_to"`
-	Type      uint8 `json:"type"`       // PlanetEarth, PlanetMars, etc.
+	Type      uint8 `json:"type"` // PlanetEarth, PlanetMars, etc.
 	ExplTimer uint8 `json:"expl_timer"`
 	Explored  bool  `json:"explored"`
 }

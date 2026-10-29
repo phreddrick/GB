@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/gbgame/gb/internal/model"
+	"github.com/phreddrick/GB/go/internal/model"
 )
 
 // MoveConsts scales the movement amount per orbit level (univ, star, plan).
@@ -278,7 +278,7 @@ func (s *State) doShip(ship *model.Ship, update bool) {
 	if ship.WhatOrbits != model.LevelUniv {
 		star := s.stars[ship.StOrbits]
 		if star != nil && star.NovaStage > 0 {
-			dmg := 5 * int(star.NovaStage) / (int(ship.EffArmor(model.Shipdata))+1) / segments
+			dmg := 5 * int(star.NovaStage) / (int(ship.EffArmor(model.Shipdata)) + 1) / segments
 			ship.Damage += uint8(dmg)
 			if ship.Damage >= 100 {
 				s.killShip(int(ship.Owner), ship)
@@ -528,7 +528,7 @@ func (s *State) doMissile(ship *model.Ship) {
 		}
 		dist := math.Hypot(ship.XPos-target.XPos, ship.YPos-target.YPos)
 		threshold := float64(ship.Speed) * s.cfg.StrikeDistanceFactor *
-			(100.0-float64(ship.Damage)) / 100.0
+			(100.0 - float64(ship.Damage)) / 100.0
 		if dist <= threshold {
 			var longBuf, shortBuf string
 			s.shootShipToShip(ship, target, int(ship.Destruct), 0, 0,

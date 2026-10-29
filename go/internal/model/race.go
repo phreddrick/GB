@@ -3,39 +3,39 @@ package model
 // Toggle holds per-governor display/behavior toggles.
 // Corresponds to toggletype in races.h.
 type Toggle struct {
-	Invisible     bool `json:"invisible"`
-	Standby       bool `json:"standby"`
-	Color         bool `json:"color"`
-	Gag           bool `json:"gag"`
-	DoubleDigits  bool `json:"double_digits"`
-	Inverse       bool `json:"inverse"`
-	Geography     bool `json:"geography"`
-	AutoLoad      bool `json:"auto_load"`
-	Highlight     uint8 `json:"highlight"` // race number to highlight
-	Compat        bool `json:"compat"`
+	Invisible    bool  `json:"invisible"`
+	Standby      bool  `json:"standby"`
+	Color        bool  `json:"color"`
+	Gag          bool  `json:"gag"`
+	DoubleDigits bool  `json:"double_digits"`
+	Inverse      bool  `json:"inverse"`
+	Geography    bool  `json:"geography"`
+	AutoLoad     bool  `json:"auto_load"`
+	Highlight    uint8 `json:"highlight"` // race number to highlight
+	Compat       bool  `json:"compat"`
 }
 
 // Governor holds per-governor state within a race.
 // Corresponds to struct gov inside struct race in races.h.
 type Governor struct {
-	Name           string  `json:"name"`
-	Password       string  `json:"password"`
-	Active         bool    `json:"active"`
-	DefLevel       uint8   `json:"def_level"`
-	DefSystem      uint8   `json:"def_system"`
-	DefPlanetNum   uint8   `json:"def_planet_num"`
-	HomeLevel      uint8   `json:"home_level"`
-	HomeSystem     uint8   `json:"home_system"`
-	HomePlanetNum  uint8   `json:"home_planet_num"`
-	NewsPos        [4]uint64 `json:"news_pos"` // file positions in news streams
-	Toggle         Toggle  `json:"toggle"`
-	Money          uint64  `json:"money"`
-	Income         uint64  `json:"income"`
-	Maintain       uint64  `json:"maintain"`
-	CostTech       uint64  `json:"cost_tech"`
-	CostMarket     uint64  `json:"cost_market"`
-	ProfitMarket   uint64  `json:"profit_market"`
-	Login          int64   `json:"login"` // Unix timestamp of last login
+	Name          string    `json:"name"`
+	Password      string    `json:"password"`
+	Active        bool      `json:"active"`
+	DefLevel      uint8     `json:"def_level"`
+	DefSystem     uint8     `json:"def_system"`
+	DefPlanetNum  uint8     `json:"def_planet_num"`
+	HomeLevel     uint8     `json:"home_level"`
+	HomeSystem    uint8     `json:"home_system"`
+	HomePlanetNum uint8     `json:"home_planet_num"`
+	NewsPos       [4]uint64 `json:"news_pos"` // file positions in news streams
+	Toggle        Toggle    `json:"toggle"`
+	Money         uint64    `json:"money"`
+	Income        uint64    `json:"income"`
+	Maintain      uint64    `json:"maintain"`
+	CostTech      uint64    `json:"cost_tech"`
+	CostMarket    uint64    `json:"cost_market"`
+	ProfitMarket  uint64    `json:"profit_market"`
+	Login         int64     `json:"login"` // Unix timestamp of last login
 }
 
 // Race represents one player race.
@@ -44,11 +44,11 @@ type Governor struct {
 // AtWar and Allied are 64-bit bitmaps: bit N set means player N+1.
 // The C code uses [2]uint32; Go uses uint64 directly.
 type Race struct {
-	PlayerNum     int    `json:"player_num"`
-	Name          string `json:"name"`
-	Password      string `json:"password"` // hashed in practice
-	Info          string `json:"info"`
-	Motto         string `json:"motto"`
+	PlayerNum int    `json:"player_num"`
+	Name      string `json:"name"`
+	Password  string `json:"password"` // hashed in practice
+	Info      string `json:"info"`
+	Motto     string `json:"motto"`
 
 	// Racial traits
 	Absorb       bool    `json:"absorb"`
@@ -66,18 +66,18 @@ type Race struct {
 
 	// Environmental preferences
 	// Indexed by AtmosXxx constants; length = AtmosToxic+1 = 11
-	Conditions [AtmosToxic + 1]int16   `json:"conditions"`
+	Conditions [AtmosToxic + 1]int16 `json:"conditions"`
 	// Sector type compatibility; indexed by SectorXxx constants
 	// length = SectorWasted+1 = 9
-	Likes      [SectorWasted + 1]float64 `json:"likes"`
-	LikesBest  uint8                     `json:"likes_best"`
+	Likes     [SectorWasted + 1]float64 `json:"likes"`
+	LikesBest uint8                     `json:"likes_best"`
 
 	// Status flags
-	Dissolved  bool `json:"dissolved"`
-	God        bool `json:"god"`
-	Guest      bool `json:"guest"`
-	Metamorph  bool `json:"metamorph"`
-	Monitor    bool `json:"monitor"`
+	Dissolved bool `json:"dissolved"`
+	God       bool `json:"god"`
+	Guest     bool `json:"guest"`
+	Metamorph bool `json:"metamorph"`
+	Monitor   bool `json:"monitor"`
 
 	// Diplomacy — 64-bit bitmaps (bit N = player N+1)
 	AtWar  uint64 `json:"at_war"`
@@ -93,14 +93,14 @@ type Race struct {
 	VictoryTurns      uint16             `json:"victory_turns"`
 	Turn              uint16             `json:"turn"`
 
-	Tech         float64  `json:"tech"`
+	Tech         float64   `json:"tech"`
 	Discoveries  [80]uint8 `json:"discoveries"` // indexed by DiscXxx constants
-	VictoryScore uint64   `json:"victory_score"`
-	Votes        uint64   `json:"votes"`
-	PlanetPoints uint64   `json:"planet_points"`
+	VictoryScore uint64    `json:"victory_score"`
+	Votes        uint64    `json:"votes"`
+	PlanetPoints uint64    `json:"planet_points"`
 
-	Governors int8                          `json:"governors"` // number of governors
-	Governor  [MaxGovernors + 1]Governor    `json:"governor"`
+	Governors int8                       `json:"governors"` // number of governors
+	Governor  [MaxGovernors + 1]Governor `json:"governor"`
 }
 
 // IsAtWar returns true if this race is at war with the given player.

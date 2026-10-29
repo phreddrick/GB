@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/gbgame/gb/internal/model"
+	"github.com/phreddrick/GB/go/internal/model"
 )
 
 const vnResTake = 0.5 // fraction of sector resource a VN mines each turn

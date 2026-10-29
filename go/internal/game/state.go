@@ -12,10 +12,10 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/gbgame/gb/internal/config"
-	"github.com/gbgame/gb/internal/db"
-	"github.com/gbgame/gb/internal/model"
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/config"
+	"github.com/phreddrick/GB/go/internal/db"
+	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 // State is the central game state. It owns all in-memory game data and
@@ -37,12 +37,12 @@ type State struct {
 
 	// In-memory game data (owned exclusively by the actor goroutine).
 	// Populated at startup from the DB and refreshed at turn start.
-	mu      sync.RWMutex // protects read-only access from REST handlers
-	stars   []*model.Star
-	planets map[uint8]map[uint8]*model.Planet
-	races   []*model.Race   // index 0 = player 1
-	ships   map[uint32]*model.Ship
-	sdata   *model.StarData
+	mu          sync.RWMutex // protects read-only access from REST handlers
+	stars       []*model.Star
+	planets     map[uint8]map[uint8]*model.Planet
+	races       []*model.Race // index 0 = player 1
+	ships       map[uint32]*model.Ship
+	sdata       *model.StarData
 	power       [model.MaxPlayers]model.Power
 	blocks      [model.MaxPlayers]model.Block
 	powerBlocks model.PowerBlocks

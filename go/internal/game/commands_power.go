@@ -18,8 +18,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gbgame/gb/internal/model"
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 // ---- Helpers (from prof.c) ------------------------------------------------
@@ -127,8 +127,9 @@ func (s *State) getPlayerArg(arg string) int {
 // cmdPower displays the galactic power report.
 //
 // Syntax (mirrors power() in power.c):
-//   power          — all races sorted by VP
-//   power <player> — detail line for one race
+//
+//	power          — all races sorted by VP
+//	power <player> — detail line for one race
 func (s *State) cmdPower(p, g int, args []string, sess net.Responder) {
 	Race := s.raceByNum(p)
 	if Race == nil {
@@ -233,9 +234,10 @@ func (s *State) powerOutputLine(sess net.Responder, viewer, r *model.Race, i, ra
 // cmdBlock displays alliance block information.
 //
 // Syntax (mirrors block() in power.c):
-//   block                    — list all blocks with VPs
-//   block <player>           — show members and stats of that player's block
-//   block player <player>    — show block memberships for that player
+//
+//	block                    — list all blocks with VPs
+//	block <player>           — show members and stats of that player's block
+//	block player <player>    — show block memberships for that player
 func (s *State) cmdBlock(p, g int, args []string, sess net.Responder) {
 	Race := s.raceByNum(p)
 	if Race == nil {
@@ -379,4 +381,3 @@ func (s *State) cmdBlock(p, g int, args []string, sess net.Responder) {
 		}
 	}
 }
-

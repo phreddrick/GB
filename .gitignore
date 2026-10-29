@@ -1,7 +1,8 @@
 *.o
-GB
-enrol
-guardian
-makeuniv
-racegen
+# C binaries built in source/ (anchored so the names do not match go/cmd/* source directories)
+/source/GB
+/source/enrol
+/source/guardian
+/source/makeuniv
+/source/racegen
 *.swp

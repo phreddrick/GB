@@ -5,7 +5,7 @@ package enroll
 import (
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/gbgame/gb/internal/model"
+	"github.com/phreddrick/GB/go/internal/model"
 )
 
 // Request represents an enrollment request from the web form.

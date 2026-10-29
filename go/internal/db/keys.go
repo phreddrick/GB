@@ -7,28 +7,28 @@ import "encoding/binary"
 
 // Bucket names
 var (
-	BucketShips      = []byte("ships")
-	BucketPlanets    = []byte("planets")
-	BucketStars      = []byte("stars")
-	BucketRaces      = []byte("races")
-	BucketSData      = []byte("sdata")      // global StarData (single record)
-	BucketPower      = []byte("power")      // power report (single record)
-	BucketBlocks     = []byte("blocks")     // power blocks (single record)
+	BucketShips       = []byte("ships")
+	BucketPlanets     = []byte("planets")
+	BucketStars       = []byte("stars")
+	BucketRaces       = []byte("races")
+	BucketSData       = []byte("sdata")  // global StarData (single record)
+	BucketPower       = []byte("power")  // power report (single record)
+	BucketBlocks      = []byte("blocks") // power blocks (single record)
 	BucketCommodities = []byte("commodities")
-	BucketShipFree   = []byte("ship_free")  // free ship number list
-	BucketCommodFree = []byte("commod_free")
-	BucketMeta       = []byte("meta")       // update_time, segment_time, counters
-	BucketNews       = []byte("news")       // keyed by [type(1)|seq(8)]
-	BucketTelegrams  = []byte("telegrams")  // keyed by [player(1)|seq(8)]
+	BucketShipFree    = []byte("ship_free") // free ship number list
+	BucketCommodFree  = []byte("commod_free")
+	BucketMeta        = []byte("meta")      // update_time, segment_time, counters
+	BucketNews        = []byte("news")      // keyed by [type(1)|seq(8)]
+	BucketTelegrams   = []byte("telegrams") // keyed by [player(1)|seq(8)]
 )
 
 // Meta keys
 var (
-	KeyUpdateTime   = []byte("update_time")
-	KeySegmentTime  = []byte("segment_time")
-	KeyNumUpdates   = []byte("num_updates")
-	KeyNumSegments  = []byte("num_segments")
-	KeyGlobalLists  = []byte("global_lists") // ship_free / commod_free JSON arrays
+	KeyUpdateTime  = []byte("update_time")
+	KeySegmentTime = []byte("segment_time")
+	KeyNumUpdates  = []byte("num_updates")
+	KeyNumSegments = []byte("num_segments")
+	KeyGlobalLists = []byte("global_lists") // ship_free / commod_free JSON arrays
 )
 
 // ShipKey encodes a ship number as a 4-byte big-endian key.

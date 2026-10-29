@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gbgame/gb/internal/config"
-	"github.com/gbgame/gb/internal/db"
-	"github.com/gbgame/gb/internal/enroll"
-	"github.com/gbgame/gb/internal/model"
+	"github.com/phreddrick/GB/go/internal/config"
+	"github.com/phreddrick/GB/go/internal/db"
+	"github.com/phreddrick/GB/go/internal/enroll"
+	"github.com/phreddrick/GB/go/internal/model"
 )
 
 // GameIface is the interface the network layer uses to interact with game logic.

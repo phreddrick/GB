@@ -15,16 +15,17 @@ import (
 	"math"
 	"strings"
 
-	"github.com/gbgame/gb/internal/model"
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 // cmdOrder handles "order [<ships> [<subcommand> ...]]".
 //
 // Modes:
-//   order                  — list orders for all own ships
-//   order <ships>          — list orders for matching ships
-//   order <ships> <sub>... — set and then list orders for matching ships
+//
+//	order                  — list orders for all own ships
+//	order <ships>          — list orders for matching ships
+//	order <ships> <sub>... — set and then list orders for matching ships
 //
 // Mirrors order() in order.c.
 func (s *State) cmdOrder(p, g int, args []string, sess net.Responder) {
@@ -637,8 +638,8 @@ func (s *State) activateFactory(p, g int, ship *model.Ship, sess net.Responder) 
 			sess.Send("The factory is currently being transported.\n")
 			return fmt.Errorf("not a habitat")
 		}
-		const habFactOnCost = 4   // HAB_FACT_ON_COST from tweakables.h
-		const habFactSize = 0.2  // HAB_FACT_SIZE from tweakables.h
+		const habFactOnCost = 4 // HAB_FACT_ON_COST from tweakables.h
+		const habFactSize = 0.2 // HAB_FACT_SIZE from tweakables.h
 		onCost := uint16(habFactOnCost * int(ship.BuildCost))
 		hangerNeeded := (1 + int(habFactSize*float64(s.shipSize(ship)))) -
 			(int(carrier.MaxHanger-carrier.Hanger) + int(ship.Size))
@@ -988,14 +989,15 @@ func gunTypeStr(lgt, med, hvy string, gunType uint8) string {
 // cmdRoute handles "route [<n> [<subcommand> <arg>]]".
 //
 // Modes:
-//   route                     — list all active routes for current planet
-//   route <n>                 — show one route
-//   route <n> activate        — activate route
-//   route <n> deactivate      — deactivate route
-//   route <n> <place>         — set destination
-//   route <n> land <x,y>      — set landing sector
-//   route <n> load <fdxr>     — set load commodities
-//   route <n> unload <fdxr>   — set unload commodities
+//
+//	route                     — list all active routes for current planet
+//	route <n>                 — show one route
+//	route <n> activate        — activate route
+//	route <n> deactivate      — deactivate route
+//	route <n> <place>         — set destination
+//	route <n> land <x,y>      — set landing sector
+//	route <n> load <fdxr>     — set load commodities
+//	route <n> unload <fdxr>   — set unload commodities
 //
 // Mirrors route() in order.c.
 func (s *State) cmdRoute(p, g int, args []string, sess net.Responder) {

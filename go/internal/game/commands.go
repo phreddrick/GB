@@ -61,7 +61,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gbgame/gb/internal/net"
+	"github.com/phreddrick/GB/go/internal/net"
 )
 
 func (s *State) cmdWho(p, g int, args []string, sess net.Responder) {
