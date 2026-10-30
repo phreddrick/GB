@@ -1,8 +1,9 @@
 package game
 
 import (
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"time"
 
@@ -11,68 +12,62 @@ import (
 
 // doUpdate performs a full game update (production, combat, etc.).
 // Corresponds to do_update() + do_turn(update=1) in doturn.c / GB_server.c.
-// Called exclusively by the actor goroutine.
+// Called exclusively by the actor goroutine, through runTurn (lifecycle.go),
+// which handles mode transitions, panic isolation and schedule persistence.
 func (s *State) doUpdate() {
-	s.numUpdates++
-	log.Printf("Starting update %d", s.numUpdates)
-	s.shout(fmt.Sprintf("\n*** DOING UPDATE %d ***\n", s.numUpdates))
+	s.sched.numUpdates++
+	s.shout(fmt.Sprintf("\n*** DOING UPDATE %d ***\n", s.sched.numUpdates))
 
-	updateMins := s.cfg.DefaultUpdateMinutes
-	s.nextUpdateTime = s.nextUpdateTime.Add(time.Duration(updateMins) * time.Minute)
+	s.sched.nextUpdate = s.sched.nextUpdate.Add(s.updateInterval())
+	s.sched.numSegments = 0
+	s.sched.nextSegment = s.sched.nextUpdate.Add(-time.Duration(s.cfg.MovesPerUpdate-1) * s.segmentInterval())
 
-	segMins := updateMins / s.cfg.MovesPerUpdate
-	if segMins < 1 {
-		segMins = 1
+	if err := s.doTurn(true); err != nil {
+		// A turn that cannot read its inputs must not be skipped silently:
+		// fail closed (Phase 1 policy; Phase 3a adds reload-on-failure).
+		panic(fmt.Sprintf("update %d aborted: %v", s.sched.numUpdates, err))
 	}
-	s.numSegments = 0
-	s.nextSegmentTime = s.nextUpdateTime.Add(-time.Duration(segMins*(s.cfg.MovesPerUpdate-1)) * time.Minute)
 
-	s.doTurn(true)
-
-	s.shout(fmt.Sprintf("\n*** UPDATE %d COMPLETE ***\n", s.numUpdates))
-	log.Printf("Update %d complete", s.numUpdates)
-
-	s.persistTiming()
+	s.shout(fmt.Sprintf("\n*** UPDATE %d COMPLETE ***\n", s.sched.numUpdates))
 }
 
 // doSegment performs a movement segment between updates.
 // Corresponds to do_segment() + do_turn(update=0) in GB_server.c.
-// Called exclusively by the actor goroutine.
+// Called exclusively by the actor goroutine, through runTurn.
 func (s *State) doSegment() {
-	if s.numSegments >= s.cfg.MovesPerUpdate-1 {
-		// Already fired all segments for this update cycle; skip.
+	if s.sched.numSegments >= s.cfg.MovesPerUpdate-1 {
+		// Already fired all segments for this update cycle; move the segment
+		// timer past the update so the loop does not spin on it.
+		s.sched.nextSegment = s.sched.nextUpdate
+		s.logger.Info("segment skipped: all segments of this cycle already ran", slog.String("op", "turn.segment"),
+			slog.Int("segment", s.sched.numSegments), slog.Int("moves_per_update", s.cfg.MovesPerUpdate))
 		return
 	}
-	s.numSegments++
-	log.Printf("Starting segment %d/%d", s.numSegments, s.cfg.MovesPerUpdate-1)
+	s.sched.numSegments++
 	s.shout(fmt.Sprintf("\n*** DOING MOVEMENT SEGMENT %d/%d ***\n",
-		s.numSegments, s.cfg.MovesPerUpdate-1))
+		s.sched.numSegments, s.cfg.MovesPerUpdate-1))
 
-	segMins := s.cfg.DefaultUpdateMinutes / s.cfg.MovesPerUpdate
-	if segMins < 1 {
-		segMins = 1
+	s.sched.nextSegment = s.sched.nextSegment.Add(s.segmentInterval())
+
+	if err := s.doTurn(false); err != nil {
+		panic(fmt.Sprintf("segment %d aborted: %v", s.sched.numSegments, err))
 	}
-	s.nextSegmentTime = s.nextSegmentTime.Add(time.Duration(segMins) * time.Minute)
 
-	s.doTurn(false)
-
-	s.shout(fmt.Sprintf("\n*** MOVEMENT %d DONE ***\n", s.numSegments))
-	log.Printf("Segment %d complete", s.numSegments)
-
-	s.persistTiming()
+	s.shout(fmt.Sprintf("\n*** MOVEMENT %d DONE ***\n", s.sched.numSegments))
 }
 
 // doTurn executes one game turn.
 // If update is true, performs full production + movement; otherwise movement only.
-// Corresponds to do_turn() in doturn.c.
-func (s *State) doTurn(update bool) {
+// Corresponds to do_turn() in doturn.c. It returns an error only when the
+// turn's inputs could not be read; flush errors are logged and reported
+// through flushAll's return value.
+func (s *State) doTurn(update bool) error {
 	// Reload ships from DB to pick up any changes made by player commands
 	// since the last turn. Stars and races are kept in memory.
 	var err error
 	s.ships, err = s.store.AllShips()
 	if err != nil {
-		log.Printf("doTurn: AllShips: %v", err)
-		return
+		return fmt.Errorf("reload ships: %w", err)
 	}
 
 	// Post and clear ground-assault counters accumulated since the last turn.
@@ -125,6 +120,7 @@ func (s *State) doTurn(update bool) {
 		if star == nil {
 			continue
 		}
+		s.Progress()
 		starPlanets := s.planets[uint8(i)]
 
 		if update {
@@ -466,24 +462,34 @@ func (s *State) doTurn(update bool) {
 		}
 
 		s.computePowerBlocks()
-		s.flushAll()
+		var flushErrs []error
+		if err := s.flushAll(); err != nil {
+			flushErrs = append(flushErrs, err)
+		}
 
 		// Persist power and blocks.
 		if err := s.store.PutPower(s.power); err != nil {
-			log.Printf("doTurn: PutPower: %v", err)
+			flushErrs = append(flushErrs, fmt.Errorf("PutPower: %w", err))
 		}
 		if err := s.store.PutBlocks(s.blocks); err != nil {
-			log.Printf("doTurn: PutBlocks: %v", err)
+			flushErrs = append(flushErrs, fmt.Errorf("PutBlocks: %w", err))
 		}
 		if err := s.store.PutPowerBlocks(&s.powerBlocks); err != nil {
-			log.Printf("doTurn: PutPowerBlocks: %v", err)
+			flushErrs = append(flushErrs, fmt.Errorf("PutPowerBlocks: %w", err))
 		}
 		if err := s.store.PutStarData(s.sdata); err != nil {
-			log.Printf("doTurn: PutStarData: %v", err)
+			flushErrs = append(flushErrs, fmt.Errorf("PutStarData: %w", err))
+		}
+		if len(flushErrs) > 0 {
+			// Part of the turn may be on disk (CR-18). Fail closed rather
+			// than continue with a store that disagrees with memory.
+			panic(fmt.Sprintf("update flush failed: %v", errors.Join(flushErrs...)))
 		}
 	} else {
 		// Segment-only flush.
-		s.flushAll()
+		if err := s.flushAll(); err != nil {
+			panic(fmt.Sprintf("segment flush failed: %v", err))
+		}
 	}
 
 	// Notify all races.
@@ -497,27 +503,39 @@ func (s *State) doTurn(update bool) {
 			s.notifyRace(r.PlayerNum, "Finished with movement segment.\n")
 		}
 	}
+	return nil
 }
 
-// flushAll writes all in-memory state back to the DB.
-// Called at the end of a full update or segment.
-func (s *State) flushAll() {
-	if err := s.store.PutShipsBatch(s.ships); err != nil {
-		log.Printf("flushAll: PutShipsBatch: %v", err)
+// flushAll writes all in-memory state back to the DB, one transaction per
+// record (not atomic across records: CR-18, Phase 3a). Called at the end of
+// a full update or segment and by the orderly shutdown path. Every error is
+// logged and all of them are returned joined; the caller decides whether to
+// halt.
+func (s *State) flushAll() error {
+	var errs []error
+	fail := func(err error) {
+		s.logger.Error("flush error", slog.String("op", "flush"), slog.String("err", err.Error()))
+		errs = append(errs, err)
 	}
+	if err := s.store.PutShipsBatch(s.ships); err != nil {
+		fail(fmt.Errorf("PutShipsBatch: %w", err))
+	}
+	s.Progress()
 	for _, star := range s.stars {
 		if star == nil {
 			continue
 		}
 		if err := s.store.PutStar(star); err != nil {
-			log.Printf("flushAll: PutStar %d: %v", star.Number, err)
+			fail(fmt.Errorf("PutStar %d: %w", star.Number, err))
 		}
+		s.Progress()
 	}
 	for _, byPlanet := range s.planets {
 		for _, planet := range byPlanet {
 			if err := s.store.PutPlanet(planet); err != nil {
-				log.Printf("flushAll: PutPlanet: %v", err)
+				fail(fmt.Errorf("PutPlanet %d/%d: %w", planet.StarNum, planet.PlanetNum, err))
 			}
+			s.Progress()
 		}
 	}
 	for _, race := range s.races {
@@ -525,24 +543,11 @@ func (s *State) flushAll() {
 			continue
 		}
 		if err := s.store.PutRace(race); err != nil {
-			log.Printf("flushAll: PutRace %d: %v", race.PlayerNum, err)
+			fail(fmt.Errorf("PutRace %d: %w", race.PlayerNum, err))
 		}
+		s.Progress()
 	}
-}
-
-// persistTiming saves update/segment timestamps to the DB for crash recovery.
-func (s *State) persistTiming() {
-	encode := func(t time.Time) []byte {
-		unix := t.Unix()
-		b := make([]byte, 8)
-		for i := 0; i < 8; i++ {
-			b[i] = byte(unix)
-			unix >>= 8
-		}
-		return b
-	}
-	_ = s.store.PutMeta([]byte("update_time"), encode(s.nextUpdateTime))
-	_ = s.store.PutMeta([]byte("segment_time"), encode(s.nextSegmentTime))
+	return errors.Join(errs...)
 }
 
 // rebuildOrbitChains clears all nextship/ships linked-list pointers and

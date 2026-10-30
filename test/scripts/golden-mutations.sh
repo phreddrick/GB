@@ -21,22 +21,45 @@
 #  15. the unchanged tree reconciles (records written and matched)       -> pass
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Full package runs (no -run filter) so that TestMain inventory validation and
+# the repository-wide static validation both execute.
+run_golden() { (cd "$WORK/repo/go" && go test -count=1 ./internal/game ./internal/testutil "$@" 2>&1); }
+run_inventory() { (cd "$WORK/repo" && test/scripts/inventory-check.sh 2>&1); }
+# output_matches <text> <ERE>: true when the pattern occurs in the text. The
+# text is supplied as a here-string, never through a pipe from echo: with
+# `set -o pipefail`, `echo "$out" | grep -q` fails spuriously when grep exits
+# at the first match while echo is still writing more than a pipe buffer
+# (SIGPIPE on echo), which turned correct outputs into false mutation
+# failures (GB1-10). grep consumes the complete input here.
+output_matches() { grep -E -- "$2" <<< "$1" > /dev/null; }
+# check_outcome <0|1> <label> <ERE> <got-exit> <output>: the assertion shared
+# by expect and expect_inv; prints the verdict and fails the run on mismatch.
+check_outcome() {
+  local want="$1" label="$2" pat="$3" got="$4" out="$5"
+  [ "$got" -ne 0 ] && got=1
+  if [ "$got" -ne "$want" ]; then echo "MUTATION FAIL: $label: exit $got, wanted $want"; tail -20 <<< "$out"; exit 1; fi
+  if ! output_matches "$out" "$pat"; then echo "MUTATION FAIL: $label: output lacks /$pat/"; tail -20 <<< "$out"; exit 1; fi
+  echo "mutation ok: $label (exit $got)"
+}
+expect() { # expect <0|1> <label> <grep-pattern>
+  local want="$1" label="$2" pat="$3"
+  set +e; out="$(run_golden)"; got=$?; set -e
+  check_outcome "$want" "$label" "$pat" "$got" "$out"
+}
+expect_inv() { # expect_inv <0|1> <label> <grep-pattern>
+  local want="$1" label="$2" pat="$3"
+  set +e; out="$(run_inventory)"; got=$?; set -e
+  check_outcome "$want" "$label" "$pat" "$got" "$out"
+}
+# Self-test hook (GB1-10): test/scripts/golden-mutations-selftest.sh sources
+# this file with GOLDEN_MUTATIONS_LIB_ONLY=1 to exercise expect/expect_inv on
+# synthetic output. Only when sourced; running the script is unaffected.
+if [ "${BASH_SOURCE[0]}" != "$0" ] && [ "${GOLDEN_MUTATIONS_LIB_ONLY:-}" = 1 ]; then return 0; fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 fresh() {
   rm -rf "$WORK/repo"; mkdir -p "$WORK/repo"
   (cd "$ROOT" && tar --exclude='./test/ctool/obj' --exclude='./test/ctool/gb_golden' -cf - ./go ./test) | (cd "$WORK/repo" && tar -xf -)
-}
-# Full package runs (no -run filter) so that TestMain inventory validation and
-# the repository-wide static validation both execute.
-run_golden() { (cd "$WORK/repo/go" && go test -count=1 ./internal/game ./internal/testutil "$@" 2>&1); }
-expect() { # expect <0|1> <label> <grep-pattern>
-  local want="$1" label="$2" pat="$3"
-  set +e; out="$(run_golden)"; got=$?; set -e
-  [ "$got" -ne 0 ] && got=1
-  if [ "$got" -ne "$want" ]; then echo "MUTATION FAIL: $label: exit $got, wanted $want"; echo "$out" | tail -20; exit 1; fi
-  if ! echo "$out" | grep -qE "$pat"; then echo "MUTATION FAIL: $label: output lacks /$pat/"; echo "$out" | tail -20; exit 1; fi
-  echo "mutation ok: $label (exit $got)"
 }
 
 fresh
@@ -117,15 +140,6 @@ printf '\n- id: mutation/untested\n  untested: true\n  finding: CR-00\n  reason:
 expect 0 "11 legitimate untested entry passes" 'ok'
 out="$(cd "$WORK/repo/go" && go test -count=1 -v ./internal/testutil -run TestInventoryStatic 2>&1 | grep 'UNTESTED (explicit) mutation/untested')"
 [ -n "$out" ] && echo "    visible: $out"
-run_inventory() { (cd "$WORK/repo" && test/scripts/inventory-check.sh 2>&1); }
-expect_inv() { # expect_inv <0|1> <label> <grep-pattern>
-  local want="$1" label="$2" pat="$3"
-  set +e; out="$(run_inventory)"; got=$?; set -e
-  [ "$got" -ne 0 ] && got=1
-  if [ "$got" -ne "$want" ]; then echo "MUTATION FAIL: $label: exit $got, wanted $want"; echo "$out" | tail -20; exit 1; fi
-  if ! echo "$out" | grep -qE "$pat"; then echo "MUTATION FAIL: $label: output lacks /$pat/"; echo "$out" | tail -20; exit 1; fi
-  echo "mutation ok: $label (exit $got)"
-}
 winpkg() { # a package whose only test file is windows-only
   mkdir -p "$WORK/repo/go/internal/winonly"
   printf 'package winonly\n' > "$WORK/repo/go/internal/winonly/doc.go"

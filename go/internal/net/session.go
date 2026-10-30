@@ -2,7 +2,11 @@
 package net
 
 import (
+	"encoding/json"
+	"errors"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -10,72 +14,164 @@ import (
 // Session holds per-player connection state.
 // This replaces struct descriptor_data and the descriptor_list in GB_server.c.
 //
-// One goroutine per Session handles I/O; game state mutations are sent to the
-// central game state actor via the server's command channel.
+// Two goroutines serve a session: the read loop (handleWS) and a writer
+// goroutine that owns every write to the WebSocket. Send only enqueues, so
+// the game actor never blocks on a client's TCP window (CR-23): a client
+// whose queue fills is disconnected, like the C server's MAX_OUTPUT drop.
 type Session struct {
-	mu sync.Mutex
-
-	// Identity (set after authentication)
+	// Identity. Set once by newSession from the verified token, before the
+	// session is published in the registry, and never written again; the
+	// registry's mutex orders those writes before every reader (GB1-02).
 	PlayerNum int
 	Governor  int
 	God       bool
+	ID        string // short random id for logs (no token material)
 
-	// WebSocket connection
-	conn *websocket.Conn
-
-	// Rate limiting (mirrors the quota field in descriptor_data)
-	quota int
-
-	// Whether this session is still active
-	active bool
+	conn         *websocket.Conn
+	outbound     chan outMsg
+	done         chan struct{} // closed when the session is closed
+	closeOnce    sync.Once
+	closeReason  atomic.Pointer[string]
+	writeTimeout time.Duration
+	pingInterval time.Duration
+	dropped      atomic.Bool // closed because the outbound queue overflowed
 }
 
-// newSession creates a Session for an accepted WebSocket connection.
-func newSession(conn *websocket.Conn) *Session {
-	return &Session{
-		conn:   conn,
-		active: true,
+type outMsg struct {
+	kind int // websocket.TextMessage or CloseMessage
+	data []byte
+}
+
+// ErrSessionClosed is returned by Send after the session closed.
+var ErrSessionClosed = errors.New("session closed")
+
+// ErrSessionOverflow is returned when the outbound queue is full; the
+// session is closed as a consequence.
+var ErrSessionOverflow = errors.New("session outbound queue overflow")
+
+// Identity is the authenticated identity a session is created with.
+type Identity struct {
+	PlayerNum int
+	Governor  int
+	God       bool
+}
+
+// newSession creates a Session for an accepted WebSocket connection, with
+// its identity already in place, and starts its writer goroutine.
+func newSession(conn *websocket.Conn, id string, ident Identity, queue int, writeTimeout, pingInterval time.Duration) *Session {
+	s := &Session{
+		PlayerNum:    ident.PlayerNum,
+		Governor:     ident.Governor,
+		God:          ident.God,
+		conn:         conn,
+		ID:           id,
+		outbound:     make(chan outMsg, queue),
+		done:         make(chan struct{}),
+		writeTimeout: writeTimeout,
+		pingInterval: pingInterval,
+	}
+	go s.writeLoop()
+	return s
+}
+
+// writeLoop is the only goroutine that writes to conn.
+func (s *Session) writeLoop() {
+	ticker := time.NewTicker(s.pingInterval)
+	defer ticker.Stop()
+	defer func() { _ = s.conn.Close() }()
+	for {
+		select {
+		case <-s.done:
+			// Best-effort close frame with the recorded reason.
+			reason := websocket.FormatCloseMessage(websocket.CloseGoingAway, "")
+			if r := s.closeReason.Load(); r != nil {
+				reason = []byte(*r)
+			}
+			_ = s.conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
+			_ = s.conn.WriteMessage(websocket.CloseMessage, reason)
+			return
+		case m := <-s.outbound:
+			_ = s.conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
+			if err := s.conn.WriteMessage(m.kind, m.data); err != nil {
+				s.closeWith(websocket.CloseAbnormalClosure, "write failed")
+				return
+			}
+		case <-ticker.C:
+			_ = s.conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
+			if err := s.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				s.closeWith(websocket.CloseAbnormalClosure, "ping failed")
+				return
+			}
+		}
 	}
 }
 
-// Send writes a text message to the player.
-// Safe to call from any goroutine.
+// Send queues a text message for the player. Safe to call from any
+// goroutine; never blocks. A full queue closes the session and returns
+// ErrSessionOverflow.
 func (s *Session) Send(text string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.active {
-		return nil
-	}
-	return s.conn.WriteMessage(websocket.TextMessage, []byte(text))
+	return s.enqueue(websocket.TextMessage, []byte(text))
 }
 
-// SendJSON writes a structured JSON message to the player.
-// Safe to call from any goroutine.
+// SendJSON queues a structured JSON message for the player.
 func (s *Session) SendJSON(v interface{}) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.active {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return s.enqueue(websocket.TextMessage, data)
+}
+
+func (s *Session) enqueue(kind int, data []byte) error {
+	select {
+	case <-s.done:
+		return ErrSessionClosed
+	default:
+	}
+	select {
+	case s.outbound <- outMsg{kind: kind, data: data}:
 		return nil
-	}
-	return s.conn.WriteJSON(v)
-}
-
-// Close marks the session as inactive and closes the WebSocket.
-func (s *Session) Close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.active {
-		s.active = false
-		s.conn.Close()
+	case <-s.done:
+		return ErrSessionClosed
+	default:
+		s.dropped.Store(true)
+		s.closeWith(websocket.ClosePolicyViolation, "output queue overflow (slow client)")
+		return ErrSessionOverflow
 	}
 }
 
-// IsActive returns whether the session is still connected.
+// Close closes the session with a "going away" frame. Idempotent.
+func (s *Session) Close() { s.closeWith(websocket.CloseGoingAway, "") }
+
+// CloseForRestart closes the session with 1012 (service restart), used during
+// server shutdown.
+func (s *Session) CloseForRestart() {
+	s.closeWith(websocket.CloseServiceRestart, "server shutting down")
+}
+
+func (s *Session) closeWith(code int, text string) {
+	s.closeOnce.Do(func() {
+		msg := string(websocket.FormatCloseMessage(code, text))
+		s.closeReason.Store(&msg)
+		close(s.done)
+	})
+}
+
+// IsActive returns whether the session is still open.
 func (s *Session) IsActive() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.active
+	select {
+	case <-s.done:
+		return false
+	default:
+		return true
+	}
 }
+
+// Done is closed when the session closes.
+func (s *Session) Done() <-chan struct{} { return s.done }
+
+// Dropped reports whether the session was closed for output overflow.
+func (s *Session) Dropped() bool { return s.dropped.Load() }
 
 // SessionRegistry tracks all live sessions.
 // Replaces the descriptor_list linked list in GB_server.c.
@@ -83,23 +179,45 @@ type SessionRegistry struct {
 	mu       sync.RWMutex
 	sessions map[int][]*Session // playerNum → []Session (one per governor)
 	all      []*Session
+	closed   bool        // set by CloseAll; later registrations are refused
+	onChange func(n int) // gauge hook
 }
 
-func newRegistry() *SessionRegistry {
+// ErrRegistryClosed is returned by register once shutdown has closed the
+// registry.
+var ErrRegistryClosed = errors.New("session registry closed: server shutting down")
+
+func newRegistry(onChange func(n int)) *SessionRegistry {
 	return &SessionRegistry{
 		sessions: make(map[int][]*Session),
+		onChange: onChange,
 	}
 }
 
-func (r *SessionRegistry) register(s *Session) {
+// register publishes a fully initialised session (identity included) in one
+// step: there is no window in which a broadcast can see it without its
+// identity. It refuses once CloseAll has run, so a session that finishes
+// its upgrade during shutdown is never left open and unregistered.
+func (r *SessionRegistry) register(s *Session) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	if r.closed {
+		r.mu.Unlock()
+		return ErrRegistryClosed
+	}
 	r.all = append(r.all, s)
+	if s.PlayerNum > 0 {
+		r.sessions[s.PlayerNum] = append(r.sessions[s.PlayerNum], s)
+	}
+	n := len(r.all)
+	r.mu.Unlock()
+	if r.onChange != nil {
+		r.onChange(n)
+	}
+	return nil
 }
 
 func (r *SessionRegistry) unregister(s *Session) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	for i, sess := range r.all {
 		if sess == s {
 			r.all = append(r.all[:i], r.all[i+1:]...)
@@ -115,15 +233,29 @@ func (r *SessionRegistry) unregister(s *Session) {
 			}
 		}
 	}
+	n := len(r.all)
+	r.mu.Unlock()
+	if r.onChange != nil {
+		r.onChange(n)
+	}
 }
 
-func (r *SessionRegistry) setAuth(s *Session, playerNum, governor int, god bool) {
+// Count returns the number of open sessions.
+func (r *SessionRegistry) Count() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return len(r.all)
+}
+
+// CloseAll closes every session for a server restart (close code 1012).
+func (r *SessionRegistry) CloseAll() {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	s.PlayerNum = playerNum
-	s.Governor = governor
-	s.God = god
-	r.sessions[playerNum] = append(r.sessions[playerNum], s)
+	r.closed = true
+	all := append([]*Session(nil), r.all...)
+	r.mu.Unlock()
+	for _, s := range all {
+		s.CloseForRestart()
+	}
 }
 
 // NotifyRace sends a text message to all governors of a given race.
@@ -133,12 +265,12 @@ func (r *SessionRegistry) NotifyRace(playerNum int, text string) {
 	sessions := append([]*Session(nil), r.sessions[playerNum]...)
 	r.mu.RUnlock()
 	for _, s := range sessions {
-		s.Send(text)
+		_ = s.Send(text)
 	}
 }
 
 // Notify sends a text message to a specific governor of a race.
-// Returns true if a connected session was found and the message was delivered.
+// Returns true if a connected session was found and the message was queued.
 // Corresponds to notify() in GB_server.c.
 func (r *SessionRegistry) Notify(playerNum, governor int, text string) bool {
 	r.mu.RLock()
@@ -146,7 +278,7 @@ func (r *SessionRegistry) Notify(playerNum, governor int, text string) bool {
 	r.mu.RUnlock()
 	for _, s := range sessions {
 		if s.Governor == governor {
-			s.Send(text)
+			_ = s.Send(text)
 			return true
 		}
 	}
@@ -161,7 +293,7 @@ func (r *SessionRegistry) Broadcast(senderPlayerNum int, text string) {
 	r.mu.RUnlock()
 	for _, s := range all {
 		if s.PlayerNum != senderPlayerNum && s.PlayerNum > 0 {
-			s.Send(text)
+			_ = s.Send(text)
 		}
 	}
 }
@@ -173,11 +305,11 @@ func (r *SessionRegistry) Shout(text string) {
 	all := append([]*Session(nil), r.all...)
 	r.mu.RUnlock()
 	for _, s := range all {
-		s.Send(text)
+		_ = s.Send(text)
 	}
 }
 
-// ConnectedPlayers returns the player numbers and names for the WHO display.
+// ConnectedPlayers returns the player numbers for the WHO display.
 func (r *SessionRegistry) ConnectedPlayers() []SessionInfo {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

@@ -108,7 +108,7 @@ Found by the Phase 0 golden tests on 2026-10-28; neither is in `go-code-review.m
 - **GD-01, compatibility temperature truncation.** `source/max.c` declares `reg int i,add;` and computes `add = 0.1*((double)planet->conditions[TEMP]-race->conditions[TEMP]);`, so the temperature term is truncated to an integer before `abs(add)/100.0`. `go/internal/game/planet.go` (`compatibility`) keeps `0.1 * diff` as a float. 47 of 60 fixture rows differ (relative differences up to about 1%); the rows that agree are those where the temperature difference is a multiple of 10. Fix in Phase 3c under the golden test; whether to keep C's truncation is a rules question, so it is also listed for ADR-0012.
 - **GD-02, morale_factor constant.** `source/shlmisc.c` line 647: `atan(x/10000.)/3.14159565+.5`; the divisor is not pi. `go/internal/game/combat.go` (`moraleFactor`) uses `math.Pi`. Every ground-attack strength differs by roughly 2e-6 relative. This is almost certainly a typo in the original. The owner's provisional decision (Phase 0 review, 2026-10-28) is to **keep Go's `math.Pi`** and record the intentional divergence for confirmation in Phase 3 (ADR-0012, Decision 10); until that confirmation the golden tests keep reporting the 80 affected cases as XFAIL with their recorded values, so the divergence stays visible and cannot drift.
 
-## Current inventory (2026-10-28)
+## Current inventory (2026-10-29)
 
 | id | finding | test | expected cases | fix phase |
 |---|---|---|---|---|
@@ -116,6 +116,9 @@ Found by the Phase 0 golden tests on 2026-10-28; neither is in `go-code-review.m
 | `combat/cew-strength-multiplier` | CR-27 | `TestCEWCallSite` (deterministic call-site test in radiation mode; reference is the C formula `strength*CEW_hit`) | 3 of 4 | 3c |
 | `golden/compatibility` | GD-01 | `TestGolden/compatibility` | 47 of 60 | 3c |
 | `golden/ground_attack/astrength`, `/dstrength` | GD-02 | `TestGolden/ground_attack` | 40 of 40 each | 3d (provisional owner decision: keep `math.Pi`, record the intentional divergence in ADR-0012) |
+| `persistence/non-atomic-turn-flush` | CR-18 | **untested** (explicit): no test can assert crash consistency until the single-transaction commit exists | n/a | 3a |
+
+The CR-18 entry was added in Phase 1 (2026-10-29) so that the remaining crash-consistency risk stays in the same inventory as the parity gaps and is printed by every run. Phase 1 closes only the orderly-shutdown path (`docs/operations/local-server.md` sections 8 and 10); the crash-injection tests T1 to T8 of plan section 8.11 arrive with Phase 3a and will replace the entry with tested ones.
 
 ## Parity-gap report
 

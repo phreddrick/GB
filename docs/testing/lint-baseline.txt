@@ -6,65 +6,6 @@ go/cmd/gb-client/main.go	errcheck	Error return value of `resp.Body.Close` is not
 go/cmd/gb-client/main.go	errcheck	Error return value of `syscall.Syscall` is not checked	func promptPassword	syscall.Syscall(syscall.SYS_IOCTL, fd, syscall.TCSETS, uintptr(unsafe.Pointer(&noEcho)))
 go/cmd/gb-client/main.go	errcheck	Error return value of `syscall.Syscall` is not checked	func promptPassword	syscall.Syscall(syscall.SYS_IOCTL, fd, syscall.TCSETS, uintptr(unsafe.Pointer(&oldState)))
 go/cmd/gb-client/main.go	gosec	G103: Use of unsafe calls should be audited	func promptPassword	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, syscall.TCGETS, uintptr(unsafe.Pointer(&oldState))); errno != 0 {
-go/cmd/gb-server/main.go	errcheck	Error return value of `f.Close` is not checked	func main	f.Close()
-go/cmd/gb-server/main.go	errcheck	Error return value of `store.Close` is not checked	func main	defer store.Close()
-go/cmd/makeuniv/main.go	errcheck	Error return value of `f.Close` is not checked	func readNameList	defer f.Close()
-go/cmd/makeuniv/main.go	errcheck	Error return value of `fmt.Scan` is not checked	func main	fmt.Scan(&maxPlanets)
-go/cmd/makeuniv/main.go	errcheck	Error return value of `fmt.Scan` is not checked	func main	fmt.Scan(&minPlanets)
-go/cmd/makeuniv/main.go	errcheck	Error return value of `fmt.Scan` is not checked	func main	fmt.Scan(&nstars)
-go/cmd/makeuniv/main.go	errcheck	Error return value of `fmt.Scanln` is not checked	func nextStarName	fmt.Scanln(&name)
-go/cmd/makeuniv/main.go	errcheck	Error return value of `store.Close` is not checked	func main	defer store.Close()
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makeEarthAtmosphere	p.Conditions[model.AtmosCO2] = int16(intRand(10, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makeEarthAtmosphere	p.Conditions[model.AtmosHelium] = int16(intRand(2, atmos/8+1))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makeEarthAtmosphere	p.Conditions[model.AtmosHydrogen] = int16(intRand(1, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makeEarthAtmosphere	p.Conditions[model.AtmosMethane] = int16(intRand(70, 80))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makeEarthAtmosphere	p.Conditions[model.AtmosNitrogen] = int16(intRand(1, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makeEarthAtmosphere	p.Conditions[model.AtmosNitrogen] = int16(intRand(20, atmos-20))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makeEarthAtmosphere	p.Conditions[model.AtmosOther] = int16(atmos)
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makeEarthAtmosphere	p.Conditions[model.AtmosOther] = int16(atmos)
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makeEarthAtmosphere	p.Conditions[model.AtmosOxygen] = int16(intRand(10, 25))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosCO2] = int16(intRand(30, 45))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosCO2] = int16(intRand(30, 45))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosHelium] = int16(intRand(20, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosHydrogen] = int16(intRand(1, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosHydrogen] = int16(intRand(30, 75))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosMethane] = int16(intRand(70, 80))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosNitrogen] = int16(intRand(1, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosNitrogen] = int16(intRand(1, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosNitrogen] = int16(intRand(10, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosNitrogen] = int16(intRand(10, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosOther] = int16(atmos)
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosOther] = int16(atmos)
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosOther] = int16(atmos)
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosOther] = int16(atmos)
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosSulfur] = int16(intRand(20, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	p.Conditions[model.AtmosSulfur] = int16(intRand(20, atmos/2))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> int16	func makePlanet	t := int16(temperature(dist, stemp))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> uint16	func makesurface	s.Resource = uint16(intRand(lo, hi))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> uint8	func makePlanet	p.MaxX = uint8(intRand(xmin[ptype], xmax[ptype]))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> uint8	func makePlanet	p.MaxY = uint8(maxy)
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> uint8	func makePlanet	p.Type = uint8(ptype)
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> uint8	func makeStar	star.NumPlanets = uint8(nplanets)
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> uint8	func makeStar	star.Temperature = uint8(roundRand(star.Gravity / 100.0))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> uint8	func makesurface	s.Crystals = uint8(intRand(4, 8))
-go/cmd/makeuniv/main.go	gosec	G115: integer overflow conversion int -> uint8	func makesurface	s.Fert = uint8(intRand(flo, fhi))
-go/cmd/makeuniv/main.go	gosec	G304: Potential file inclusion via variable	func readNameList	f, err := os.Open(filename)
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func doubleRand	return rand.Float64()
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func intRand	return low + rand.Intn(hi-low+1)
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makeEarthAtmosphere	p.Conditions[model.AtmosCO2] = int16(1 + rand.Intn(2))
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makeEarthAtmosphere	p.Conditions[model.AtmosHelium] = int16(1 + rand.Intn(2))
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makeEarthAtmosphere	p.Conditions[model.AtmosMethane] = int16(rand.Intn(2))
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makeEarthAtmosphere	p.Conditions[model.AtmosSulfur] = int16(rand.Intn(2))
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makePlanet	if rand.Intn(2) == 0 {
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makePlanet	if rand.Intn(2) == 0 {
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makePlanet	if rand.Intn(2) == 0 {
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makePlanet	if rand.Intn(2) == 0 { // methane planet
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makePlanet	p.Conditions[model.AtmosCO2] = int16(rand.Intn(2))
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makePlanet	p.Conditions[model.AtmosMethane] = int16(rand.Intn(2))
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makesurface	if rand.Intn(1000) < xChance[st] {
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makesurface	if temp < 0 && rand.Intn(100) < -temp && (y == 0 || y == int(p.MaxY)-1) {
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makesurface	if temp < 0 && rand.Intn(100) < -temp && (y == 0 || y == int(p.MaxY)-1) {
-go/cmd/makeuniv/main.go	gosec	G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)	func makesurface	if temp < 0 && rand.Intn(100) < -temp && (y == 0 || y == int(p.MaxY)-1) {
 go/cmd/racegen/main.go	errcheck	Error return value of `store.Close` is not checked	func main	store.Close()
 go/cmd/racegen/main.go	errcheck	Error return value of `store.Close` is not checked	func main	store.Close()
 go/cmd/racegen/main.go	errcheck	Error return value of `store.Close` is not checked	func main	store.Close()
@@ -1086,12 +1027,9 @@ go/internal/game/ship.go	staticcheck	QF1001: could apply De Morgan's law	func (*
 go/internal/game/ship.go	staticcheck	QF1003: could use tagged switch on ship.WhatOrbits	func (*State).doPod	if ship.WhatOrbits == model.LevelStar {
 go/internal/game/ship.go	staticcheck	QF1003: could use tagged switch on ship.WhatOrbits	func (*State).moveShip	if ship.WhatOrbits == model.LevelPlan {
 go/internal/game/ship.go	staticcheck	QF1003: could use tagged switch on ship.WhatOrbits	func (*State).moveShip	if ship.WhatOrbits == model.LevelPlan {
-go/internal/game/state.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).dispatchCommand	sess.Send(fmt.Sprintf("Unknown command '%s'. Type 'help' for a list of commands.\n", verb))
-go/internal/game/state.go	staticcheck	SA4006: this value of now is never used	func (*State).actorLoop	now := time.Now()
 go/internal/game/turn.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).handleVictory	if r.VictoryTurns >= uint16(victoryUpdates) {
 go/internal/game/turn.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).handleVictory	threshold := uint16(planetCount) * uint16(victoryPercent) / 100
 go/internal/game/turn.go	gosec	G115: integer overflow conversion int64 -> uint64	func (*State).doTurn	r.VictoryScore = uint64(raw)
-go/internal/game/turn.go	gosec	G115: integer overflow conversion int64 -> uint8	func (*State).persistTiming	b[i] = byte(unix)
 go/internal/game/turn.go	gosec	G115: integer overflow conversion uint64 -> int	func (*State).doTurn	aps := int(s.sdata.AP[i]) + int(r.PlanetPoints)
 go/internal/game/turn.go	gosec	G115: integer overflow conversion uint64 -> int	func (*State).doTurn	int(starAcc[starIdx].popn[i]),
 go/internal/game/turn.go	gosec	G115: integer overflow conversion uint64 -> int64	func (*State).doTurn	vcs[i].money += int64(s.races[i].Governor[j].Money)
@@ -1120,14 +1058,3 @@ go/internal/game/vn.go	gosec	G115: integer overflow conversion int64 -> uint8	fu
 go/internal/game/vn.go	gosec	G115: integer overflow conversion int64 -> uint8	func (*State).spawnVN	child.Secondary = uint8(sd[model.AbilGuns])
 go/internal/game/vn.go	gosec	G115: integer overflow conversion int64 -> uint8	func (*State).spawnVN	child.Speed = uint8(model.Shipdata[model.OtypeBers][model.AbilSpeed])
 go/internal/game/vn.go	gosec	G115: integer overflow conversion int64 -> uint8	func (*State).spawnVN	child.Speed = uint8(model.Shipdata[model.OtypeVN][model.AbilSpeed])
-go/internal/net/server.go	errcheck	Error return value of `r.Body.Close` is not checked	func decodeJSON	defer r.Body.Close()
-go/internal/net/server.go	errcheck	Error return value of `store.Close` is not checked	func (*Server).handleEnroll	defer store.Close()
-go/internal/net/server.go	errcheck	Error return value of `w.Write` is not checked	func (*Server).handleEnrollPage	w.Write([]byte(enrollmentHTML))
-go/internal/net/session.go	errcheck	Error return value of `s.Send` is not checked	func (*SessionRegistry).Broadcast	s.Send(text)
-go/internal/net/session.go	errcheck	Error return value of `s.Send` is not checked	func (*SessionRegistry).Notify	s.Send(text)
-go/internal/net/session.go	errcheck	Error return value of `s.Send` is not checked	func (*SessionRegistry).NotifyRace	s.Send(text)
-go/internal/net/session.go	errcheck	Error return value of `s.Send` is not checked	func (*SessionRegistry).Shout	s.Send(text)
-go/internal/net/session.go	errcheck	Error return value of `s.conn.Close` is not checked	func (*Session).Close	s.conn.Close()
-go/internal/net/ws.go	errcheck	Error return value of `conn.SetReadDeadline` is not checked	func (*Server).handleWS	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-go/internal/net/ws.go	errcheck	Error return value of `conn.SetReadDeadline` is not checked	func (*Server).handleWS	conn.SetReadDeadline(time.Time{}) // no deadline — game is long-running
-go/internal/net/ws.go	errcheck	Error return value of `sess.Send` is not checked	func (*Server).handleWS	sess.Send(srv.game.WelcomeMessage(claims.PlayerNum, claims.Governor))

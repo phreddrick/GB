@@ -49,7 +49,11 @@ jobs:
 
       - name: Entry points are tracked (CR-01 guard)
         run: |
-          test "$(git ls-files go/cmd | wc -l)" -eq 4 || { echo "expected 4 tracked files under go/cmd"; git ls-files go/cmd; exit 1; }
+          # Every command's main.go must be tracked (Phase 0 found go/cmd
+          # ignored by a loose pattern). Test files may accompany them.
+          for f in gb-client gb-server gbctl makeuniv racegen; do
+            git ls-files --error-unmatch "go/cmd/$f/main.go" >/dev/null || { echo "go/cmd/$f/main.go is not tracked"; git ls-files go/cmd; exit 1; }
+          done
 
       - uses: actions/setup-go@v5
         with:

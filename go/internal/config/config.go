@@ -1,6 +1,8 @@
-// Package config holds all compile-time tunable constants that were
-// scattered across config.h and tweakables.h in the C source.
-// Change values here and recompile — no feature flags needed.
+// Package config holds the server's runtime configuration: the tunable
+// constants that were scattered across config.h and tweakables.h in the C
+// source, plus the operational settings (addresses, database path, secrets)
+// that Phase 1 reads from the environment. Precedence and validation are
+// documented in env.go and validate.go.
 package config
 
 // Config holds all server and game-balance configuration.
@@ -12,11 +14,33 @@ type Config struct {
 	TLSCert string `json:"tls_cert"` // path to TLS cert file (empty = no TLS)
 	TLSKey  string `json:"tls_key"`
 
+	// --- Administrative listener (Phase 1 transitional interface) ---
+	// AdminAddr is the host:port of the token-protected admin listener
+	// (gbctl talks to it). Loopback by default; empty disables the listener
+	// (and with it update triggers and universe initialisation).
+	AdminAddr string `json:"admin_addr"`
+	// AdminToken is never read from the JSON file; it comes from GB_ADMIN_TOKEN
+	// or GB_ADMIN_TOKEN_FILE only (see env.go). The json:"-" tag enforces it.
+	AdminToken string `json:"-"`
+
 	// --- JWT authentication ---
-	JWTSecret string `json:"jwt_secret"` // signing secret; override in production
+	// JWTSecret is never read from the JSON file; it comes from GB_JWT_SECRET
+	// or GB_JWT_SECRET_FILE only (see env.go). There is no default: the server
+	// refuses to start without a secret that passes validate.go (CR-35).
+	JWTSecret string `json:"-"`
 
 	// --- Database ---
 	DBPath string `json:"db_path"` // path to bbolt database file
+
+	// --- Operations ---
+	LogLevel               string   `json:"log_level"`                  // debug, info, warn, error
+	ShutdownTimeoutSeconds int      `json:"shutdown_timeout_seconds"`   // orderly shutdown budget
+	TurnStallTimeoutSecs   int      `json:"turn_stall_timeout_seconds"` // liveness: max time without turn progress
+	WSAllowedOrigins       []string `json:"ws_allowed_origins"`         // browser Origin allow-list; empty = same-origin only
+	WSMaxMessageBytes      int64    `json:"ws_max_message_bytes"`       // read limit per WebSocket frame
+	WSWriteTimeoutSeconds  int      `json:"ws_write_timeout_seconds"`   // per-write deadline
+	WSOutboundQueue        int      `json:"ws_outbound_queue"`          // queued messages before a slow client is dropped
+	EnrollPreview          bool     `json:"enroll_preview"`             // enable the INCOMPLETE web enrollment preview (CR-07)
 
 	// --- Data directories ---
 	DataDir string `json:"data_dir"` // game data root
@@ -37,19 +61,16 @@ type Config struct {
 	MovesPerUpdate            int `json:"moves_per_update"` // movement segments per update
 
 	// --- Feature flags (replaces #define in config.h) ---
-	Market          bool   `json:"market"`           // commodity market system
-	Victory         bool   `json:"victory"`          // victory conditions
-	Defense         bool   `json:"defense"`          // planetary gun emplacements
-	Voting          bool   `json:"voting"`           // player voting
-	Dissolve        bool   `json:"dissolve"`         // allow races to dissolve
-	Monitor         bool   `json:"monitor"`          // deity can monitor messages
-	ExternalTrigger bool   `json:"external_trigger"` // password-triggered updates
-	UpdatePassword  string `json:"update_password"`  // password for TriggerUpdate
-	SegmentPassword string `json:"segment_password"` // password for TriggerSegment
-	AccessCheck     bool   `json:"access_check"`     // address authorization
-	Nomads          bool   `json:"nomads"`           // nomad race rules
-	PodTerraform    bool   `json:"pod_terraform"`    // pods terraform on infection
-	ShowCowards     bool   `json:"show_cowards"`     // show invisible player count
+	Market       bool `json:"market"`        // commodity market system
+	Victory      bool `json:"victory"`       // victory conditions
+	Defense      bool `json:"defense"`       // planetary gun emplacements
+	Voting       bool `json:"voting"`        // player voting
+	Dissolve     bool `json:"dissolve"`      // allow races to dissolve
+	Monitor      bool `json:"monitor"`       // deity can monitor messages
+	AccessCheck  bool `json:"access_check"`  // address authorization
+	Nomads       bool `json:"nomads"`        // nomad race rules
+	PodTerraform bool `json:"pod_terraform"` // pods terraform on infection
+	ShowCowards  bool `json:"show_cowards"`  // show invisible player count
 
 	// --- Game balance (from tweakables.h) ---
 	MoveFactor         float64 `json:"move_factor"`
@@ -198,17 +219,26 @@ type Config struct {
 	CreatUnivIterat int `json:"creat_univ_iterat"`
 }
 
-// Default returns a Config pre-filled with the original tweakables.h values.
+// Default returns a Config pre-filled with the original tweakables.h values
+// and safe operational defaults. It deliberately has no JWT secret and no
+// admin token: both must be supplied through the environment (validate.go).
 func Default() *Config {
 	return &Config{
 		Host:      "localhost",
 		Port:      8080,
-		JWTSecret: "change-me-in-production",
+		AdminAddr: "127.0.0.1:8081",
 		DBPath:    "./gb.db",
 		DataDir:   "./Data",
 		DocsDir:   "./Docs",
 		TeleDir:   "./Tele",
 		NewsDir:   "./News",
+
+		LogLevel:               "info",
+		ShutdownTimeoutSeconds: 30,
+		TurnStallTimeoutSecs:   600,
+		WSMaxMessageBytes:      4096,
+		WSWriteTimeoutSeconds:  10,
+		WSOutboundQueue:        256,
 
 		CommandTimeMSec:  250,
 		CommandsPerTime:  1,

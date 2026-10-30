@@ -2,6 +2,7 @@
 # used to match the source directories cmd/gb-server etc. and hid main.go from git, CR-01)
 /gb-server
 /gb-client
+/gbctl
 /makeuniv
 /racegen
 *.exe

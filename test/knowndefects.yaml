@@ -57,3 +57,10 @@
   reason: same cause as golden/ground_attack/astrength (morale_factor constant)
   phase_to_fix: 3d
   since: 2026-10-28
+
+- id: persistence/non-atomic-turn-flush
+  untested: true
+  finding: CR-18
+  reason: a turn is flushed in one bbolt transaction per ship batch, star, planet and race (turn.go flushAll) plus separate power, block and star-data writes; a crash or kill during the flush leaves a mixed-turn store; Phase 1 closes only the orderly path (SIGTERM waits for the running turn and reports a timeout honestly) and no test asserts crash consistency; the crash-injection tests T1-T8 of plan section 8.11 arrive with the single-transaction commit in Phase 3a
+  phase_to_fix: 3a
+  since: 2026-10-29
