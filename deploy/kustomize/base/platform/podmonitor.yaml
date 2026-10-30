@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: gb-engine
+  labels:
+    app.kubernetes.io/name: gb-engine
+    app.kubernetes.io/component: engine
+# A PodMonitor (the convention apps/n8n already uses in k8s-helpers) scrapes
+# the pod directly on the named admin port, so no Service ever lists 8081.
+# Rancher Monitoring's Prometheus selects PodMonitors in every namespace
+# (podMonitorNamespaceSelector {} and podMonitorSelector {}, verified
+# read-only 2026-10-30). The CRD (monitoring.coreos.com/v1, prometheus-operator
+# 0.87.1) is a cluster prerequisite validated against the vendored schema in
+# ../../schemas; it is never installed by these manifests. The ci entry point
+# drops this object because kind has no prometheus-operator.
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gb-engine
+      app.kubernetes.io/component: engine
+  podMetricsEndpoints:
+    - port: admin
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s

@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# base/platform: namespaced platform prerequisites for one GB environment
+# (migration plan 12.3 item 2 as amended for Phase 2; ADR-0005). Rendered
+# only through apps/<env>/platform, the single entry point of the
+# gb-<env>-platform Argo CD Application.
+#
+# Deliberately absent:
+#   - the Namespace: operator-owned, created in a separately authorised step
+#     (Decision C of the Phase 2B brief); no Application renders or patches it;
+#   - Secrets: gb-server-secrets is created out of band (ADR-0004, ADR-0005);
+#   - Role/RoleBinding: the server never talks to the Kubernetes API;
+#   - the workload, its Services and Ingress: those belong to base/server.
+#
+# The target namespace is set by the entry point (apps/<env>/platform).
+
+resources:
+  - serviceaccount.yaml
+  - networkpolicy-default-deny.yaml
+  - networkpolicy-allow-dns.yaml
+  - networkpolicy-allow-player-from-traefik.yaml
+  - networkpolicy-allow-metrics-from-monitoring.yaml
+  - podmonitor.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: gb
+    includeSelectors: false
+    includeTemplates: false

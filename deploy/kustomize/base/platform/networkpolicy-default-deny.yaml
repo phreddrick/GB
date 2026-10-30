@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+# Every pod in the namespace starts with no ingress and no egress. The
+# allow policies below open exactly: DNS egress, the player port from
+# Traefik, the admin port's /metrics from Prometheus. Nothing opens the
+# admin API (port 8081) to anything else; gbctl reaches it through
+# `kubectl port-forward`, which dials localhost inside the pod's network
+# namespace and is not subject to this policy (to be verified live:
+# docs/operations/storage-and-network-validation.md).
+#
+# Enforcement is a property of the CNI (Cilium on the home-lab cluster, a
+# no-op on a vanilla kind cluster) and must be verified on the cluster
+# before the workload is deployed; rendering this object proves nothing.
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

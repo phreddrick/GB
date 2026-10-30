@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gb-player
+  labels:
+    app.kubernetes.io/name: gb-engine
+    app.kubernetes.io/component: engine
+  # The entry point adds cert-manager.io/cluster-issuer and the
+  # traefik router.middlewares annotation (namespace-qualified).
+# Player interface only. Traefik upgrades WebSocket connections on a plain
+# Ingress route without further configuration; the server must list the
+# public origin in GB_WS_ALLOWED_ORIGINS (set by the entry point).
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - gb.example.invalid
+      secretName: gb-player-tls
+  rules:
+    - host: gb.example.invalid
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gb-player
+                port:
+                  name: player

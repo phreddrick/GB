@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# base/server: the Phase 2 to 4 monolith as a StatefulSet named gb-engine
+# whose identity fields are frozen (migration plan 12.3 item 5; ADR-0005,
+# ADR-0007; Decision D of the Phase 2B brief):
+#   metadata.name gb-engine, spec.serviceName gb-engine, the selector
+#   labels, podManagementPolicy, replicas 1 and volumeClaimTemplates[world].
+# deploy/kustomize/tests/validate.py compares the rendered dev entry point
+# with statefulset-identity.golden.json and fails on any difference.
+#
+# Rendered only through apps/<env>/server (Application gb-<env>-server).
+# The target namespace, the image digest, the ingress host, the issuer and
+# the WebSocket origin allow-list are set by the entry point.
+
+resources:
+  - statefulset.yaml
+  - service-headless.yaml
+  - service-player.yaml
+  - middleware-https-redirect.yaml
+  - ingress.yaml
+
+configMapGenerator:
+  # Non-secret runtime configuration (ADR-0004: environment wins; the two
+  # secrets come from mounted files, never from here). Hash suffix on, so a
+  # changed value rolls the pod.
+  - name: gb-engine-config
+    literals:
+      - GB_ADDR=0.0.0.0:8080
+      - GB_ADMIN_ADDR=0.0.0.0:8081
+      - GB_DB_PATH=/data/world/gb.db
+      - GB_LOG_LEVEL=info
+      - GB_SHUTDOWN_TIMEOUT=240
+      - GB_TURN_STALL_TIMEOUT=600
+      - GB_ENROLL_PREVIEW=false
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: gb
+    includeSelectors: false
+    includeTemplates: false

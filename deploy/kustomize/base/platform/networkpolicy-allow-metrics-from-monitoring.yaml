@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gb-engine-allow-metrics-from-monitoring
+# Decision A (Phase 2B brief): the admin listener binds 0.0.0.0:8081 inside
+# the pod so Prometheus can scrape /metrics (served only on that listener,
+# unauthenticated) through the PodMonitor. This policy is the only path to
+# port 8081 from the pod network, and it admits exactly the Rancher
+# Monitoring Prometheus pods (cattle-monitoring-system,
+# app.kubernetes.io/name=prometheus, prometheus=rancher-monitoring-prometheus;
+# labels verified read-only 2026-10-30). Every /admin/v1/* operation on the
+# same port still requires the static bearer token (ADR-0004); the
+# NetworkPolicy is defence in depth, not authentication.
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gb-engine
+      app.kubernetes.io/component: engine
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cattle-monitoring-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+              prometheus: rancher-monitoring-prometheus
+      ports:
+        - protocol: TCP
+          port: admin

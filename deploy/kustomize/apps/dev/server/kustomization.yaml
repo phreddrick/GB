@@ -1,0 +1,49 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Entry point of the Argo CD Application gb-dev-server (k8s-helpers:
+# argocd/applications/gb-dev-server.yaml, path deploy/kustomize/apps/dev/server,
+# targetRevision master). Manual sync only; synced after gb-dev-platform
+# (docs/operations/deploy.md).
+
+namespace: gb-dev
+
+resources:
+  - ../../../base/server
+
+images:
+  # Deployments reference a digest, never a tag (ADR-0006). No image has
+  # been published yet (Phase 2B builds nothing): the all-zero value below
+  # is a documented sentinel that the validator reports as UNPUBLISHED and
+  # that must be replaced by the digest the CI publish job prints (Stage 3)
+  # before this entry point may be synced. It is not a real digest.
+  - name: ghcr.io/phreddrick/gb-server
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+configMapGenerator:
+  - name: gb-engine-config
+    behavior: merge
+    literals:
+      # Browser Origin seen through Traefik; required for WebSocket upgrades
+      # (empty would mean same-origin only, which the pod's Host is not).
+      - GB_WS_ALLOWED_ORIGINS=https://gb-dev.home.spukhaus.com
+
+patches:
+  - target:
+      kind: Ingress
+      name: gb-player
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          cert-manager.io/cluster-issuer: letsencrypt-production-cloudflare
+          traefik.ingress.kubernetes.io/router.middlewares: gb-dev-https-redirect@kubernetescrd
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: gb-dev.home.spukhaus.com
+      - op: replace
+        path: /spec/tls/0/secretName
+        value: gb-dev-tls
+      - op: replace
+        path: /spec/rules/0/host
+        value: gb-dev.home.spukhaus.com
