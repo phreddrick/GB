@@ -21,3 +21,7 @@ The migration plan (`../microservices-migration-plan.md`, section 19) lists the 
 | [0002](0002-golden-test-method.md) | C-to-Go golden-test method for parity | Accepted 2026-10-28 |
 | [0003](0003-known-defect-inventory.md) | Known-defect inventory and parity-gap reporting; lint baseline | Accepted 2026-10-28 |
 | [0004](0004-configuration-and-secrets.md) | Configuration and secrets through the environment; refuse insecure defaults | Accepted 2026-10-29 |
+| [0005](0005-kustomize-and-gitops-ownership.md) | Kustomize in the GB repository; one entry point per Argo CD Application; operator-owned Namespace | Proposed 2026-10-30 (Phase 2B draft) |
+| [0006](0006-image-registry-and-digest-pinning.md) | Container images: GHCR, digest pinning, distroless non-root, supply-chain checks | Proposed 2026-10-30 (Phase 2B draft) |
+| [0007](0007-node-placement-and-storage.md) | Node placement, Longhorn persistence and the single-writer volume (RWOP with a declared fallback) | Proposed 2026-10-30 (Phase 2B draft; RWOP unvalidated) |
+| [0008](0008-explicit-universe-bootstrap.md) | Explicit universe bootstrap through the admin API; recovery by volume replacement, no overwrite option | Proposed 2026-10-30 (Phase 2B draft) |
