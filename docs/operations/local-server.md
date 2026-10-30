@@ -85,6 +85,8 @@ Concurrent requests are serialized by the actor; the second one is refused.
 There is **no overwrite option**. To recreate a *disposable development*
 universe: stop the server, delete the database file, start the server,
 initialise again. Do not do this to a database that holds player data.
+(In Kubernetes the equivalent is a new empty volume, never an in-place
+reset: `dev-volume-recovery.md`, ADR-0008.)
 
 The offline `makeuniv -db PATH -seed N ...` tool does the same against a
 database no server has open (it refuses a running server's file after the
