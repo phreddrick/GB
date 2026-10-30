@@ -1,3 +1,10 @@
+# SUPERSEDED (2026-10-30): do not apply. This file is the pre-Phase-0 minikube
+# manifest (Deployment, RWO PVC, makeuniv init container that regenerates the
+# universe on every start, no secrets, wrong probes; CR-02, CR-05, CR-06). The
+# supported manifests are the Kustomize bases and entry points under
+# deploy/kustomize/ (StatefulSet gb-engine, headless Service, RWOP volume
+# claim template `world`, out-of-band Secret gb-server-secrets) with the
+# runbooks in docs/operations/. Kept unchanged below only as history.
 ---
 # ConfigMap for Galactic Bloodshed configuration
 apiVersion: v1

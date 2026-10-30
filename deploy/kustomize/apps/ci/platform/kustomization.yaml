@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# kind-compatible platform entry point (migration plan 13.3). Same structure
+# as apps/dev/platform; the PodMonitor is dropped because a vanilla kind
+# cluster has no prometheus-operator CRDs (its rendering is schema-checked
+# from the dev entry point instead). NetworkPolicies are kept even though
+# kind's default CNI does not enforce them: the ownership test runs on ci
+# too, so the structure stays identical to dev. The namespace is created by
+# the kind harness, not rendered here.
+
+namespace: gb-dev
+
+resources:
+  - ../../../base/platform
+
+patches:
+  - target:
+      group: monitoring.coreos.com
+      kind: PodMonitor
+      name: gb-engine
+    patch: |-
+      $patch: delete
+      apiVersion: monitoring.coreos.com/v1
+      kind: PodMonitor
+      metadata:
+        name: gb-engine

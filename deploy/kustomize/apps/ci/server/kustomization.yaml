@@ -1,0 +1,60 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# kind-compatible server entry point (migration plan 13.3): the image the
+# CI job just built and loaded into kind (tag, because there is no registry
+# in the loop), kind's local-path StorageClass with ReadWriteOnce (RWOP is
+# not relied on in CI), no Ingress or Middleware (the harness port-forwards
+# the gb-player Service), no node selector (kind nodes carry no home-lab
+# labels). Everything else, including the frozen name, serviceName,
+# selector, replicas and the volume claim template name, is the base.
+
+namespace: gb-dev
+
+resources:
+  - ../../../base/server
+
+images:
+  - name: ghcr.io/phreddrick/gb-server
+    newName: gb-server
+    newTag: ci
+
+configMapGenerator:
+  - name: gb-engine-config
+    behavior: merge
+    literals:
+      - GB_WS_ALLOWED_ORIGINS=http://127.0.0.1:18080
+
+patches:
+  - target:
+      kind: StatefulSet
+      name: gb-engine
+    patch: |-
+      - op: replace
+        path: /spec/volumeClaimTemplates/0/spec/storageClassName
+        value: standard
+      - op: replace
+        path: /spec/volumeClaimTemplates/0/spec/accessModes
+        value:
+          - ReadWriteOnce
+      - op: remove
+        path: /spec/template/spec/nodeSelector
+  - target:
+      kind: Ingress
+      name: gb-player
+    patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: gb-player
+  - target:
+      group: traefik.io
+      kind: Middleware
+      name: https-redirect
+    patch: |-
+      $patch: delete
+      apiVersion: traefik.io/v1alpha1
+      kind: Middleware
+      metadata:
+        name: https-redirect

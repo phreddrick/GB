@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gb-engine-allow-player-from-traefik
+# The player listener (named port "player", 8080) is reachable only from the
+# ingress controller. Selector copied from the live DaemonSet pods
+# (kube-system, app.kubernetes.io/name=rke2-traefik,
+# app.kubernetes.io/instance=rke2-traefik-kube-system; verified read-only
+# 2026-10-30) and identical to the policy k8s-helpers uses for the Argo CD
+# UI (argocd/argocd-server-from-traefik).
+#
+# Port 8081 is intentionally not listed here: the admin API is never
+# reachable from the ingress path.
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gb-engine
+      app.kubernetes.io/component: engine
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rke2-traefik
+              app.kubernetes.io/instance: rke2-traefik-kube-system
+      ports:
+        - protocol: TCP
+          port: player

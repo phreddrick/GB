@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Entry point of the Argo CD Application gb-dev-platform (k8s-helpers:
+# argocd/applications/gb-dev-platform.yaml, path deploy/kustomize/apps/dev/platform,
+# targetRevision master). Manual sync only.
+#
+# The namespace gb-dev is operator-owned and must exist before this entry
+# point is synced; it is not rendered here (Decision C).
+
+namespace: gb-dev
+
+resources:
+  - ../../../base/platform

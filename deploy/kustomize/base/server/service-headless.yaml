@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gb-engine
+  labels:
+    app.kubernetes.io/name: gb-engine
+    app.kubernetes.io/component: engine
+# Governing headless Service of the StatefulSet (spec.serviceName), giving
+# the pod its stable DNS name gb-engine-0.gb-engine.<ns>.svc. Only the
+# player port is listed; the admin port is never on any Service.
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: gb-engine
+    app.kubernetes.io/component: engine
+  ports:
+    - name: player
+      port: 8080
+      targetPort: player
+      protocol: TCP

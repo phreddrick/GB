@@ -1,4 +1,11 @@
 # Multi-stage build for Galactic Bloodshed
+#
+# LEGACY (2026-10-30): kept only because CI's `docker` job still builds it.
+# The Phase 2 image specification is deploy/docker/Dockerfile (context `go/`,
+# targets `server` and `gbctl`, distroless, UID 65532, digest-pinned bases;
+# see deploy/docker/README.md and ADR-0006). This file runs as root on an
+# unpinned alpine runtime and is not used by any deployment manifest; it is
+# replaced by a pointer when the CI job is retargeted in the next stage.
 
 # Stage 1: Build all Go binaries.
 # Builder pinned to the same patched Go toolchain CI uses (1.27.3). The digest

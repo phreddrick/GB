@@ -1,0 +1,11 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: https-redirect
+# Same object every k8s-helpers app ships (homebox, n8n, plex, jellyfin).
+# Referenced by the Ingress as <namespace>-https-redirect@kubernetescrd,
+# which is why the entry point, not the base, writes that annotation.
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true

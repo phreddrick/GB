@@ -1,0 +1,31 @@
+# Build context filter for deploy/docker/Dockerfile (context = this directory).
+# Keep the context to the tracked module: no local binaries, databases,
+# editor files or test artefacts.
+/gb-server
+/gb-client
+/gbctl
+/makeuniv
+/racegen
+*.exe
+*.db
+*.db-wal
+*.db-shm
+Data/
+data/
+Tele/
+tele/
+News/
+news/
+Docs/
+config.json
+dist/
+build/
+bin/
+*.log
+*.tmp
+*.bak
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store

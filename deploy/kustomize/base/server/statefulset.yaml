@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gb-engine
+  labels:
+    app.kubernetes.io/name: gb-engine
+    app.kubernetes.io/component: engine
+spec:
+  # ---- frozen identity (immutable on a StatefulSet; see base kustomization) ----
+  replicas: 1
+  serviceName: gb-engine
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gb-engine
+      app.kubernetes.io/component: engine
+  # ---- end of frozen identity (volumeClaimTemplates below is also frozen) ----
+  updateStrategy:
+    type: RollingUpdate
+  persistentVolumeClaimRetentionPolicy:
+    # Deleting or scaling the StatefulSet never deletes world-gb-engine-0.
+    # Nothing here protects against `kubectl delete pvc`
+    # (docs/operations/dev-volume-recovery.md).
+    whenDeleted: Retain
+    whenScaled: Retain
+  minReadySeconds: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gb-engine
+        app.kubernetes.io/component: engine
+    spec:
+      serviceAccountName: gb-engine
+      automountServiceAccountToken: false
+      # Decision 5 / Phase 2A: the home-apps workers (backup, wkr1 today).
+      # Mandatory on this cluster because no node, control-plane nodes
+      # included, carries a taint. The ci entry point removes it.
+      nodeSelector:
+        workload.home-apps: "true"
+      # GB_SHUTDOWN_TIMEOUT (240 s) must stay below this budget so the
+      # server's own orderly path (finish the turn, flush, persist the
+      # schedule, close the store) decides the exit code, not the kubelet.
+      terminationGracePeriodSeconds: 300
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        # Longhorn's CSIDriver has fsGroupPolicy ReadWriteOnceWithFSType, so
+        # the kubelet applies the group ownership to the ext4 mount; bbolt
+        # then creates /data/world/gb.db (mode 0600) as UID 65532. No init
+        # container and no chown are needed. OnRootMismatch makes the
+        # ownership pass a one-time cost. Verified only by the authorised
+        # throwaway test (docs/operations/storage-and-network-validation.md).
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gb-server
+          # Digest set by the entry point (apps/<env>/server). Never a tag.
+          image: ghcr.io/phreddrick/gb-server
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: player
+              containerPort: 8080
+              protocol: TCP
+            # Admin API (bearer token) and /metrics. Reachable only through the
+            # NetworkPolicy allow from Prometheus and through
+            # `kubectl port-forward`; never listed on a Service or Ingress.
+            - name: admin
+              containerPort: 8081
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: gb-engine-config
+          env:
+            # ADR-0004: secrets are read from mounted files; the plain
+            # variables must not also be set (the loader refuses both).
+            - name: GB_JWT_SECRET_FILE
+              value: /var/run/secrets/gb/jwt-secret
+            - name: GB_ADMIN_TOKEN_FILE
+              value: /var/run/secrets/gb/admin-token
+          volumeMounts:
+            - name: world
+              mountPath: /data/world
+            - name: gb-secrets
+              mountPath: /var/run/secrets/gb
+              readOnly: true
+          # Probes use the player listener on the pod IP. /readyz is 200 in
+          # UNINITIALIZED (game_ready:false) so a fresh volume can be
+          # initialised through a port-forward without a restart loop
+          # (docs/operations/local-server.md section 5).
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: player
+            periodSeconds: 5
+            failureThreshold: 120
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: player
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: player
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: gb-secrets
+          secret:
+            # Created out of band by the operator (docs/operations/bootstrap.md);
+            # never rendered by any entry point.
+            secretName: gb-server-secrets
+            defaultMode: 0440
+            items:
+              - key: jwt-secret
+                path: jwt-secret
+              - key: admin-token
+                path: admin-token
+  volumeClaimTemplates:
+    - metadata:
+        name: world
+      spec:
+        # ReadWriteOncePod is the design; its support on the home-lab Longhorn
+        # 1.12.1 is unvalidated until the authorised throwaway test. The
+        # documented fallback (ReadWriteOnce) is a different frozen value and
+        # must be chosen before the first PVC exists (ADR-0007).
+        accessModes:
+          - ReadWriteOncePod
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 5Gi

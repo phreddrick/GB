@@ -1,0 +1,32 @@
+{
+  "_comment": "Frozen identity of the gb-engine StatefulSet (migration plan 12.3 item 5, ADR-0005/0007, Phase 2B Decision D). validate.py compares every non-ci entry point against this file; a change here is a change to immutable StatefulSet fields and means deleting and recreating the StatefulSet. accessModes/storageClassName are part of the identity too: the RWO fallback (ADR-0007) must be chosen here before the first PVC exists.",
+  "kind": "StatefulSet",
+  "name": "gb-engine",
+  "replicas": 1,
+  "serviceName": "gb-engine",
+  "podManagementPolicy": "OrderedReady",
+  "selector": {
+    "matchLabels": {
+      "app.kubernetes.io/component": "engine",
+      "app.kubernetes.io/name": "gb-engine"
+    }
+  },
+  "persistentVolumeClaimRetentionPolicy": {
+    "whenDeleted": "Retain",
+    "whenScaled": "Retain"
+  },
+  "volumeClaimTemplates": [
+    {
+      "name": "world",
+      "accessModes": [
+        "ReadWriteOncePod"
+      ],
+      "storageClassName": "longhorn",
+      "storage": "5Gi"
+    }
+  ],
+  "ci_overrides_allowed": [
+    "volumeClaimTemplates[0].accessModes",
+    "volumeClaimTemplates[0].storageClassName"
+  ]
+}
