@@ -68,6 +68,12 @@ help:
 	@grep -E '^#   make' $(MAKEFILE_LIST) | sed 's/^#   //'
 
 # ─── Docker Targets ────────────────────────────────────────────────────────
+#
+# LEGACY (2026-10-30): the docker-* and k8s-* targets below drive the old root
+# Dockerfile, k8s-deployment.yaml and a minikube flow that are superseded by
+# deploy/docker/Dockerfile and deploy/kustomize/ (Argo CD, manual sync; see
+# docs/operations/deploy.md). They are kept unchanged for now and are not
+# used by CI or by any deployment; do not run k8s-deploy against the lab.
 
 # Build Docker image
 docker-build:
