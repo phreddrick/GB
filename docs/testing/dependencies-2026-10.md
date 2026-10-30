@@ -58,3 +58,7 @@ Verified locally on 2026-10-28: `GOTOOLCHAIN=local go version` is `go1.27.3`; `g
 - Tooling versions pinned for repeatability: `golang.org/x/vuln/cmd/govulncheck@v1.9.0`, `golangci-lint` v2.15.0, `honnef.co/go/tools/cmd/staticcheck@v0.8.2` (baseline cross-check), `actionlint@v1.7.7` (workflow validation).
 
 A clean vulnerability scan is not evidence that the application is secure: the review's security findings (default JWT secret accepted, tokens in query strings, no origin check, unauthenticated enrollment and status endpoints, no read limits) are all still open and scheduled for Phases 1 and 4b.
+
+## Phase 1 update (2026-10-29)
+
+`go mod tidy` removed `golang.org/x/term` from `go.mod`/`go.sum`: its only user was the interactive terminal check in the old `cmd/makeuniv`, which Phase 1 replaced by a non-interactive wrapper around `internal/universe`. No module was added: the metrics endpoint is a dependency-free text-exposition registry (`internal/platform/metrics`), logging uses `log/slog`, and the admin interface is plain `net/http`. `govulncheck` v1.9.0 on the Phase 1 tree: 0 reachable vulnerabilities (17 in required modules, none called). The `x/crypto`/`x/sys` bumps and the dependency-update automation remain open.
