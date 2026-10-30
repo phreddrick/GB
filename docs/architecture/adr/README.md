@@ -20,3 +20,4 @@ The migration plan (`../microservices-migration-plan.md`, section 19) lists the 
 | [0001](0001-modular-monolith-first.md) | Modular monolith before service extraction; extraction conditional on gates | Accepted 2026-10-28 |
 | [0002](0002-golden-test-method.md) | C-to-Go golden-test method for parity | Accepted 2026-10-28 |
 | [0003](0003-known-defect-inventory.md) | Known-defect inventory and parity-gap reporting; lint baseline | Accepted 2026-10-28 |
+| [0004](0004-configuration-and-secrets.md) | Configuration and secrets through the environment; refuse insecure defaults | Accepted 2026-10-29 |

@@ -4,6 +4,7 @@
 #   make              - Build all binaries
 #   make gb-server    - Build main game server
 #   make gb-client    - Build game client
+#   make gbctl        - Build the admin command-line tool
 #   make makeuniv     - Build universe initializer
 #   make racegen      - Build player enrollment
 #   make clean        - Remove all binaries
@@ -14,7 +15,7 @@
 #   make k8s-delete   - Delete Kubernetes deployment
 #   make help         - Show this help message
 
-.PHONY: all gb-server gb-client makeuniv racegen clean test docker-build docker-run k8s-deploy k8s-delete help
+.PHONY: all gb-server gb-client gbctl makeuniv racegen clean test docker-build docker-run k8s-deploy k8s-delete help
 
 # Build configuration
 GO := go
@@ -22,7 +23,7 @@ GOFLAGS := -v
 BINDIR := .
 
 # Build all binaries
-all: gb-server gb-client makeuniv racegen
+all: gb-server gb-client gbctl makeuniv racegen
 
 # Main game server
 gb-server:
@@ -33,6 +34,11 @@ gb-server:
 gb-client:
 	@echo "Building gb-client..."
 	$(GO) build $(GOFLAGS) -o $(BINDIR)/gb-client ./cmd/gb-client
+
+# Admin command-line tool (talks to the gb-server admin listener)
+gbctl:
+	@echo "Building gbctl..."
+	$(GO) build $(GOFLAGS) -o $(BINDIR)/gbctl ./cmd/gbctl
 
 # Universe initializer
 makeuniv:
@@ -47,7 +53,7 @@ racegen:
 # Clean up binaries
 clean:
 	@echo "Cleaning..."
-	rm -f $(BINDIR)/gb-server $(BINDIR)/gb-client $(BINDIR)/makeuniv $(BINDIR)/racegen
+	rm -f $(BINDIR)/gb-server $(BINDIR)/gb-client $(BINDIR)/gbctl $(BINDIR)/makeuniv $(BINDIR)/racegen
 	$(GO) clean
 
 # Run tests

@@ -1,6 +1,7 @@
 package net
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -78,23 +79,34 @@ func (srv *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 		Governor int    `json:"governor"`
 	}
-	if err := decodeJSON(r, &req); err != nil {
+	if err := decodeJSON(r, &req, 4<<10); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
 
-	// Delegate authentication to the game state actor.
-	authResp := srv.game.Authenticate(req.Race, req.Password, req.Governor)
+	// Delegate authentication to the game state actor (bounded wait: during
+	// a long turn the client gets 503 instead of an indefinite hang).
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	authResp, err := srv.game.Authenticate(ctx, req.Race, req.Password, req.Governor)
+	if err != nil {
+		srv.metrics.Logins.Inc("unavailable")
+		http.Error(w, "server busy, retry shortly", http.StatusServiceUnavailable)
+		return
+	}
 	if !authResp.OK {
+		srv.metrics.Logins.Inc("denied")
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
 	token, err := srv.issueToken(authResp.PlayerNum, req.Governor, authResp.God)
 	if err != nil {
+		srv.metrics.Logins.Inc("error")
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	srv.metrics.Logins.Inc("ok")
 
-	writeJSON(w, map[string]string{"token": token})
+	writeJSON(w, http.StatusOK, map[string]string{"token": token})
 }
