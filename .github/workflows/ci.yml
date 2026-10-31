@@ -1,5 +1,5 @@
 # CI for the GB Go port: Phase 0 gates (migration plan section 21, PR-B) plus
-# the Phase 2C image and manifest jobs (plan 13.1 to 13.2, ADR-0006).
+# the Phase 2C image, manifest and kind jobs (plan 13.1 to 13.3, ADR-0006).
 #
 # Phase 0/1 gates, unchanged in substance: build, gofmt, go vet, go mod
 # verify/tidy, go test, go test -race, golden fixture reproducibility, golden
@@ -24,6 +24,21 @@
 #                     pinned by safety-check.py S5 and re-asserted here) and
 #                     the sentinel assertion: strict mode must fail while the
 #                     dev image is the all-zero digest and pass afterwards.
+#   image scan        Trivy (pinned) on both final images: policy fails on a
+#                     CRITICAL vulnerability with a fix available or a secret;
+#                     every finding is reported in the summary.
+#   image sbom        Syft (pinned) SPDX JSON for both images, kept 90 days.
+#   kind e2e          a disposable kind cluster on the hosted runner, the
+#                     apps/ci/* entry points, UID/read-only/volume checks,
+#                     gbctl universe init once (then exit 4), probes, an
+#                     orderly restart preserving universe and schedule,
+#                     cluster deleted at the end and its absence confirmed by
+#                     a successful listing (kind-cleanup.sh; a deletion or
+#                     inspection error fails the job; only the cluster whose
+#                     ownership marker this run wrote after a successful
+#                     creation is ever deleted). kind proves nothing about
+#                     Longhorn RWOP, Cilium NetworkPolicy enforcement, Traefik,
+#                     PodMonitor or node fencing.
 #
 # Runtime: ubuntu-26.04 (ubuntu-latest is migrating to it), actions pinned to
 # commit SHAs of Node 24 releases (Node 20 removal from the runners,
@@ -356,3 +371,202 @@ jobs:
             grep -E '^(PASS|FAIL|WARN|==|Summary|renderer)' "$RUNNER_TEMP/manifests.txt" 2>/dev/null | tail -80 || echo "(did not run)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  image-scan:
+    name: image scan (trivy)
+    needs: docker
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      # Trivy DB mirrors, tried in order (GHCR rate limits anonymous pulls).
+      TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: container-images
+          path: ${{ runner.temp }}/images
+
+      - name: Archives are the ones the build recorded
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+        run: |
+          mkdir -p "$RUNNER_TEMP/scan"
+          for t in gb-server gbctl; do python3 .github/scripts/oci_digest.py "$IMAGES_DIR/$t.oci.tar" --field manifest_digest; done
+
+      - name: Trivy scan of the server image (all severities, vulnerabilities and secrets, JSON)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          input: ${{ runner.temp }}/images/gb-server.oci.tar
+          format: json
+          output: ${{ runner.temp }}/scan/trivy-gb-server.json
+          scanners: vuln,secret
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "0"
+          version: ${{ env.TRIVY_VERSION }}
+
+      - name: Trivy scan of the gbctl image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          input: ${{ runner.temp }}/images/gbctl.oci.tar
+          format: json
+          output: ${{ runner.temp }}/scan/trivy-gbctl.json
+          scanners: vuln,secret
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "0"
+          version: ${{ env.TRIVY_VERSION }}
+
+      - name: Scanner version and database recorded
+        env:
+          SCAN_DIR: ${{ runner.temp }}/scan
+        run: |
+          trivy --version | tee "$SCAN_DIR/trivy-version.txt"
+          grep -q "Version: ${TRIVY_VERSION#v}" "$SCAN_DIR/trivy-version.txt" || { echo "trivy is not ${TRIVY_VERSION}"; exit 1; }
+          for f in "$SCAN_DIR"/trivy-*.json; do test -s "$f" || { echo "$f is empty: the scan did not produce a report"; exit 1; }; done
+          { echo "## Trivy"; echo '```'; cat "$SCAN_DIR/trivy-version.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Policy (fail on CRITICAL with a fix available or on any secret; fail on a malformed report or the wrong image; report everything)
+        env:
+          SCAN_DIR: ${{ runner.temp }}/scan
+          IMAGES_DIR: ${{ runner.temp }}/images
+        run: |
+          server_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gb-server.oci.tar" --field config_digest)
+          gbctl_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gbctl.oci.tar" --field config_digest)
+          python3 .github/scripts/trivy_policy.py "$SCAN_DIR/trivy-gb-server.json" "$SCAN_DIR/trivy-gbctl.json" --require-identity \
+            --expect "$SCAN_DIR/trivy-gb-server.json" "$IMAGES_DIR/gb-server.oci.tar" "$server_id" \
+            --expect "$SCAN_DIR/trivy-gbctl.json" "$IMAGES_DIR/gbctl.oci.tar" "$gbctl_id"
+
+      - name: Upload scan reports (90 days)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trivy-reports
+          path: ${{ runner.temp }}/scan/
+          if-no-files-found: error
+          retention-days: 90
+
+  image-sbom:
+    name: image sbom (syft)
+    needs: docker
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: container-images
+          path: ${{ runner.temp }}/images
+
+      - name: Install syft (pinned)
+        id: syft
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: ${{ env.SYFT_VERSION }}
+
+      - name: SPDX JSON SBOM for both images
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+          IMAGES_DIR: ${{ runner.temp }}/images
+          SBOM_DIR: ${{ runner.temp }}/sbom
+        run: |
+          mkdir -p "$SBOM_DIR"
+          "$SYFT" version | tee "$SBOM_DIR/syft-version.txt"
+          grep -q "Version: *${SYFT_VERSION#v}" "$SBOM_DIR/syft-version.txt" || { echo "syft is not ${SYFT_VERSION}"; exit 1; }
+          for t in gb-server gbctl; do
+            digest=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/$t.oci.tar" --field manifest_digest)
+            "$SYFT" scan "oci-archive:$IMAGES_DIR/$t.oci.tar" --source-name "$t" --source-version "$digest" -o "spdx-json=$SBOM_DIR/$t.spdx.json" -q
+            test -s "$SBOM_DIR/$t.spdx.json"
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(sys.argv[2], "packages:", len(d.get("packages", [])))' "$SBOM_DIR/$t.spdx.json" "$t" | tee -a "$SBOM_DIR/summary.txt"
+          done
+          { echo "## SBOM (SPDX JSON, syft)"; echo '```'; cat "$SBOM_DIR/syft-version.txt" "$SBOM_DIR/summary.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload SBOMs (90 days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sboms
+          path: ${{ runner.temp }}/sbom/
+          if-no-files-found: error
+          retention-days: 90
+
+  kind-e2e:
+    name: kind e2e (ci entry points, disposable cluster)
+    needs: docker
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: container-images
+          path: ${{ runner.temp }}/images
+
+      - name: Tooling (kind pinned through the Go module proxy; kubectl from the runner image)
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "sigs.k8s.io/kind@${KIND_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/kind" version
+          kubectl version --client
+          docker version --format '{{.Server.Version}}'
+
+      - name: kind end-to-end (create, load, apply ci entry points, verify, init once, restart, delete)
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+          WORK_DIR: ${{ runner.temp }}/kind-e2e
+          DIAG_DIR: ${{ runner.temp }}/kind-diagnostics
+          # The kubeconfig lives in a private file; no other context exists on
+          # the runner and nothing here has a credential for any other cluster.
+          KUBECONFIG: ${{ runner.temp }}/kind-e2e/kubeconfig
+          # The cluster name is unique to this run and attempt (the script
+          # derives it from GITHUB_RUN_ID/GITHUB_RUN_ATTEMPT); the ownership
+          # marker is written here only after `kind create cluster` succeeded
+          # and is the sole authority for any deletion (GB2C-04R).
+          KIND_OWNERSHIP_FILE: ${{ runner.temp }}/kind-e2e/ownership.json
+        run: .github/scripts/kind-e2e.sh "$IMAGES_DIR/gb-server.oci.tar" "$IMAGES_DIR/gbctl.docker.tar"
+
+      - name: The cluster this run created is gone (deletes only with this run's ownership marker; an inspection error is a failure, not absence)
+        if: always()
+        env:
+          KIND_OWNERSHIP_FILE: ${{ runner.temp }}/kind-e2e/ownership.json
+        # Same ownership contract and fail-closed verdict as the script's own
+        # trap (kind-cleanup.sh): no marker from this run, or a marker already
+        # released, means nothing is deleted; a marker for another run,
+        # attempt, job or cluster is refused; with this run's "owned" marker
+        # the cluster is deleted only if still listed, then a successful
+        # listing and a successful `docker ps` must show nothing.
+        run: .github/scripts/kind-cleanup.sh --fallback --ownership "$KIND_OWNERSHIP_FILE" --timeout 300
+
+      - name: Upload diagnostics (on failure; no Secret objects are read)
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: kind-e2e-diagnostics
+          path: ${{ runner.temp }}/kind-diagnostics/
+          if-no-files-found: ignore
+          retention-days: 14
