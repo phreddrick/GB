@@ -1,4 +1,5 @@
-# CI for the GB Go port: Phase 0 gates (migration plan section 21, PR-B).
+# CI for the GB Go port: Phase 0 gates (migration plan section 21, PR-B) plus
+# the Phase 2C image and manifest jobs (plan 13.1 to 13.2, ADR-0006).
 #
 # Phase 0/1 gates, unchanged in substance: build, gofmt, go vet, go mod
 # verify/tidy, go test, go test -race, golden fixture reproducibility, golden
@@ -9,8 +10,20 @@
 # add/remove re-runs the workflow; pushes to master run technical validation
 # only; commit messages are never an acknowledgment).
 #
-# Phase 2C (2026-10-30), first step: runtime modernisation only; the jobs
-# and their checks are unchanged in substance.
+# Phase 2C additions (2026-10-30):
+#   docker            builds the legacy root Dockerfile as before AND the two
+#                     reviewed targets of deploy/docker/Dockerfile (server,
+#                     gbctl) with buildx, linux/amd64, no push, no remote
+#                     cache, provenance and SBOM attestations off (single
+#                     image manifest per target, digest recorded from the
+#                     archive), then checks the images in the runner's Docker
+#                     engine (UID 65532, static binaries, no shell, distinct
+#                     images, read-only root start, secret refusal) and
+#                     uploads the OCI archives for the jobs below.
+#   manifests         deploy/kustomize/tests/run.sh unchanged (its SHA-256 is
+#                     pinned by safety-check.py S5 and re-asserted here) and
+#                     the sentinel assertion: strict mode must fail while the
+#                     dev image is the all-zero digest and pass afterwards.
 #
 # Runtime: ubuntu-26.04 (ubuntu-latest is migrating to it), actions pinned to
 # commit SHAs of Node 24 releases (Node 20 removal from the runners,
@@ -183,3 +196,163 @@ jobs:
 
       - name: Build the legacy root Dockerfile from tracked sources only (unchanged Phase 0 check)
         run: docker build --tag gb:ci .
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build metadata (commit time as SOURCE_DATE_EPOCH; no remote cache)
+        id: meta
+        run: |
+          mkdir -p "$RUNNER_TEMP/images"
+          epoch=$(git log -1 --format=%ct)
+          created=$(git log -1 --format=%cI)
+          echo "epoch=$epoch" >> "$GITHUB_OUTPUT"
+          echo "created=$created" >> "$GITHUB_OUTPUT"
+          echo "SOURCE_DATE_EPOCH=$epoch created=$created sha=$GITHUB_SHA"
+
+      - name: Build target server (deploy/docker/Dockerfile, context go/, linux/amd64, no push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: go
+          file: deploy/docker/Dockerfile
+          target: server
+          platforms: linux/amd64
+          push: false
+          load: false
+          provenance: false
+          sbom: false
+          no-cache: false
+          tags: gb-server:ci
+          labels: |
+            org.opencontainers.image.title=gb-server
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+          outputs: |
+            type=oci,dest=${{ runner.temp }}/images/gb-server.oci.tar,rewrite-timestamp=true
+            type=docker,dest=${{ runner.temp }}/images/gb-server.docker.tar,rewrite-timestamp=true
+
+      - name: Build target gbctl (same Dockerfile and context, no push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: go
+          file: deploy/docker/Dockerfile
+          target: gbctl
+          platforms: linux/amd64
+          push: false
+          load: false
+          provenance: false
+          sbom: false
+          no-cache: false
+          tags: gbctl:ci
+          labels: |
+            org.opencontainers.image.title=gbctl
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+          outputs: |
+            type=oci,dest=${{ runner.temp }}/images/gbctl.oci.tar,rewrite-timestamp=true
+            type=docker,dest=${{ runner.temp }}/images/gbctl.docker.tar,rewrite-timestamp=true
+
+      - name: Image checks (digests, UID 65532, static binaries, no shell, distinct images, read-only start, secret refusal)
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+          RECORD_OUT: ${{ runner.temp }}/image-build-record.json
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+          EXPECTED_GO_VERSION: ${{ env.GO_VERSION }}
+        run: .github/scripts/image-checks.sh "$IMAGES_DIR" "$RECORD_OUT"
+
+      - name: Upload OCI and Docker archives for the scan, SBOM and kind jobs (7 days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: container-images
+          path: ${{ runner.temp }}/images/*.tar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload the build record (90 days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-build-record
+          path: ${{ runner.temp }}/image-build-record.json
+          if-no-files-found: error
+          retention-days: 90
+
+  manifests:
+    name: manifests (render, mutations, safety check, kubeconform, sentinel)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - name: Tooling (PyYAML from the distribution; kustomize pinned through the Go module proxy)
+        working-directory: ${{ runner.temp }}
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml; }
+          python3 -c 'import yaml; print("PyYAML", yaml.__version__)'
+          mkdir -p "$RUNNER_TEMP/bin"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "sigs.k8s.io/kustomize/kustomize/v5@${KUSTOMIZE_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/kustomize" version
+
+      - name: The offline validation runner is the reviewed one (safety-check S5 digest, asserted before it runs)
+        run: |
+          actual=$(sha256sum deploy/kustomize/tests/run.sh | cut -d' ' -f1)
+          echo "run.sh sha256 $actual (approved $APPROVED_RUN_SH_SHA256)"
+          [ "$actual" = "$APPROVED_RUN_SH_SHA256" ] || { echo "deploy/kustomize/tests/run.sh differs from the reviewed runner; review it and update the pinned digest by hand"; exit 1; }
+          [ ! -L deploy/kustomize/tests/run.sh ] || { echo "run.sh is a symbolic link"; exit 1; }
+
+      - name: deploy/kustomize/tests/run.sh (render, 15 structural checks, 33 mutations, safety check + self-test, kubeconform)
+        env:
+          KUSTOMIZE_RENDER_DIR: ${{ runner.temp }}/render
+        run: |
+          mkdir -p "$KUSTOMIZE_RENDER_DIR"
+          deploy/kustomize/tests/run.sh 2>&1 | tee "$RUNNER_TEMP/manifests.txt"
+
+      - name: Image sentinel assertion (strict mode fails while the dev image is unpublished, passes once a digest is pinned)
+        run: |
+          current=$(python3 .github/scripts/set_image_digest.py --check --file deploy/kustomize/apps/dev/server/kustomization.yaml --image ghcr.io/phreddrick/gb-server)
+          echo "dev entry point image digest: $current"
+          set +e
+          python3 deploy/kustomize/tests/validate.py --require-published-image > "$RUNNER_TEMP/strict.txt" 2>&1
+          rc=$?
+          set -e
+          if [ "$current" = "sha256:0000000000000000000000000000000000000000000000000000000000000000" ]; then
+            if [ "$rc" -eq 0 ]; then echo "strict validation accepted the UNPUBLISHED sentinel; the blocker is broken"; cat "$RUNNER_TEMP/strict.txt"; exit 1; fi
+            grep -q 'UNPUBLISHED' "$RUNNER_TEMP/strict.txt" || { echo "strict validation failed for another reason:"; cat "$RUNNER_TEMP/strict.txt"; exit 1; }
+            echo "sentinel still present: --require-published-image fails as designed (exit $rc); gb-dev deployment stays blocked"
+          else
+            if [ "$rc" -ne 0 ]; then echo "a digest is pinned but strict validation fails:"; cat "$RUNNER_TEMP/strict.txt"; exit 1; fi
+            echo "published digest pinned: --require-published-image passes"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Manifest validation"
+            echo '```'
+            grep -E '^(PASS|FAIL|WARN|==|Summary|renderer)' "$RUNNER_TEMP/manifests.txt" 2>/dev/null | tail -80 || echo "(did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
