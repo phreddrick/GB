@@ -1,6 +1,6 @@
 # ADR-0006: Container images: GHCR, digest pinning, distroless non-root, supply-chain checks
 
-Status: Proposed 2026-10-30 (Phase 2B draft for owner review; `deploy/docker/Dockerfile` written, never built)
+Status: Proposed 2026-10-30 (Phase 2B draft for owner review; `deploy/docker/Dockerfile` written; Phase 2C added the CI build, scan, SBOM, kind, publish and digest-update workflows as artifacts, see "Phase 2C amendments" below; no hosted run and no publication yet at the time of writing)
 
 ## Context
 
@@ -14,6 +14,14 @@ The root `Dockerfile` that exists today builds `makeuniv`, `gb-server` and `race
 4. **Pull access.** Public packages, no `imagePullSecret` (plan Decision 6, repository already public). GitHub creates a new package as private; making it public is a one-time owner action in GitHub settings recorded in `docs/operations/bootstrap.md`. If the owner keeps it private, an `imagePullSecret` becomes a third out-of-band Secret.
 5. **Supply chain in CI.** `govulncheck` (already), Trivy on both images failing on critical fixable findings, an SBOM attached to the image; cosign keyless signing deferred (Decision 6). `linux/amd64` only.
 6. **The legacy root `Dockerfile` stays until the CI `docker` job is retargeted** in the next stage, then becomes a pointer; the `KUBERNETES.md`/`k8s-deployment.yaml` pair already carries superseded notices.
+
+### Phase 2C amendments (2026-10-30, `docs/testing/phase2c-handoff.md`)
+
+- **Decision 3, trigger:** publication does **not** run on pushes to `master`. `publish-images.yml` is `workflow_dispatch` only, from `master`, with a typed confirmation and the environment `ghcr-publish`, and requires the `ci` checks of the exact commit to have succeeded. Automatic publication on master is migration plan Decision 31, to be taken after the first publications. The digest-bump pull request is `digest-update-pr.yml`, called from the publish run on request or dispatched by hand; it never merges.
+- **Decision 3, digest identity:** builds run with `provenance=false`, `sbom=false`, one platform, so each published artifact is a **single `linux/amd64` OCI image manifest** (no index). That manifest digest is what buildx writes into the OCI archive, what Trivy scanned, what `crane push` uploads unchanged, and what the Kustomize entry point references. Tags `<sha>` and `master` are convenience only.
+- **Decision 5, SBOM:** the SBOM (Syft, SPDX JSON, one per image) is kept as a 90-day workflow artifact with the publish record, not attached to the image as a referrer; attaching, provenance attestations and cosign signing stay deferred (Decision 6).
+- **Decision 5, scan policy as code:** Trivy (pinned) scans both final images; `.github/scripts/trivy_policy.py` fails on a CRITICAL vulnerability with a fix available or on any secret and reports every other finding. The scan runs in `ci` and again in the publish job before anything is pushed.
+- **Reproducibility, stated exactly:** source builds are repeatable (pinned toolchain, `go mod verify`, `-trimpath -buildid=`), `SOURCE_DATE_EPOCH` is the commit time and layer timestamps are rewritten, so an identical image digest from an identical commit is *expected* and is recorded by comparing the `ci` and publish records; it is not asserted and is not claimed until observed.
 
 ## Alternatives considered
 
@@ -30,7 +38,7 @@ The root `Dockerfile` that exists today builds `makeuniv`, `gb-server` and `race
 
 ## Validation
 
-CI (next stage): both targets build; `docker inspect` shows `User: 65532:65532`; the kind job starts the image with `readOnlyRootFilesystem: true` and a mounted volume and reaches `/readyz`; Trivy and SBOM steps pass; the published digest matches the one the digest-bump pull request writes. Locally: `deploy/kustomize/tests/validate.py` enforces the digest form of the image reference.
+CI (Phase 2C workflows, pending their first hosted run): both targets build; `.github/scripts/image-checks.sh` asserts `User 65532:65532`, static binaries from the pinned toolchain, no shell, distinct images, a read-only start on a tmpfs volume and refusal without secrets; the kind job starts the image under Pod Security `restricted` with `readOnlyRootFilesystem: true` and a mounted volume and reaches `/readyz`; Trivy and SBOM steps pass; `publish-push.sh` fails unless the published digest equals the scanned archive's and a validated publish record exists (a half-published pair is `partial`, never a release); `trivy_policy.py` accepts only a well-formed Trivy report about the built archive; `verify-published-image.sh` ties a proposed digest to its source commit through the revision label before the digest-bump pull request is opened. Locally: `deploy/kustomize/tests/validate.py` enforces the digest form of the image reference and `.github/scripts/workflow_policy_check.py` keeps the permission model.
 
 ## References
 

@@ -1,0 +1,7 @@
+# actionlint configuration (Phase 2C). The pinned actionlint release predates
+# the GitHub-hosted `ubuntu-26.04` label (generally available 2026-09-17), so
+# it is declared here; actionlint otherwise reports it as unknown. No
+# self-hosted runner exists for this repository.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

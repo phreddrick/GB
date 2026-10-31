@@ -20,22 +20,43 @@ This document lists what must exist before `gb-dev-platform` and `gb-dev-server`
 | ServiceAccount, NetworkPolicies, PodMonitor | Application `gb-dev-platform` | rendered from `base/platform` | |
 | StatefulSet, Services, Ingress, Middleware, ConfigMap | Application `gb-dev-server` | rendered from `base/server` | |
 
-## 2. GitHub: image publication (next stage, owner-approved)
+## 2. GitHub: image publication (Phase 2C workflows; first publication owner-approved)
 
-Required in `.github/workflows/ci.yml` (protected tooling, `gate-change-reviewed`):
+Implemented in Phase 2C as three workflows (protected tooling, `gate-change-reviewed`; design and status in `docs/testing/phase2c-handoff.md`):
 
-- an `image` job that builds both targets with buildx on pull requests (no push) and, on pushes to `master`, logs in to GHCR with the workflow `GITHUB_TOKEN`, pushes `ghcr.io/phreddrick/gb-server:{sha,master}` and `ghcr.io/phreddrick/gbctl:{sha,master}`, and prints the digests. Permissions for that job only: `contents: read`, `packages: write`.
-- a `digest-pr` job that rewrites `images[0].digest` in `deploy/kustomize/apps/dev/server/kustomization.yaml` and opens a pull request. Permissions: `contents: write`, `pull-requests: write`. Whether the default token may open pull requests on this repository depends on the repository's Actions settings and branch protection, which are unverified from the development host; a fine-grained token is the fallback.
-- Trivy (fail on critical fixable) and SBOM steps.
+- `ci.yml`: the `docker build from checkout (no push)` job builds both targets of `deploy/docker/Dockerfile` with buildx on every pull request and master push, checks them in the runner's Docker engine, and hands the archives to the Trivy, SBOM and kind jobs. Every `ci` job is `contents: read`; nothing is pushed.
+- `publish-images.yml`: **manual only** (`workflow_dispatch` on `master`, confirmation word `publish`, environment `ghcr-publish`). Its preflight resolves **one** completed, successful run of `.github/workflows/ci.yml` for that exact commit (this repository, branch `master`, event `push`) through the workflow-runs API and requires every required job to belong to that run and attempt (`.github/scripts/ci_provenance.py`; check-run names from any other workflow are not evidence, and a run finished with "Re-run failed jobs" is refused when its jobs report mixed attempts: use "Re-run all jobs"). The publish job rebuilds both targets, re-scans them (the report must be a well-formed Trivy report about the built archive, `trivy_policy.py`), logs in to GHCR with the workflow `GITHUB_TOKEN` (the only job with `packages: write`), pushes the scanned bytes as `ghcr.io/phreddrick/gb-server:<sha>` and `ghcr.io/phreddrick/gbctl:<sha>`, verifies each by digest, tags both `master` only after both verified, and uploads the publish record (`publish-record.json`, validated by `publish_record.py` before the run may report success: `status` is `published`, `partial` or `failed`). Automatic publication on every master push is **not** configured; it is migration plan Decision 31, pending.
+- `digest-update-pr.yml`: called from the publish run (input `open_digest_pr`, only after a `published` record) or dispatched by hand with a digest and source commit; verifies the digest against the registry and the commit, rewrites the one `digest:` line of `deploy/kustomize/apps/dev/server/kustomization.yaml`, runs the offline validation in strict mode, pushes `bot/gb-server-digest-<12 hex>` and opens a pull request with `gh`. Permissions `contents: write`, `pull-requests: write`, `packages: read` for that job only. What happens next is in "Token-created pull requests" below.
 
-Owner action after the first push: set both packages to **public** in GitHub package settings (new packages are private), or decide on an `imagePullSecret` (a third out-of-band Secret). Verify read-only from any host:
+### Partial publication (operator procedure; nothing here changes registry state automatically)
+
+Two GHCR pushes are not one transaction. If `publish-push.sh` ends with `publish-push: PARTIAL_PUBLICATION`, the run is failed, the record says `status: partial`, the `published` list names exactly what reached the registry (image, `<sha>` tag, digest, `verified` or `pushed_unverified`), no `master` tag was moved unless both images had verified, no digest is exported and no digest pull request is opened from that run. The same line with `registry writes complete ... record was NOT finalised` means both images verified and were tagged `master` but the record could not be written at its exact pathname (the step log names the kept temporary file and every digest; the artifact then has no `publish-record.json`): treat it as unpublished for Git purposes and re-dispatch as in step 3, which re-verifies the same bytes and writes the record. Then:
+
+1. Read the record and the step log in the `publish-<sha>` artifact; note which image is on the registry and with which digest.
+2. Decide nothing about the registry in a hurry: a pushed manifest is content-addressed and immutable. Deleting the `<sha>` tag or the package version in the GitHub UI removes the *reference*, not the fact that those bytes were published under that digest; do not describe such a deletion as a rollback.
+3. Fix the cause (registry outage, token scope, a digest mismatch means the bytes on the registry are not the scanned archive and that image must not be referenced anywhere) and **re-dispatch `publish-images.yml` for the same commit**: `crane push` of the identical layout is idempotent (same bytes, same digest), the second image is pushed, both are verified, and only a `published` record moves `master` and may open the digest pull request.
+4. If the commit must not be published after all, leave the partial `<sha>` tags unreferenced and record the fact in the operations log; nothing in Git points at them (the dev entry point is edited only by the digest pull request, from a `published` record).
+
+### Token-created pull requests: five separate things
+
+GitHub's documentation ("GITHUB_TOKEN", section "When `GITHUB_TOKEN` triggers workflow runs", <https://docs.github.com/en/actions/concepts/security/github_token>) states that events triggered by `GITHUB_TOKEN` do not create workflow runs, **except** that the `opened`, `synchronize` and `reopened` activity types of a pull request created with it create workflow runs in an **approval-required** state, shown as a banner in the pull request's merge box; a user with write access starts them with **Approve workflows to run**. Other activity types from the token, such as `labeled`, create no run. Keep these apart:
+
+1. **Permission to create the pull request**: the repository setting "Allow GitHub Actions to create and approve pull requests" (Settings > Actions > General > Workflow permissions). Whether it is on here is **unverified**; if it is off, `gh pr create` fails, the job fails after pushing the branch and prints the compare URL, and the maintainer opens the pull request by hand (that pull request then runs `ci` like any other).
+2. **Approval of the workflow runs** on a bot-created pull request: a maintainer selects **Approve workflows to run** on the pull request. Adding a label does not approve anything (a maintainer's `labeled` event would start `ci` only because `ci.yml` lists it; it is not the documented path and is not needed).
+3. **Required status checks** execute after that approval and must pass; `ci` runs its full gate set on the one-line change.
+4. **Acknowledgment labels** (`known-defect-added`, `gate-change-reviewed`) are a different gate for protected tooling; the digest file is not protected tooling, so none is needed.
+5. **Review and merge** are a human decision under the ruleset; merging deploys nothing (Argo CD sync is manual, `deploy.md` section 2).
+
+No personal access token and no GitHub App is introduced to skip the approval; the approval is the control.
+
+Owner actions around the first publication (in order): review the Phase 2C pull request and its hosted run; merge; optionally protect the `ghcr-publish` environment (required reviewer, deployment branch `master` only); dispatch `publish-images.yml` on `master` with `publish`; after the run, set both packages to **public** in GitHub package settings (new packages are private), or decide on an `imagePullSecret` (a third out-of-band Secret). Verify read-only from any host:
 
 ```sh
 curl -fsS 'https://ghcr.io/token?scope=repository:phreddrick/gb-server:pull' | jq -r .token > /tmp/t
 curl -fsS -H "Authorization: Bearer $(cat /tmp/t)" https://ghcr.io/v2/phreddrick/gb-server/tags/list
 ```
 
-Until then the dev entry point carries the all-zero sentinel digest and `deploy/kustomize/tests/run.sh --require-published-image` fails by design.
+Until the digest-update pull request is merged, the dev entry point carries the all-zero sentinel digest and `deploy/kustomize/tests/run.sh --require-published-image` fails by design (the `manifests` job of `ci` asserts exactly that). Merging the digest pull request changes Git only; synchronisation stays a separately approved manual step (`deploy.md` section 2).
 
 ## 3. Argo CD: repository access
 

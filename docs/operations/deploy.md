@@ -4,7 +4,7 @@
 
 ## 1. Preconditions (all verifiable read-only)
 
-- `bootstrap.md` sections 2 to 7 complete: image digest merged into `deploy/kustomize/apps/dev/server/kustomization.yaml` (no sentinel: `deploy/kustomize/tests/run.sh --require-published-image` passes), AppProject `gb` and both Applications exist, controller RBAC in `gb-dev` verified with `kubectl auth can-i`, namespace `gb-dev` labelled, Secret `gb-server-secrets` present with both keys, DNS record resolving.
+- `bootstrap.md` sections 2 to 7 complete: image published by the manual `publish-images.yml` run and its digest merged into `deploy/kustomize/apps/dev/server/kustomization.yaml` through the digest-update pull request (no sentinel: `deploy/kustomize/tests/run.sh --require-published-image` passes; the publish record artifact of that run names the digest and the source commit), AppProject `gb` and both Applications exist, controller RBAC in `gb-dev` verified with `kubectl auth can-i`, namespace `gb-dev` labelled, Secret `gb-server-secrets` present with both keys, DNS record resolving.
 - `storage-and-network-validation.md` section 1 (RWOP) recorded as supported or the RWO fallback committed.
 - `argocd app diff gb-dev-platform` and `argocd app diff gb-dev-server` show only additions (nothing exists yet).
 
@@ -41,7 +41,7 @@ Record in the operations log immediately: seed, stars, planets, min/max planets,
 
 Precondition: no turn in progress and none due within the next few minutes, or `gbctl quiesce` first (the schedule is persisted and resumes after restart; `gbctl resume` if it was quiesced).
 
-- Image or config change: merge the digest or ConfigMap change, `argocd app sync gb-dev-server`; the StatefulSet replaces `gb-engine-0` (RollingUpdate with one replica is a stop-then-start).
+- Image or config change: merge the digest or ConfigMap change (an image digest arrives as the `bot/gb-server-digest-*` pull request opened by `digest-update-pr.yml` after a publish run whose record says `published`; because the token opened it, a maintainer first selects **Approve workflows to run** on it, then its required checks must pass (`bootstrap.md` section 2); merging deploys nothing), then `argocd app sync gb-dev-server`; the StatefulSet replaces `gb-engine-0` (RollingUpdate with one replica is a stop-then-start).
 - Plain restart: `kubectl -n gb-dev rollout restart statefulset gb-engine` (approved).
 - Secret rotation: recreate `gb-server-secrets`, update the workstation copy, then a plain restart.
 

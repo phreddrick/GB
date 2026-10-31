@@ -1,19 +1,55 @@
-# Phase 0 CI for the GB Go port (migration plan section 21, PR-B).
+# CI for the GB Go port: Phase 0 gates (migration plan section 21, PR-B) plus
+# the Phase 2C image, manifest and kind jobs (plan 13.1 to 13.3, ADR-0006).
 #
-# Strict gates: build, gofmt, go vet, go mod verify/tidy, go test, go test -race,
-# golden fixture reproducibility, golden mutation self-checks, inventory
-# reconciliation against the tests that actually executed, govulncheck, Docker
-# build from the checkout. Baselined gate: golangci-lint findings are compared
-# with the committed baseline by tools/lintdiff (file, linter, message, enclosing
-# declaration and source fingerprint; new and stale findings both fail).
-# Changes to the expected-failure allowances and to the gate tooling need the
-# labels known-defect-added and gate-change-reviewed, applied to the pull
-# request by the repository's sole maintainer as explicit acknowledgments (not
-# independent reviews); label add/remove re-runs the workflow. Pushes to master
-# run technical validation only: the acknowledgment gate applies to pull
-# requests, and merging without one relies on branch protection (UNVERIFIED;
-# docs/testing/known-defects.md). Commit messages are never an acknowledgment.
-# No deployment, no image push, no cluster access, read-only permissions.
+# Phase 0/1 gates, unchanged in substance: build, gofmt, go vet, go mod
+# verify/tidy, go test, go test -race, golden fixture reproducibility, golden
+# mutation self-checks, inventory reconciliation against the tests that
+# actually executed, govulncheck, lint baseline (tools/lintdiff), the
+# acknowledgment gate (labels known-defect-added / gate-change-reviewed,
+# applied to the pull request by the repository's sole maintainer; label
+# add/remove re-runs the workflow; pushes to master run technical validation
+# only; commit messages are never an acknowledgment).
+#
+# Phase 2C additions (2026-10-30):
+#   docker            builds the legacy root Dockerfile as before AND the two
+#                     reviewed targets of deploy/docker/Dockerfile (server,
+#                     gbctl) with buildx, linux/amd64, no push, no remote
+#                     cache, provenance and SBOM attestations off (single
+#                     image manifest per target, digest recorded from the
+#                     archive), then checks the images in the runner's Docker
+#                     engine (UID 65532, static binaries, no shell, distinct
+#                     images, read-only root start, secret refusal) and
+#                     uploads the OCI archives for the jobs below.
+#   manifests         deploy/kustomize/tests/run.sh unchanged (its SHA-256 is
+#                     pinned by safety-check.py S5 and re-asserted here) and
+#                     the sentinel assertion: strict mode must fail while the
+#                     dev image is the all-zero digest and pass afterwards.
+#   workflow policy   actionlint, shellcheck on .github/scripts, the static
+#                     workflow policy (workflow_policy_check.py) and the unit
+#                     tests of the digest/OCI/scan helpers.
+#   image scan        Trivy (pinned) on both final images: policy fails on a
+#                     CRITICAL vulnerability with a fix available or a secret;
+#                     every finding is reported in the summary.
+#   image sbom        Syft (pinned) SPDX JSON for both images, kept 90 days.
+#   kind e2e          a disposable kind cluster on the hosted runner, the
+#                     apps/ci/* entry points, UID/read-only/volume checks,
+#                     gbctl universe init once (then exit 4), probes, an
+#                     orderly restart preserving universe and schedule,
+#                     cluster deleted at the end and its absence confirmed by
+#                     a successful listing (kind-cleanup.sh; a deletion or
+#                     inspection error fails the job; only the cluster whose
+#                     ownership marker this run wrote after a successful
+#                     creation is ever deleted). kind proves nothing about
+#                     Longhorn RWOP, Cilium NetworkPolicy enforcement, Traefik,
+#                     PodMonitor or node fencing.
+#
+# Runtime: ubuntu-26.04 (ubuntu-latest is migrating to it), actions pinned to
+# commit SHAs of Node 24 releases (Node 20 removal from the runners,
+# 2026-09-16). Every job is read-only (contents: read). Nothing here pushes an
+# image, opens a pull request, or has any credential or route to the home-lab
+# cluster; publication is the separate, manually dispatched
+# publish-images.yml. Changes under .github/ need the label
+# gate-change-reviewed (test/scripts/growth-gate.sh).
 name: ci
 
 on:
@@ -33,6 +69,23 @@ env:
   # scanned standard library is the one the binaries are built with.
   GO_VERSION: "1.27.3"
   GOTOOLCHAIN: local
+  # Pinned versions of the tools that are installed from the Go module proxy
+  # (checksums verified against sum.golang.org by the go command) rather than
+  # downloaded as opaque binaries.
+  KUSTOMIZE_VERSION: v5.8.1
+  KIND_VERSION: v0.33.0
+  ACTIONLINT_VERSION: v1.7.12
+  # Pinned scanner and SBOM generator versions (installed by their pinned
+  # actions; the versions are asserted and recorded in the summaries).
+  TRIVY_VERSION: v0.76.1
+  SYFT_VERSION: v1.55.0
+  # kind node image matching the home-lab Kubernetes minor (1.36.4), by digest
+  # from the kind v0.33.0 release notes.
+  KIND_NODE_IMAGE: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+  # Reviewed digest of deploy/kustomize/tests/run.sh (safety-check.py S5). A
+  # changed runner needs a review, the constant updated there, and this value
+  # updated in the same gate-change-reviewed change; never recomputed to pass.
+  APPROVED_RUN_SH_SHA256: 9de4f58606298cac2f21d5180c098e1374cb1693aaac0da0b77f34660f09e46a
 
 defaults:
   run:
@@ -41,11 +94,15 @@ defaults:
 jobs:
   go:
     name: build, test, lint (fresh checkout)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the growth gate compares against the base revision
+          persist-credentials: false
 
       - name: Entry points are tracked (CR-01 guard)
         run: |
@@ -55,7 +112,7 @@ jobs:
             git ls-files --error-unmatch "go/cmd/$f/main.go" >/dev/null || { echo "go/cmd/$f/main.go is not tracked"; git ls-files go/cmd; exit 1; }
           done
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           check-latest: false
@@ -147,8 +204,422 @@ jobs:
 
   docker:
     name: docker build from checkout (no push)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - name: Build the existing Dockerfile from tracked sources only
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the legacy root Dockerfile from tracked sources only (unchanged Phase 0 check)
         run: docker build --tag gb:ci .
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build metadata (commit time as SOURCE_DATE_EPOCH; no remote cache)
+        id: meta
+        run: |
+          mkdir -p "$RUNNER_TEMP/images"
+          epoch=$(git log -1 --format=%ct)
+          created=$(git log -1 --format=%cI)
+          echo "epoch=$epoch" >> "$GITHUB_OUTPUT"
+          echo "created=$created" >> "$GITHUB_OUTPUT"
+          echo "SOURCE_DATE_EPOCH=$epoch created=$created sha=$GITHUB_SHA"
+
+      - name: Build target server (deploy/docker/Dockerfile, context go/, linux/amd64, no push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: go
+          file: deploy/docker/Dockerfile
+          target: server
+          platforms: linux/amd64
+          push: false
+          load: false
+          provenance: false
+          sbom: false
+          no-cache: false
+          tags: gb-server:ci
+          labels: |
+            org.opencontainers.image.title=gb-server
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+          outputs: |
+            type=oci,dest=${{ runner.temp }}/images/gb-server.oci.tar,rewrite-timestamp=true
+            type=docker,dest=${{ runner.temp }}/images/gb-server.docker.tar,rewrite-timestamp=true
+
+      - name: Build target gbctl (same Dockerfile and context, no push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: go
+          file: deploy/docker/Dockerfile
+          target: gbctl
+          platforms: linux/amd64
+          push: false
+          load: false
+          provenance: false
+          sbom: false
+          no-cache: false
+          tags: gbctl:ci
+          labels: |
+            org.opencontainers.image.title=gbctl
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+          outputs: |
+            type=oci,dest=${{ runner.temp }}/images/gbctl.oci.tar,rewrite-timestamp=true
+            type=docker,dest=${{ runner.temp }}/images/gbctl.docker.tar,rewrite-timestamp=true
+
+      - name: Image checks (digests, UID 65532, static binaries, no shell, distinct images, read-only start, secret refusal)
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+          RECORD_OUT: ${{ runner.temp }}/image-build-record.json
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+          EXPECTED_GO_VERSION: ${{ env.GO_VERSION }}
+        run: .github/scripts/image-checks.sh "$IMAGES_DIR" "$RECORD_OUT"
+
+      - name: Upload OCI and Docker archives for the scan, SBOM and kind jobs (7 days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: container-images
+          path: ${{ runner.temp }}/images/*.tar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload the build record (90 days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-build-record
+          path: ${{ runner.temp }}/image-build-record.json
+          if-no-files-found: error
+          retention-days: 90
+
+  manifests:
+    name: manifests (render, mutations, safety check, kubeconform, sentinel)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - name: Tooling (PyYAML from the distribution; kustomize pinned through the Go module proxy)
+        working-directory: ${{ runner.temp }}
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml; }
+          python3 -c 'import yaml; print("PyYAML", yaml.__version__)'
+          mkdir -p "$RUNNER_TEMP/bin"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "sigs.k8s.io/kustomize/kustomize/v5@${KUSTOMIZE_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/kustomize" version
+
+      - name: The offline validation runner is the reviewed one (safety-check S5 digest, asserted before it runs)
+        run: |
+          actual=$(sha256sum deploy/kustomize/tests/run.sh | cut -d' ' -f1)
+          echo "run.sh sha256 $actual (approved $APPROVED_RUN_SH_SHA256)"
+          [ "$actual" = "$APPROVED_RUN_SH_SHA256" ] || { echo "deploy/kustomize/tests/run.sh differs from the reviewed runner; review it and update the pinned digest by hand"; exit 1; }
+          [ ! -L deploy/kustomize/tests/run.sh ] || { echo "run.sh is a symbolic link"; exit 1; }
+
+      - name: deploy/kustomize/tests/run.sh (render, 15 structural checks, 33 mutations, safety check + self-test, kubeconform)
+        env:
+          KUSTOMIZE_RENDER_DIR: ${{ runner.temp }}/render
+        run: |
+          mkdir -p "$KUSTOMIZE_RENDER_DIR"
+          deploy/kustomize/tests/run.sh 2>&1 | tee "$RUNNER_TEMP/manifests.txt"
+
+      - name: Image sentinel assertion (strict mode fails while the dev image is unpublished, passes once a digest is pinned)
+        run: |
+          current=$(python3 .github/scripts/set_image_digest.py --check --file deploy/kustomize/apps/dev/server/kustomization.yaml --image ghcr.io/phreddrick/gb-server)
+          echo "dev entry point image digest: $current"
+          set +e
+          python3 deploy/kustomize/tests/validate.py --require-published-image > "$RUNNER_TEMP/strict.txt" 2>&1
+          rc=$?
+          set -e
+          if [ "$current" = "sha256:0000000000000000000000000000000000000000000000000000000000000000" ]; then
+            if [ "$rc" -eq 0 ]; then echo "strict validation accepted the UNPUBLISHED sentinel; the blocker is broken"; cat "$RUNNER_TEMP/strict.txt"; exit 1; fi
+            grep -q 'UNPUBLISHED' "$RUNNER_TEMP/strict.txt" || { echo "strict validation failed for another reason:"; cat "$RUNNER_TEMP/strict.txt"; exit 1; }
+            echo "sentinel still present: --require-published-image fails as designed (exit $rc); gb-dev deployment stays blocked"
+          else
+            if [ "$rc" -ne 0 ]; then echo "a digest is pinned but strict validation fails:"; cat "$RUNNER_TEMP/strict.txt"; exit 1; fi
+            echo "published digest pinned: --require-published-image passes"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Manifest validation"
+            echo '```'
+            grep -E '^(PASS|FAIL|WARN|==|Summary|renderer)' "$RUNNER_TEMP/manifests.txt" 2>/dev/null | tail -80 || echo "(did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  workflow-policy:
+    name: workflow policy (actionlint, shellcheck, permissions, helper tests)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - name: Tooling (PyYAML; actionlint pinned through the Go module proxy; shellcheck from the runner image)
+        working-directory: ${{ runner.temp }}
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml; }
+          mkdir -p "$RUNNER_TEMP/bin"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/actionlint" -version
+          shellcheck --version | head -2
+
+      - name: actionlint (with shellcheck on run blocks)
+        run: actionlint -no-color
+
+      - name: shellcheck on the workflow helper scripts
+        run: shellcheck -S warning .github/scripts/*.sh
+
+      - name: Workflow policy (triggers, permissions, pins, timeouts, injection, secrets)
+        run: python3 .github/scripts/workflow_policy_check.py | tee "$RUNNER_TEMP/policy.txt"
+
+      - name: Helper unit tests (OCI digest reader, digest transformer, Trivy policy, workflow policy, release-safety regressions with mocked crane/gh/kind)
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Workflow policy"
+            echo '```'
+            cat "$RUNNER_TEMP/policy.txt" 2>/dev/null || echo "(did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  image-scan:
+    name: image scan (trivy)
+    needs: docker
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      # Trivy DB mirrors, tried in order (GHCR rate limits anonymous pulls).
+      TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: container-images
+          path: ${{ runner.temp }}/images
+
+      - name: Archives are the ones the build recorded
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+        run: |
+          mkdir -p "$RUNNER_TEMP/scan"
+          for t in gb-server gbctl; do python3 .github/scripts/oci_digest.py "$IMAGES_DIR/$t.oci.tar" --field manifest_digest; done
+
+      - name: Trivy scan of the server image (all severities, vulnerabilities and secrets, JSON)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          input: ${{ runner.temp }}/images/gb-server.oci.tar
+          format: json
+          output: ${{ runner.temp }}/scan/trivy-gb-server.json
+          scanners: vuln,secret
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "0"
+          version: ${{ env.TRIVY_VERSION }}
+
+      - name: Trivy scan of the gbctl image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          input: ${{ runner.temp }}/images/gbctl.oci.tar
+          format: json
+          output: ${{ runner.temp }}/scan/trivy-gbctl.json
+          scanners: vuln,secret
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "0"
+          version: ${{ env.TRIVY_VERSION }}
+
+      - name: Scanner version and database recorded
+        env:
+          SCAN_DIR: ${{ runner.temp }}/scan
+        run: |
+          trivy --version | tee "$SCAN_DIR/trivy-version.txt"
+          grep -q "Version: ${TRIVY_VERSION#v}" "$SCAN_DIR/trivy-version.txt" || { echo "trivy is not ${TRIVY_VERSION}"; exit 1; }
+          for f in "$SCAN_DIR"/trivy-*.json; do test -s "$f" || { echo "$f is empty: the scan did not produce a report"; exit 1; }; done
+          { echo "## Trivy"; echo '```'; cat "$SCAN_DIR/trivy-version.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Policy (fail on CRITICAL with a fix available or on any secret; fail on a malformed report or the wrong image; report everything)
+        env:
+          SCAN_DIR: ${{ runner.temp }}/scan
+          IMAGES_DIR: ${{ runner.temp }}/images
+        run: |
+          server_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gb-server.oci.tar" --field config_digest)
+          gbctl_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gbctl.oci.tar" --field config_digest)
+          python3 .github/scripts/trivy_policy.py "$SCAN_DIR/trivy-gb-server.json" "$SCAN_DIR/trivy-gbctl.json" --require-identity \
+            --expect "$SCAN_DIR/trivy-gb-server.json" "$IMAGES_DIR/gb-server.oci.tar" "$server_id" \
+            --expect "$SCAN_DIR/trivy-gbctl.json" "$IMAGES_DIR/gbctl.oci.tar" "$gbctl_id"
+
+      - name: Upload scan reports (90 days)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trivy-reports
+          path: ${{ runner.temp }}/scan/
+          if-no-files-found: error
+          retention-days: 90
+
+  image-sbom:
+    name: image sbom (syft)
+    needs: docker
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: container-images
+          path: ${{ runner.temp }}/images
+
+      - name: Install syft (pinned)
+        id: syft
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: ${{ env.SYFT_VERSION }}
+
+      - name: SPDX JSON SBOM for both images
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+          IMAGES_DIR: ${{ runner.temp }}/images
+          SBOM_DIR: ${{ runner.temp }}/sbom
+        run: |
+          mkdir -p "$SBOM_DIR"
+          "$SYFT" version | tee "$SBOM_DIR/syft-version.txt"
+          grep -q "Version: *${SYFT_VERSION#v}" "$SBOM_DIR/syft-version.txt" || { echo "syft is not ${SYFT_VERSION}"; exit 1; }
+          for t in gb-server gbctl; do
+            digest=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/$t.oci.tar" --field manifest_digest)
+            "$SYFT" scan "oci-archive:$IMAGES_DIR/$t.oci.tar" --source-name "$t" --source-version "$digest" -o "spdx-json=$SBOM_DIR/$t.spdx.json" -q
+            test -s "$SBOM_DIR/$t.spdx.json"
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(sys.argv[2], "packages:", len(d.get("packages", [])))' "$SBOM_DIR/$t.spdx.json" "$t" | tee -a "$SBOM_DIR/summary.txt"
+          done
+          { echo "## SBOM (SPDX JSON, syft)"; echo '```'; cat "$SBOM_DIR/syft-version.txt" "$SBOM_DIR/summary.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload SBOMs (90 days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sboms
+          path: ${{ runner.temp }}/sbom/
+          if-no-files-found: error
+          retention-days: 90
+
+  kind-e2e:
+    name: kind e2e (ci entry points, disposable cluster)
+    needs: docker
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: container-images
+          path: ${{ runner.temp }}/images
+
+      - name: Tooling (kind pinned through the Go module proxy; kubectl from the runner image)
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "sigs.k8s.io/kind@${KIND_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/kind" version
+          kubectl version --client
+          docker version --format '{{.Server.Version}}'
+
+      - name: kind end-to-end (create, load, apply ci entry points, verify, init once, restart, delete)
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+          WORK_DIR: ${{ runner.temp }}/kind-e2e
+          DIAG_DIR: ${{ runner.temp }}/kind-diagnostics
+          # The kubeconfig lives in a private file; no other context exists on
+          # the runner and nothing here has a credential for any other cluster.
+          KUBECONFIG: ${{ runner.temp }}/kind-e2e/kubeconfig
+          # The cluster name is unique to this run and attempt (the script
+          # derives it from GITHUB_RUN_ID/GITHUB_RUN_ATTEMPT); the ownership
+          # marker is written here only after `kind create cluster` succeeded
+          # and is the sole authority for any deletion (GB2C-04R).
+          KIND_OWNERSHIP_FILE: ${{ runner.temp }}/kind-e2e/ownership.json
+        run: .github/scripts/kind-e2e.sh "$IMAGES_DIR/gb-server.oci.tar" "$IMAGES_DIR/gbctl.docker.tar"
+
+      - name: The cluster this run created is gone (deletes only with this run's ownership marker; an inspection error is a failure, not absence)
+        if: always()
+        env:
+          KIND_OWNERSHIP_FILE: ${{ runner.temp }}/kind-e2e/ownership.json
+        # Same ownership contract and fail-closed verdict as the script's own
+        # trap (kind-cleanup.sh): no marker from this run, or a marker already
+        # released, means nothing is deleted; a marker for another run,
+        # attempt, job or cluster is refused; with this run's "owned" marker
+        # the cluster is deleted only if still listed, then a successful
+        # listing and a successful `docker ps` must show nothing.
+        run: .github/scripts/kind-cleanup.sh --fallback --ownership "$KIND_OWNERSHIP_FILE" --timeout 300
+
+      - name: Upload diagnostics (on failure; no Secret objects are read)
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: kind-e2e-diagnostics
+          path: ${{ runner.temp }}/kind-diagnostics/
+          if-no-files-found: ignore
+          retention-days: 14
