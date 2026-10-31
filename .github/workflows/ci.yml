@@ -1,19 +1,23 @@
-# Phase 0 CI for the GB Go port (migration plan section 21, PR-B).
+# CI for the GB Go port: Phase 0 gates (migration plan section 21, PR-B).
 #
-# Strict gates: build, gofmt, go vet, go mod verify/tidy, go test, go test -race,
-# golden fixture reproducibility, golden mutation self-checks, inventory
-# reconciliation against the tests that actually executed, govulncheck, Docker
-# build from the checkout. Baselined gate: golangci-lint findings are compared
-# with the committed baseline by tools/lintdiff (file, linter, message, enclosing
-# declaration and source fingerprint; new and stale findings both fail).
-# Changes to the expected-failure allowances and to the gate tooling need the
-# labels known-defect-added and gate-change-reviewed, applied to the pull
-# request by the repository's sole maintainer as explicit acknowledgments (not
-# independent reviews); label add/remove re-runs the workflow. Pushes to master
-# run technical validation only: the acknowledgment gate applies to pull
-# requests, and merging without one relies on branch protection (UNVERIFIED;
-# docs/testing/known-defects.md). Commit messages are never an acknowledgment.
-# No deployment, no image push, no cluster access, read-only permissions.
+# Phase 0/1 gates, unchanged in substance: build, gofmt, go vet, go mod
+# verify/tidy, go test, go test -race, golden fixture reproducibility, golden
+# mutation self-checks, inventory reconciliation against the tests that
+# actually executed, govulncheck, lint baseline (tools/lintdiff), the
+# acknowledgment gate (labels known-defect-added / gate-change-reviewed,
+# applied to the pull request by the repository's sole maintainer; label
+# add/remove re-runs the workflow; pushes to master run technical validation
+# only; commit messages are never an acknowledgment).
+#
+# Phase 2C (2026-10-30), first step: runtime modernisation only; the jobs
+# and their checks are unchanged in substance.
+#
+# Runtime: ubuntu-26.04 (ubuntu-latest is migrating to it), actions pinned to
+# commit SHAs of Node 24 releases (Node 20 removal from the runners,
+# 2026-09-16). Every job is read-only (contents: read). Nothing here pushes an
+# image, opens a pull request, or has any credential or route to the home-lab
+# cluster. Changes under .github/ need the label gate-change-reviewed
+# (test/scripts/growth-gate.sh).
 name: ci
 
 on:
@@ -33,6 +37,23 @@ env:
   # scanned standard library is the one the binaries are built with.
   GO_VERSION: "1.27.3"
   GOTOOLCHAIN: local
+  # Pinned versions of the tools that are installed from the Go module proxy
+  # (checksums verified against sum.golang.org by the go command) rather than
+  # downloaded as opaque binaries.
+  KUSTOMIZE_VERSION: v5.8.1
+  KIND_VERSION: v0.33.0
+  ACTIONLINT_VERSION: v1.7.12
+  # Pinned scanner and SBOM generator versions (installed by their pinned
+  # actions; the versions are asserted and recorded in the summaries).
+  TRIVY_VERSION: v0.76.1
+  SYFT_VERSION: v1.55.0
+  # kind node image matching the home-lab Kubernetes minor (1.36.4), by digest
+  # from the kind v0.33.0 release notes.
+  KIND_NODE_IMAGE: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+  # Reviewed digest of deploy/kustomize/tests/run.sh (safety-check.py S5). A
+  # changed runner needs a review, the constant updated there, and this value
+  # updated in the same gate-change-reviewed change; never recomputed to pass.
+  APPROVED_RUN_SH_SHA256: 9de4f58606298cac2f21d5180c098e1374cb1693aaac0da0b77f34660f09e46a
 
 defaults:
   run:
@@ -41,11 +62,15 @@ defaults:
 jobs:
   go:
     name: build, test, lint (fresh checkout)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the growth gate compares against the base revision
+          persist-credentials: false
 
       - name: Entry points are tracked (CR-01 guard)
         run: |
@@ -55,7 +80,7 @@ jobs:
             git ls-files --error-unmatch "go/cmd/$f/main.go" >/dev/null || { echo "go/cmd/$f/main.go is not tracked"; git ls-files go/cmd; exit 1; }
           done
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           check-latest: false
@@ -147,8 +172,14 @@ jobs:
 
   docker:
     name: docker build from checkout (no push)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - name: Build the existing Dockerfile from tracked sources only
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the legacy root Dockerfile from tracked sources only (unchanged Phase 0 check)
         run: docker build --tag gb:ci .
