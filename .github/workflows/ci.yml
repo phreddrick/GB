@@ -24,6 +24,9 @@
 #                     pinned by safety-check.py S5 and re-asserted here) and
 #                     the sentinel assertion: strict mode must fail while the
 #                     dev image is the all-zero digest and pass afterwards.
+#   workflow policy   actionlint, shellcheck on .github/scripts, the static
+#                     workflow policy (workflow_policy_check.py) and the unit
+#                     tests of the digest/OCI/scan helpers.
 #   image scan        Trivy (pinned) on both final images: policy fails on a
 #                     CRITICAL vulnerability with a fix available or a secret;
 #                     every finding is reported in the summary.
@@ -44,8 +47,9 @@
 # commit SHAs of Node 24 releases (Node 20 removal from the runners,
 # 2026-09-16). Every job is read-only (contents: read). Nothing here pushes an
 # image, opens a pull request, or has any credential or route to the home-lab
-# cluster. Changes under .github/ need the label gate-change-reviewed
-# (test/scripts/growth-gate.sh).
+# cluster; publication is the separate, manually dispatched
+# publish-images.yml. Changes under .github/ need the label
+# gate-change-reviewed (test/scripts/growth-gate.sh).
 name: ci
 
 on:
@@ -369,6 +373,55 @@ jobs:
             echo "## Manifest validation"
             echo '```'
             grep -E '^(PASS|FAIL|WARN|==|Summary|renderer)' "$RUNNER_TEMP/manifests.txt" 2>/dev/null | tail -80 || echo "(did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  workflow-policy:
+    name: workflow policy (actionlint, shellcheck, permissions, helper tests)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - name: Tooling (PyYAML; actionlint pinned through the Go module proxy; shellcheck from the runner image)
+        working-directory: ${{ runner.temp }}
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml; }
+          mkdir -p "$RUNNER_TEMP/bin"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/actionlint" -version
+          shellcheck --version | head -2
+
+      - name: actionlint (with shellcheck on run blocks)
+        run: actionlint -no-color
+
+      - name: shellcheck on the workflow helper scripts
+        run: shellcheck -S warning .github/scripts/*.sh
+
+      - name: Workflow policy (triggers, permissions, pins, timeouts, injection, secrets)
+        run: python3 .github/scripts/workflow_policy_check.py | tee "$RUNNER_TEMP/policy.txt"
+
+      - name: Helper unit tests (OCI digest reader, digest transformer, Trivy policy, workflow policy, release-safety regressions with mocked crane/gh/kind)
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Workflow policy"
+            echo '```'
+            cat "$RUNNER_TEMP/policy.txt" 2>/dev/null || echo "(did not run)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

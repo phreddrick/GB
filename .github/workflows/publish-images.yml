@@ -1,0 +1,298 @@
+# Publication of the two Phase 2 images to GHCR (migration plan 13.1, ADR-0006
+# decision 3; Phase 2C). MANUAL ONLY: this workflow has no push trigger. The
+# first publication, and every later one until the owner decides otherwise,
+# is a workflow_dispatch run on master by a maintainer, who types `publish`
+# into the confirmation input. Automatic publication on every master push is
+# a documented, not yet approved, follow-up (docs/testing/phase2c-handoff.md).
+#
+# What it does, in order:
+#   preflight  refuses anything but master and the typed confirmation, then
+#              resolves ONE completed, successful run of .github/workflows/
+#              ci.yml for this exact commit (push on master, this repository)
+#              through the workflow-runs API and requires every required job
+#              to belong to that run and attempt (ci_provenance.py; check-run
+#              names alone are not evidence, GB2C-02).
+#   publish    (environment ghcr-publish; the only job in the repository with
+#              packages: write) rebuilds both targets from the reviewed
+#              Dockerfile at this commit with the same reproducible settings
+#              as ci, re-scans both archives with Trivy under the same policy,
+#              logs in to GHCR with the workflow GITHUB_TOKEN, pushes exactly
+#              the scanned bytes with crane (digest preserved), verifies that
+#              each pushed manifest is retrievable by digest and carries this
+#              commit's revision label, tags both `master` only after both
+#              verified, generates SBOMs for the published bytes, and uploads
+#              a validated publish record (publish_record.py). Any failure
+#              fails the run; a half-published pair is reported as
+#              PARTIAL_PUBLICATION with every identifier that reached the
+#              registry, is never tagged master and never reaches the digest
+#              job (GB2C-01; operator procedure in docs/operations/
+#              bootstrap.md section 2).
+#   digest-pr  optional (input), calls digest-update-pr.yml to propose the
+#              server digest in the dev entry point as a pull request. It
+#              never merges, never deploys; Argo CD sync stays manual.
+#
+# No remote build cache is used anywhere (nothing a pull request can poison).
+# No personal access token exists; GITHUB_TOKEN is the only credential. The
+# packages GHCR creates on the first push are PRIVATE until the owner makes
+# them public in the package settings (docs/operations/bootstrap.md).
+name: publish-images
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type `publish` to confirm publication of ghcr.io/phreddrick/gb-server and gbctl from this master commit"
+        required: true
+        type: string
+      open_digest_pr:
+        description: "After a verified publication, open the digest-update pull request for apps/dev/server"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ghcr-publish
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: "1.27.3"
+  GOTOOLCHAIN: local
+  CRANE_VERSION: v0.22.1
+  TRIVY_VERSION: v0.76.1
+  SYFT_VERSION: v1.55.0
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ghcr.io/phreddrick
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  preflight:
+    name: preflight (master only, one successful ci run vouches for this commit, typed confirmation)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Preflight
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI_WORKFLOW_PATH: .github/workflows/ci.yml
+          CI_BRANCH: master
+          CI_EVENT: push
+          REQUIRED_CHECKS: |
+            build, test, lint (fresh checkout)
+            docker build from checkout (no push)
+            manifests (render, mutations, safety check, kubeconform, sentinel)
+            workflow policy (actionlint, shellcheck, permissions, helper tests)
+            image scan (trivy)
+            image sbom (syft)
+            kind e2e (ci entry points, disposable cluster)
+        run: .github/scripts/publish-preflight.sh
+
+  publish:
+    name: publish to GHCR (rebuild, scan, push scanned bytes, verify, tag, SBOM)
+    needs: preflight
+    if: github.ref == 'refs/heads/master' && inputs.confirm == 'publish'
+    environment: ghcr-publish
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+    outputs:
+      server_digest: ${{ steps.push.outputs.server_digest }}
+      gbctl_digest: ${{ steps.push.outputs.gbctl_digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build metadata and tooling (crane pinned through the Go module proxy)
+        id: meta
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/images" "$RUNNER_TEMP/scan" "$RUNNER_TEMP/sbom" "$RUNNER_TEMP/bin"
+          epoch=$(git -C "$GITHUB_WORKSPACE" log -1 --format=%ct)
+          created=$(git -C "$GITHUB_WORKSPACE" log -1 --format=%cI)
+          echo "epoch=$epoch" >> "$GITHUB_OUTPUT"
+          echo "created=$created" >> "$GITHUB_OUTPUT"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "github.com/google/go-containerregistry/cmd/crane@${CRANE_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/crane" version
+
+      - name: Build target server (no push; OCI archive is what gets published)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: go
+          file: deploy/docker/Dockerfile
+          target: server
+          platforms: linux/amd64
+          push: false
+          load: false
+          provenance: false
+          sbom: false
+          labels: |
+            org.opencontainers.image.title=gb-server
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+          outputs: type=oci,dest=${{ runner.temp }}/images/gb-server.oci.tar,rewrite-timestamp=true
+
+      - name: Build target gbctl (no push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: go
+          file: deploy/docker/Dockerfile
+          target: gbctl
+          platforms: linux/amd64
+          push: false
+          load: false
+          provenance: false
+          sbom: false
+          labels: |
+            org.opencontainers.image.title=gbctl
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+          outputs: type=oci,dest=${{ runner.temp }}/images/gbctl.oci.tar,rewrite-timestamp=true
+
+      - name: Archive identities (single linux/amd64 manifest each, revision label equals this commit)
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+        run: |
+          for t in gb-server gbctl; do
+            rec=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/$t.oci.tar")
+            echo "$rec"
+            [ "$(jq -r '.labels["org.opencontainers.image.revision"]' <<<"$rec")" = "$GITHUB_SHA" ] || { echo "$t revision label mismatch"; exit 1; }
+            [ "$(jq -r '.platform.os + "/" + .platform.architecture' <<<"$rec")" = "linux/amd64" ] || { echo "$t platform mismatch"; exit 1; }
+            [ "$(jq -r .user <<<"$rec")" = "65532:65532" ] || { echo "$t user mismatch"; exit 1; }
+          done
+
+      - name: Trivy scan of the server archive (policy evaluated before anything is pushed)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          input: ${{ runner.temp }}/images/gb-server.oci.tar
+          format: json
+          output: ${{ runner.temp }}/scan/trivy-gb-server.json
+          scanners: vuln,secret
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "0"
+          version: ${{ env.TRIVY_VERSION }}
+
+      - name: Trivy scan of the gbctl archive
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          input: ${{ runner.temp }}/images/gbctl.oci.tar
+          format: json
+          output: ${{ runner.temp }}/scan/trivy-gbctl.json
+          scanners: vuln,secret
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "0"
+          version: ${{ env.TRIVY_VERSION }}
+
+      - name: Scan policy gate (CRITICAL fixable or secret fails; malformed report or wrong image fails; nothing is pushed on failure)
+        env:
+          SCAN_DIR: ${{ runner.temp }}/scan
+          IMAGES_DIR: ${{ runner.temp }}/images
+        run: |
+          trivy --version | tee "$SCAN_DIR/trivy-version.txt"
+          grep -q "Version: ${TRIVY_VERSION#v}" "$SCAN_DIR/trivy-version.txt" || { echo "trivy is not ${TRIVY_VERSION}"; exit 1; }
+          for f in "$SCAN_DIR"/trivy-*.json; do test -s "$f" || { echo "$f is empty"; exit 1; }; done
+          server_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gb-server.oci.tar" --field config_digest)
+          gbctl_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gbctl.oci.tar" --field config_digest)
+          python3 .github/scripts/trivy_policy.py "$SCAN_DIR/trivy-gb-server.json" "$SCAN_DIR/trivy-gbctl.json" --require-identity \
+            --expect "$SCAN_DIR/trivy-gb-server.json" "$IMAGES_DIR/gb-server.oci.tar" "$server_id" \
+            --expect "$SCAN_DIR/trivy-gbctl.json" "$IMAGES_DIR/gbctl.oci.tar" "$gbctl_id"
+
+      - name: Log in to GHCR with the workflow token (the job-scoped packages write permission)
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the scanned bytes, verify by digest, tag master, write and validate the publish record
+        id: push
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+          SCAN_DIR: ${{ runner.temp }}/scan
+          RECORD_OUT: ${{ runner.temp }}/publish-record.json
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        run: .github/scripts/publish-push.sh "$IMAGES_DIR" "$RECORD_OUT"
+
+      - name: Install syft (pinned)
+        id: syft
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: ${{ env.SYFT_VERSION }}
+
+      - name: SBOMs of the published bytes (SPDX JSON)
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
+          IMAGES_DIR: ${{ runner.temp }}/images
+          SBOM_DIR: ${{ runner.temp }}/sbom
+        run: |
+          "$SYFT" version | tee "$SBOM_DIR/syft-version.txt"
+          grep -q "Version: *${SYFT_VERSION#v}" "$SBOM_DIR/syft-version.txt" || { echo "syft is not ${SYFT_VERSION}"; exit 1; }
+          for t in gb-server gbctl; do
+            digest=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/$t.oci.tar" --field manifest_digest)
+            "$SYFT" scan "oci-archive:$IMAGES_DIR/$t.oci.tar" --source-name "$IMAGE_NAMESPACE/$t" --source-version "$digest" -o "spdx-json=$SBOM_DIR/$t.spdx.json" -q
+            test -s "$SBOM_DIR/$t.spdx.json"
+          done
+
+      - name: Upload the publish record, scan reports and SBOMs (90 days)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publish-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/publish-record.json
+            ${{ runner.temp }}/scan/
+            ${{ runner.temp }}/sbom/
+          if-no-files-found: error
+          retention-days: 90
+
+  digest-pr:
+    name: digest-update pull request (optional, never merges)
+    needs: publish
+    if: inputs.open_digest_pr == true
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: read
+    uses: ./.github/workflows/digest-update-pr.yml
+    with:
+      digest: ${{ needs.publish.outputs.server_digest }}
+      source_sha: ${{ github.sha }}

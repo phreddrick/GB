@@ -1,0 +1,122 @@
+# Digest-update pull request for the dev entry point (migration plan 13.1
+# "Deploy PR", ADR-0006 decision 3; Phase 2C brief section 10).
+#
+# Proposes replacing images[].digest for ghcr.io/phreddrick/gb-server in
+# deploy/kustomize/apps/dev/server/kustomization.yaml with a digest that has
+# actually been published. Called by publish-images.yml after a verified
+# publication, or dispatched by hand with the digest and the source commit.
+#
+# Before anything is written it verifies, against the registry, that the
+# manifest exists at that digest, is a single linux/amd64 image manifest, and
+# carries the org.opencontainers.image.revision label equal to the given
+# commit, which must be on master. The edit touches one line
+# (set_image_digest.py refuses anything else), the full offline validation
+# runs in strict mode on the candidate (`--require-published-image` must pass),
+# and the branch bot/gb-server-digest-<12 hex> is pushed; an existing branch
+# or open pull request for the same digest means nothing is created. The
+# pull request is opened with `gh` and the workflow GITHUB_TOKEN; it is never
+# merged here and it deploys nothing (Argo CD sync is manual, docs/operations/
+# deploy.md). Creating it needs the repository setting "Allow GitHub Actions
+# to create and approve pull requests"; without it the job fails after
+# pushing the branch and prints the compare URL for a manual pull request
+# (no other token is used). Per GitHub's GITHUB_TOKEN documentation, the
+# opened event of a token-created pull request creates the ci workflow run
+# in an approval-required state; a maintainer starts it by selecting
+# "Approve workflows to run" in the pull request's merge box, and only then
+# do the required status checks execute. Acknowledgment labels and the merge
+# are separate decisions (digest-pr.sh prints the sequence).
+name: digest-update-pr
+
+on:
+  workflow_call:
+    inputs:
+      digest:
+        description: "Published manifest digest of ghcr.io/phreddrick/gb-server (sha256:<64 hex>)"
+        required: true
+        type: string
+      source_sha:
+        description: "Commit on master the image was built from (40 hex)"
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: "Published manifest digest of ghcr.io/phreddrick/gb-server (sha256:<64 hex>)"
+        required: true
+        type: string
+      source_sha:
+        description: "Commit on master the image was built from (40 hex)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  GO_VERSION: "1.27.3"
+  GOTOOLCHAIN: local
+  CRANE_VERSION: v0.22.1
+  KUSTOMIZE_VERSION: v5.8.1
+  IMAGE: ghcr.io/phreddrick/gb-server
+  ENTRY_POINT: deploy/kustomize/apps/dev/server/kustomization.yaml
+  APPROVED_RUN_SH_SHA256: 9de4f58606298cac2f21d5180c098e1374cb1693aaac0da0b77f34660f09e46a
+
+jobs:
+  digest-pr:
+    name: verify published digest, edit one line, validate strictly, open pull request
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+          # The token stays in the checkout so the branch can be pushed; it is
+          # the job-scoped GITHUB_TOKEN with contents: write, nothing else.
+          persist-credentials: true
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache: false
+
+      - name: Tooling (PyYAML; crane and kustomize pinned through the Go module proxy)
+        working-directory: ${{ runner.temp }}
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml; }
+          mkdir -p "$RUNNER_TEMP/bin"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "github.com/google/go-containerregistry/cmd/crane@${CRANE_VERSION}"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "sigs.k8s.io/kustomize/kustomize/v5@${KUSTOMIZE_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Log in to GHCR (read; the package may still be private)
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify the published image against the registry and the source commit
+        env:
+          DIGEST: ${{ inputs.digest }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: .github/scripts/verify-published-image.sh
+
+      - name: Edit the one line, validate the candidate strictly, push the branch, open the pull request
+        env:
+          DIGEST: ${{ inputs.digest }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          KUSTOMIZE_RENDER_DIR: ${{ runner.temp }}/render
+        run: .github/scripts/digest-pr.sh
