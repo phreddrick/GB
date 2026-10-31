@@ -138,7 +138,7 @@ jobs:
           created=$(git -C "$GITHUB_WORKSPACE" log -1 --format=%cI)
           echo "epoch=$epoch" >> "$GITHUB_OUTPUT"
           echo "created=$created" >> "$GITHUB_OUTPUT"
-          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "github.com/google/go-containerregistry/cmd/crane@${CRANE_VERSION}"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS='' GOTOOLCHAIN=auto go install "github.com/google/go-containerregistry/cmd/crane@${CRANE_VERSION}"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/crane" version
 

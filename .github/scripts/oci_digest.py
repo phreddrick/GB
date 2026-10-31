@@ -14,9 +14,11 @@ digest-update workflow need, read from the archive itself and verified:
   manifest_media_type must be the OCI image manifest type (one platform-specific
                       manifest; the build disables provenance and SBOM
                       attestations so no image index is produced).
-  config_digest       sha256 of the image config blob. `docker image inspect`
-                      reports it as the image Id, which links a loaded image to
-                      this archive.
+  config_digest       sha256 of the image config blob. The classic Docker image
+                      store reports it as the image Id, the containerd image
+                      store reports manifest_digest instead (hosted run
+                      41231194459); docker_image_identity.py links a loaded
+                      image to this archive in either case.
   platform, user, entrypoint, labels, layer_count, compressed_size, annotations
 
 Every blob the record is derived from is re-hashed and compared with the digest

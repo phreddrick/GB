@@ -331,7 +331,7 @@ jobs:
           python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml; }
           python3 -c 'import yaml; print("PyYAML", yaml.__version__)'
           mkdir -p "$RUNNER_TEMP/bin"
-          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "sigs.k8s.io/kustomize/kustomize/v5@${KUSTOMIZE_VERSION}"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS='' GOTOOLCHAIN=auto go install "sigs.k8s.io/kustomize/kustomize/v5@${KUSTOMIZE_VERSION}"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/kustomize" version
 
@@ -398,7 +398,7 @@ jobs:
         run: |
           python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml; }
           mkdir -p "$RUNNER_TEMP/bin"
-          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS='' GOTOOLCHAIN=auto go install "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/actionlint" -version
           shellcheck --version | head -2
@@ -582,7 +582,7 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
-          GOBIN="$RUNNER_TEMP/bin" GOFLAGS= GOTOOLCHAIN=auto go install "sigs.k8s.io/kind@${KIND_VERSION}"
+          GOBIN="$RUNNER_TEMP/bin" GOFLAGS='' GOTOOLCHAIN=auto go install "sigs.k8s.io/kind@${KIND_VERSION}"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/kind" version
           kubectl version --client

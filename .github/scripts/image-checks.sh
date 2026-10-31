@@ -12,8 +12,10 @@
 # GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT (all set by the workflow).
 #
 # For each target it asserts: the OCI archive holds exactly one linux/amd64
-# image manifest (digest recorded); the docker-loaded image's Id equals the
-# archive's config digest (same artifact); config User 65532:65532 and the
+# image manifest (digest recorded); the docker-loaded image is the same
+# artifact (docker_image_identity.py: its Id is the archive's manifest or config
+# digest, and its saved config and layers hash to the archive's config digest
+# and diff_ids); config User 65532:65532 and the
 # expected entrypoint; the rootfs contains the expected binary, no shell, no
 # package manager, no credential-looking file, the other target's binary is
 # absent (distinct images); the binary is a static ELF x86-64 built by the
@@ -36,7 +38,7 @@ ok() { echo "PASS $*"; }
 
 declare -A BIN=([gb-server]=/usr/local/bin/gb-server [gbctl]=/usr/local/bin/gbctl)
 declare -A OTHER=([gb-server]=/usr/local/bin/gbctl [gbctl]=/usr/local/bin/gb-server)
-declare -A MANIFEST CONFIG SIZE TARSIZE GOVER
+declare -A MANIFEST CONFIG SIZE TARSIZE GOVER DOCKERID IDKIND
 
 for t in gb-server gbctl; do
   oci="$IMAGES_DIR/$t.oci.tar"; dock="$IMAGES_DIR/$t.docker.tar"; tag="$t:ci"
@@ -55,14 +57,23 @@ for t in gb-server gbctl; do
   [ "$(jq -r '.labels["org.opencontainers.image.source"]' <<<"$rec")" = "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" ] || fail "$t source label wrong"
   ok "$t OCI archive: manifest ${MANIFEST[$t]} config ${CONFIG[$t]} linux/amd64 user 65532:65532 entrypoint ${BIN[$t]}"
 
-  # 2. The docker-format archive is the same artifact (same config digest).
+  # 2. The docker-format archive is the same artifact. The loaded image's Id
+  # names the config digest on the classic image store but the manifest digest
+  # on the containerd image store (hosted runners); either is accepted only if
+  # it is this archive's, and the image is re-read with `docker image save`:
+  # its config bytes must hash to the archive config digest, every layer to
+  # the config's diff_ids, and a manifest-digest Id must name a saved manifest.
   docker load -i "$dock" >/dev/null
   id=$(docker image inspect "$tag" --format '{{.Id}}')
-  [ "$id" = "${CONFIG[$t]}" ] || fail "$t loaded image Id $id differs from the OCI config digest ${CONFIG[$t]}"
+  docker image save "$tag" -o "$WORK/$t.saved.tar" || fail "$t docker image save failed"
+  ident=$(python3 "$HERE/docker_image_identity.py" --oci "$oci" --saved "$WORK/$t.saved.tar" --docker-id "$id" --tag "$tag") \
+    || fail "$t loaded image (Id $id) is not the image in $oci"
+  rm -f "$WORK/$t.saved.tar"
+  DOCKERID[$t]=$id; IDKIND[$t]=$(jq -r .docker_id_kind <<<"$ident")
   [ "$(docker image inspect "$tag" --format '{{.Config.User}}')" = "65532:65532" ] || fail "$t docker config User"
   [ "$(docker image inspect "$tag" --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64" ] || fail "$t docker platform"
   SIZE[$t]=$(docker image inspect "$tag" --format '{{.Size}}')
-  ok "$t docker-loaded image Id equals the archive config digest; size ${SIZE[$t]} bytes"
+  ok "$t docker-loaded image is the archive's: Id $id is its ${IDKIND[$t]} digest; saved config and $(jq -r .saved_layers_verified <<<"$ident") layer(s) verified; size ${SIZE[$t]} bytes"
 
   # 3. Root filesystem contents.
   cid=$(docker create "$tag")
@@ -176,14 +187,16 @@ jq -n \
   --arg sha "$GITHUB_SHA" --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/${GITHUB_RUN_ATTEMPT:-1}" \
   --arg epoch "${SOURCE_DATE_EPOCH:-}" --arg go "$EXPECTED_GO_VERSION" \
   --arg sm "${MANIFEST[gb-server]}" --arg sc "${CONFIG[gb-server]}" --arg ss "${SIZE[gb-server]}" --arg st "${TARSIZE[gb-server]}" --arg sg "${GOVER[gb-server]}" \
+  --arg sd "${DOCKERID[gb-server]}" --arg sk "${IDKIND[gb-server]}" \
   --arg cm "${MANIFEST[gbctl]}" --arg cc "${CONFIG[gbctl]}" --arg cs "${SIZE[gbctl]}" --arg ct "${TARSIZE[gbctl]}" --arg cg "${GOVER[gbctl]}" \
+  --arg cd "${DOCKERID[gbctl]}" --arg ck "${IDKIND[gbctl]}" \
   '{
     kind: "gb-image-build-record", built_by: "ci docker job (no push)", source_commit: $sha, workflow_run: $run,
     source_date_epoch: $epoch, go_toolchain: $go, platform: "linux/amd64",
     dockerfile: "deploy/docker/Dockerfile", context: "go/",
     images: {
-      "gb-server": {target: "server", manifest_digest: $sm, config_digest: $sc, image_size_bytes: ($ss|tonumber), oci_archive_bytes: ($st|tonumber), go_version: $sg, intended_repository: "ghcr.io/phreddrick/gb-server"},
-      "gbctl":     {target: "gbctl",  manifest_digest: $cm, config_digest: $cc, image_size_bytes: ($cs|tonumber), oci_archive_bytes: ($ct|tonumber), go_version: $cg, intended_repository: "ghcr.io/phreddrick/gbctl"}
+      "gb-server": {target: "server", manifest_digest: $sm, config_digest: $sc, docker_image_id: $sd, docker_image_id_kind: $sk, image_size_bytes: ($ss|tonumber), oci_archive_bytes: ($st|tonumber), go_version: $sg, intended_repository: "ghcr.io/phreddrick/gb-server"},
+      "gbctl":     {target: "gbctl",  manifest_digest: $cm, config_digest: $cc, docker_image_id: $cd, docker_image_id_kind: $ck, image_size_bytes: ($cs|tonumber), oci_archive_bytes: ($ct|tonumber), go_version: $cg, intended_repository: "ghcr.io/phreddrick/gbctl"}
     },
     note: "digests are of the local OCI archives; a published digest exists only after publish-images.yml pushes these bytes"
   }' > "$RECORD_OUT"
