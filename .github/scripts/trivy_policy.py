@@ -5,11 +5,15 @@ has a fix available, and on any secret found inside the image. Everything
 else is reported, never hidden.
 
     trivy_policy.py REPORT.json [REPORT.json ...] [--summary FILE]
+                    [--expect-layout REPORT.json LAYOUT_DIR ARCHIVE.oci.tar]...
                     [--expect REPORT.json ARTIFACT_NAME IMAGE_ID]... [--require-identity]
 
 Fail closed on the report itself (GB2C-03). The report must be what Trivy
-v0.76.1 writes for `trivy image --input <archive> --format json --scanners
-vuln,secret` (types.Report in pkg/types/report.go of that tag):
+v0.76.1 writes for `trivy image --input <layout-dir> --format json --scanners
+vuln,secret` (types.Report in pkg/types/report.go of that tag; the input is the
+OCI layout directory oci_layout_dir.py materialised from the archive, because
+`--input` opens Docker-save tarballs and layout directories only, hosted run
+41250221737):
 
   * an object with SchemaVersion 2, a non-empty ArtifactName, ArtifactType
     "container_image", a CreatedAt timestamp and a Metadata object whose
@@ -25,10 +29,20 @@ vuln,secret` (types.Report in pkg/types/report.go of that tag):
     for a detected OS even with zero vulnerabilities (pkg/scan/ospkg), and the
     distroless base carries a dpkg status database, so a report without any
     result section is an incomplete scan, not a clean one;
-  * with --expect, ArtifactName must be the scanned archive and
-    Metadata.ImageID the archive's config digest (read by oci_digest.py), so
-    the report is evidence about the intended runtime image; --require-identity
-    makes a report without an expectation an error (CI always passes both).
+  * with --expect-layout, ArtifactName must be exactly the layout directory
+    the scanner was given (Trivy's archiveImage.Name() is the --input string;
+    the path may not contain ':' or '@', which Trivy cuts off as a reference,
+    and must be spelled canonically: no trailing or doubled separator, no '.'
+    or '..' component, GB2C-07R),
+    that directory, re-read now with oci_digest.inspect through directory file
+    descriptors that follow no symlink at any component (GB2C-07), must report
+    the same manifest digest, config digest, layer digests and diff_ids as the archive
+    it was derived from (so what was scanned is the archive's content, not a
+    substitute), and Metadata.ImageID (Trivy's ID() = the config digest) must
+    be the archive's config digest; with --expect, ArtifactName must be the
+    given name and Metadata.ImageID the given config digest. Either makes the
+    report evidence about the intended runtime image; --require-identity makes
+    a report without an expectation an error (CI always passes one).
 
 Outcomes, kept distinct in the output and the exit status:
   0  clean scan (no finding at all), or findings none of which violate policy;
@@ -46,6 +60,8 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import oci_digest  # noqa: E402
 
 SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
 FAIL_SEVERITIES = {"CRITICAL"}
@@ -145,6 +161,37 @@ def check_identity(report: dict, path: str, artifact_name: str, image_id: str) -
         raise ReportError(f"{path}: Metadata.ImageID {got_id} is not the archive's config digest {image_id}: a different image was scanned")
 
 
+def check_layout_identity(report: dict, path: str, layout_dir: str, archive: str) -> str:
+    """The report must be about `layout_dir`, which must still be the image in `archive`."""
+    if ":" in layout_dir or "@" in layout_dir:
+        raise ReportError(f"{path}: layout directory {layout_dir!r} contains ':' or '@'; the scanner would have cut it as an image reference")
+    try:
+        oci_digest.canonical_dir_components(layout_dir)  # GB2C-07R: validated as supplied, before any open
+    except oci_digest.ArchiveError as e:
+        raise ReportError(f"{path}: {e}") from None
+    got_name = report["ArtifactName"]
+    if got_name != layout_dir:  # exact: the scanner's --input string, no normalisation
+        raise ReportError(f"{path}: ArtifactName {got_name!r} is not the scanned layout directory {layout_dir!r}")
+    if os.path.islink(layout_dir):
+        raise ReportError(f"{path}: layout directory {layout_dir} is a symlink (unsafe layout structure); the scanned input cannot be re-verified")
+    if not os.path.isdir(layout_dir):
+        raise ReportError(f"{path}: layout directory {layout_dir} is missing or not a directory; the scanned input cannot be re-verified")
+    try:
+        want = oci_digest.inspect(archive)
+        got = oci_digest.inspect(layout_dir)
+    except oci_digest.ArchiveError as e:
+        raise ReportError(f"{path}: cannot re-verify the scanned input against {archive}: {e}") from e
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError, AttributeError) as e:
+        raise ReportError(f"{path}: cannot re-verify the scanned input against {archive}: malformed content: {e}") from e
+    for key in ("manifest_digest", "config_digest", "layer_digests", "diff_ids"):
+        if got.get(key) != want.get(key):
+            raise ReportError(f"{path}: layout directory {layout_dir} {key} {got.get(key)!r} differs from the archive's {want.get(key)!r}: the scanned input is not the archive's image")
+    got_id = report["Metadata"]["ImageID"]
+    if got_id != want["config_digest"]:
+        raise ReportError(f"{path}: Metadata.ImageID {got_id} is not the archive's config digest {want['config_digest']}: a different image was scanned")
+    return want["config_digest"]
+
+
 def evaluate(report: dict) -> tuple[dict, list[dict], list[dict], int]:
     """Return (counts[severity][fixable|unfixable], violations, secrets, total findings).
 
@@ -203,10 +250,18 @@ def main(argv: list[str]) -> int:
     ap.add_argument("reports", nargs="+")
     ap.add_argument("--summary", default=os.environ.get("GITHUB_STEP_SUMMARY"))
     ap.add_argument("--expect", nargs=3, action="append", default=[], metavar=("REPORT", "ARTIFACT_NAME", "IMAGE_ID"),
-                    help="the archive path and config digest the report must be about")
-    ap.add_argument("--require-identity", action="store_true", help="every report must have an --expect entry")
+                    help="the artifact name and config digest the report must be about")
+    ap.add_argument("--expect-layout", nargs=3, action="append", default=[], metavar=("REPORT", "LAYOUT_DIR", "ARCHIVE"),
+                    help="the scanned layout directory and the OCI archive it must still be the image of (re-verified now)")
+    ap.add_argument("--require-identity", action="store_true", help="every report must have an --expect or --expect-layout entry")
     args = ap.parse_args(argv)
-    expectations = {os.path.abspath(r): (a, i) for r, a, i in args.expect}
+    expectations = {os.path.abspath(r): ("name", a, i) for r, a, i in args.expect}
+    for r, d, a in args.expect_layout:
+        key = os.path.abspath(r)
+        if key in expectations:
+            print(f"trivy_policy: ERROR {r} has both --expect and --expect-layout", file=sys.stderr)
+            return 2
+        expectations[key] = ("layout", d, a)
     status = 0
     texts = []
     for path in args.reports:
@@ -214,9 +269,12 @@ def main(argv: list[str]) -> int:
             report = load(path)
             validate(report, path)
             exp = expectations.get(os.path.abspath(path))
-            if exp is not None:
-                check_identity(report, path, *exp)
-                identity = f"asserted (archive {exp[0]}, config digest {exp[1]})"
+            if exp is not None and exp[0] == "layout":
+                config_digest = check_layout_identity(report, path, exp[1], exp[2])
+                identity = f"asserted (layout directory {exp[1]} re-verified as the image of {exp[2]}, config digest {config_digest})"
+            elif exp is not None:
+                check_identity(report, path, exp[1], exp[2])
+                identity = f"asserted (archive {exp[1]}, config digest {exp[2]})"
             elif args.require_identity:
                 raise ReportError(f"{path}: no --expect entry for this report and --require-identity is set")
             else:

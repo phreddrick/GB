@@ -452,11 +452,24 @@ jobs:
           mkdir -p "$RUNNER_TEMP/scan"
           for t in gb-server gbctl; do python3 .github/scripts/oci_digest.py "$IMAGES_DIR/$t.oci.tar" --field manifest_digest; done
 
+      # Trivy's --input opens a Docker-save tarball or an OCI layout *directory*, not an OCI
+      # layout tarball (run 41250221737). The verified archive is extracted, with an allow-list
+      # of layout paths only, into a fresh directory that must read back as the same image; the
+      # archive stays the artifact of record. The policy step re-verifies the directory after
+      # the scan.
+      - name: Materialize verified OCI layout directories for the scanner
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+          LAYOUT_DIR: ${{ runner.temp }}/layout
+        run: |
+          mkdir -p "$LAYOUT_DIR"
+          for t in gb-server gbctl; do python3 .github/scripts/oci_layout_dir.py "$IMAGES_DIR/$t.oci.tar" "$LAYOUT_DIR/$t"; done
+
       - name: Trivy scan of the server image (all severities, vulnerabilities and secrets, JSON)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          input: ${{ runner.temp }}/images/gb-server.oci.tar
+          input: ${{ runner.temp }}/layout/gb-server
           format: json
           output: ${{ runner.temp }}/scan/trivy-gb-server.json
           scanners: vuln,secret
@@ -469,7 +482,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          input: ${{ runner.temp }}/images/gbctl.oci.tar
+          input: ${{ runner.temp }}/layout/gbctl
           format: json
           output: ${{ runner.temp }}/scan/trivy-gbctl.json
           scanners: vuln,secret
@@ -491,12 +504,11 @@ jobs:
         env:
           SCAN_DIR: ${{ runner.temp }}/scan
           IMAGES_DIR: ${{ runner.temp }}/images
+          LAYOUT_DIR: ${{ runner.temp }}/layout
         run: |
-          server_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gb-server.oci.tar" --field config_digest)
-          gbctl_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gbctl.oci.tar" --field config_digest)
           python3 .github/scripts/trivy_policy.py "$SCAN_DIR/trivy-gb-server.json" "$SCAN_DIR/trivy-gbctl.json" --require-identity \
-            --expect "$SCAN_DIR/trivy-gb-server.json" "$IMAGES_DIR/gb-server.oci.tar" "$server_id" \
-            --expect "$SCAN_DIR/trivy-gbctl.json" "$IMAGES_DIR/gbctl.oci.tar" "$gbctl_id"
+            --expect-layout "$SCAN_DIR/trivy-gb-server.json" "$LAYOUT_DIR/gb-server" "$IMAGES_DIR/gb-server.oci.tar" \
+            --expect-layout "$SCAN_DIR/trivy-gbctl.json" "$LAYOUT_DIR/gbctl" "$IMAGES_DIR/gbctl.oci.tar"
 
       - name: Upload scan reports (90 days)
         if: always()

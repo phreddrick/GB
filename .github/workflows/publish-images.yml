@@ -196,11 +196,21 @@ jobs:
             [ "$(jq -r .user <<<"$rec")" = "65532:65532" ] || { echo "$t user mismatch"; exit 1; }
           done
 
+      # Same scanner input as ci (Trivy reads layout directories, not layout tarballs); the
+      # archive that was verified above is what is extracted, scanned and later pushed.
+      - name: Materialize verified OCI layout directories for the scanner
+        env:
+          IMAGES_DIR: ${{ runner.temp }}/images
+          LAYOUT_DIR: ${{ runner.temp }}/layout
+        run: |
+          mkdir -p "$LAYOUT_DIR" "$RUNNER_TEMP/scan"
+          for t in gb-server gbctl; do python3 .github/scripts/oci_layout_dir.py "$IMAGES_DIR/$t.oci.tar" "$LAYOUT_DIR/$t"; done
+
       - name: Trivy scan of the server archive (policy evaluated before anything is pushed)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          input: ${{ runner.temp }}/images/gb-server.oci.tar
+          input: ${{ runner.temp }}/layout/gb-server
           format: json
           output: ${{ runner.temp }}/scan/trivy-gb-server.json
           scanners: vuln,secret
@@ -213,7 +223,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          input: ${{ runner.temp }}/images/gbctl.oci.tar
+          input: ${{ runner.temp }}/layout/gbctl
           format: json
           output: ${{ runner.temp }}/scan/trivy-gbctl.json
           scanners: vuln,secret
@@ -226,15 +236,14 @@ jobs:
         env:
           SCAN_DIR: ${{ runner.temp }}/scan
           IMAGES_DIR: ${{ runner.temp }}/images
+          LAYOUT_DIR: ${{ runner.temp }}/layout
         run: |
           trivy --version | tee "$SCAN_DIR/trivy-version.txt"
           grep -q "Version: ${TRIVY_VERSION#v}" "$SCAN_DIR/trivy-version.txt" || { echo "trivy is not ${TRIVY_VERSION}"; exit 1; }
           for f in "$SCAN_DIR"/trivy-*.json; do test -s "$f" || { echo "$f is empty"; exit 1; }; done
-          server_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gb-server.oci.tar" --field config_digest)
-          gbctl_id=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/gbctl.oci.tar" --field config_digest)
           python3 .github/scripts/trivy_policy.py "$SCAN_DIR/trivy-gb-server.json" "$SCAN_DIR/trivy-gbctl.json" --require-identity \
-            --expect "$SCAN_DIR/trivy-gb-server.json" "$IMAGES_DIR/gb-server.oci.tar" "$server_id" \
-            --expect "$SCAN_DIR/trivy-gbctl.json" "$IMAGES_DIR/gbctl.oci.tar" "$gbctl_id"
+            --expect-layout "$SCAN_DIR/trivy-gb-server.json" "$LAYOUT_DIR/gb-server" "$IMAGES_DIR/gb-server.oci.tar" \
+            --expect-layout "$SCAN_DIR/trivy-gbctl.json" "$LAYOUT_DIR/gbctl" "$IMAGES_DIR/gbctl.oci.tar"
 
       - name: Log in to GHCR with the workflow token (the job-scoped packages write permission)
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
