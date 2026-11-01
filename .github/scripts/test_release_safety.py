@@ -31,7 +31,7 @@ sys.path.insert(0, HERE)
 import ci_provenance  # noqa: E402
 import oci_digest  # noqa: E402
 import publish_record  # noqa: E402
-from test_scripts import IMAGE_ID, SECRET, make_oci_archive, trivy_report  # noqa: E402
+from test_scripts import IMAGE_ID, SECRET, blobs_hash_to_their_names, gb2c06_archive, make_oci_archive, trivy_report  # noqa: E402
 
 SHA = "8f23bb093fcbc25d2d67aba4a7d10fed6f585bb4"
 OTHER_SHA = "1" * 40
@@ -258,6 +258,32 @@ class PublishPushTests(ScriptCase):
         self.assertFalse(rec["master_tag_applied"])
         self.assertEqual({rec["images"][t]["state"] for t in rec["images"]}, {"verified"})
 
+    def test_gb2c06_archive_is_rejected_before_the_first_push(self):
+        """GB2C-06 in the shared validator: an archive carrying another image's layers under
+        its config (every blob hash correct) is refused by oci_digest.py in the identity pass
+        that precedes the first `crane push`, whichever of the two images it is, so nothing
+        reaches the registry and the record says failed / not_pushed."""
+        labels = {"org.opencontainers.image.revision": SHA}
+        for bad in ("gbctl", "gb-server"):
+            with self.subTest(inconsistent=bad):
+                for t in ("gb-server", "gbctl"):
+                    archive = os.path.join(self.images, f"{t}.oci.tar")
+                    self.ids[t] = gb2c06_archive(archive, labels=labels) if t == bad else make_oci_archive(archive, labels=labels)
+                self.assertTrue(blobs_hash_to_their_names(os.path.join(self.images, f"{bad}.oci.tar")))
+                r = self.publish()
+                self.assert_not_success(r)
+                self.assertIn("does not carry its config's layers", r.stderr)
+                self.assertIn(f"{bad}.oci.tar: not a valid single-manifest OCI archive", r.stderr)
+                self.assertIn("publish-push: FAILED", r.stderr)
+                self.assertIn("nothing was pushed", r.stderr)
+                self.assertEqual(self.calls(), "", "no crane call at all: both archives are validated before the first push")
+                rec = self.read_record()
+                self.assertEqual(rec["status"], "failed")
+                self.assertEqual({rec["images"][t]["state"] for t in ("gb-server", "gbctl")}, {"not_pushed"})
+                self.assertEqual(rec["published"], [])
+                os.unlink(self.record)
+                open(self.log, "w").close()
+
     def test_jq_program_that_does_not_compile_stops_before_any_push(self):
         scripts = os.path.join(self.tmp, "scripts")
         shutil.copytree(HERE, scripts, ignore=shutil.ignore_patterns("__pycache__", "test_*"))
@@ -449,17 +475,18 @@ class PublishRecordValidatorTests(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def render(self, status="published", master="true", **states) -> dict:
+    def render(self, status="published", master="true", ids: dict | None = None, **states) -> dict:
         s = states.get("s", "verified")
         c = states.get("c", "verified")
+        ids = ids or self.ids
         args = ["jq", "-n", "-f", os.path.join(HERE, "publish-record.jq"), "--arg", "status", status, "--arg", "master", master,
                 "--arg", "sha", SHA, "--arg", "run", "https://github.com/phreddrick/GB/actions/runs/1/attempts/1", "--arg", "epoch", "1",
                 "--arg", "ns", NS, "--arg", "trivy", "Version: 0.76.1"]
         for prefix, t, state in (("s", "gb-server", s), ("c", "gbctl", c)):
             pushed = state in ("verified", "pushed_unverified")
-            args += ["--arg", f"{prefix}_state", state, "--arg", f"{prefix}_local", self.ids[t]["manifest_digest"],
-                     "--arg", f"{prefix}_remote", self.ids[t]["manifest_digest"] if pushed else "",
-                     "--arg", f"{prefix}_config", self.ids[t]["config_digest"], "--arg", f"{prefix}_size", "123"]
+            args += ["--arg", f"{prefix}_state", state, "--arg", f"{prefix}_local", ids[t]["manifest_digest"],
+                     "--arg", f"{prefix}_remote", ids[t]["manifest_digest"] if pushed else "",
+                     "--arg", f"{prefix}_config", ids[t]["config_digest"], "--arg", f"{prefix}_size", "123"]
         r = subprocess.run(args, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         return json.loads(r.stdout)
@@ -467,12 +494,12 @@ class PublishRecordValidatorTests(unittest.TestCase):
     def problems(self, rec: dict, status: str = "published") -> list[str]:
         return publish_record.validate(rec, expect_status=status, expect_commit=SHA, expect_namespace=NS, images_dir=self.images)
 
-    def cli(self, text: bytes, status: str = "published") -> int:
+    def cli(self, text: bytes, status: str = "published", images_dir: str | None = None) -> int:
         p = os.path.join(self.tmp, "r.json")
         with open(p, "wb") as f:
             f.write(text)
         return subprocess.run([sys.executable, os.path.join(HERE, "publish_record.py"), p, "--expect-status", status, "--expect-commit", SHA,
-                               "--expect-namespace", NS, "--images-dir", self.images], capture_output=True).returncode
+                               "--expect-namespace", NS, "--images-dir", images_dir or self.images], capture_output=True).returncode
 
     def test_valid_published_and_partial(self):
         self.assertEqual(self.problems(self.render()), [])
@@ -514,6 +541,24 @@ class PublishRecordValidatorTests(unittest.TestCase):
 
     def test_publisher_and_record_must_agree(self):
         self.assertNotEqual(self.problems(self.render(), "partial"), [])
+
+    def test_gb2c06_source_archive_rejects_the_record(self):
+        """A record whose digests were read from an archive carrying another image's layers
+        under its config is refused when validated against that archive (--images-dir): the
+        shared validator cannot re-read it, so the record is invalid and the CLI exits 1."""
+        images = os.path.join(self.tmp, "images-gb2c06")
+        os.makedirs(images)
+        ids = {"gb-server": gb2c06_archive(os.path.join(images, "gb-server.oci.tar")),
+               "gbctl": make_oci_archive(os.path.join(images, "gbctl.oci.tar"))}
+        self.assertTrue(blobs_hash_to_their_names(os.path.join(images, "gb-server.oci.tar")))
+        rec = self.render(ids=ids)
+        problems = publish_record.validate(rec, expect_status="published", expect_commit=SHA, expect_namespace=NS, images_dir=images)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("images.gb-server: cannot re-read the source archive", problems[0])
+        self.assertIn("does not carry its config's layers", problems[0])
+        self.assertEqual(self.cli(json.dumps(rec).encode(), images_dir=images), 1)
+        # Without the archive check the same record is schema-valid: the rejection comes from the validator.
+        self.assertEqual(publish_record.validate(rec, expect_status="published", expect_commit=SHA, expect_namespace=NS, images_dir=None), [])
 
 
 # ------------------------------------------------------------------ GB2C-02 --

@@ -30,23 +30,18 @@ image is checked independently, from the bytes of `docker image save TAG`:
     that manifest, its bytes must hash to it, and it must reference the
     archive's config digest.
 
-The OCI archive itself is re-verified with oci_digest.inspect (every blob
-re-hashed), and its manifest's layers are tied to its config (GB2C-06): the
-ordered layer descriptors and rootfs.diff_ids must have the same length, each
-descriptor must have a supported media type (OCI tar, OCI tar+gzip or the
-Docker gzip rootfs type; zstd, foreign and anything else are rejected), a size
-equal to its blob's, and its blob, decoded as its media type states, must hash
-to the matching diff_id. Otherwise an archive whose manifest references another
-image's layers would pass, because Docker's saved layers are only compared with
-the config. Prints a JSON record; exit 1 with a reason on any mismatch.
-Standard library only.
+The OCI archive itself is re-verified with oci_digest.inspect, which returns
+no record unless every blob re-hashes to its digest and the manifest's ordered
+layers decode to the config's rootfs.diff_ids (GB2C-06; the check lives in the
+shared validator so that every caller, not only this one, enforces it).
+Otherwise an archive whose manifest references another image's layers would
+pass, because Docker's saved layers are only compared with the config. Prints
+a JSON record; exit 1 with a reason on any mismatch. Standard library only.
 """
 from __future__ import annotations
 
 import argparse
-import gzip
 import hashlib
-import io
 import json
 import re
 import sys
@@ -54,15 +49,9 @@ import tarfile
 import zlib
 
 import oci_digest
-from oci_digest import ArchiveError
+from oci_digest import CHUNK, DIGEST_RE, GZIP_MAGIC, ZSTD_MAGIC, ArchiveError, _gunzip_digest
 
-DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 BLOB_PATH_RE = re.compile(r"^(?:\./)?blobs/sha256/([0-9a-f]{64})$")
-GZIP_MAGIC = b"\x1f\x8b"
-OCI_TAR_LAYER = "application/vnd.oci.image.layer.v1.tar"
-OCI_GZIP_LAYERS = {"application/vnd.oci.image.layer.v1.tar+gzip", "application/vnd.docker.image.rootfs.diff.tar.gzip"}
-ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
-CHUNK = 1 << 20
 
 
 def _member(tar: tarfile.TarFile, name: str) -> tarfile.TarInfo:
@@ -101,67 +90,10 @@ def _raw_and_content_digest(tar: tarfile.TarFile, name: str) -> tuple[str, str]:
     return raw_digest, _gunzip_digest(f)
 
 
-def _gunzip_digest(f) -> str:
-    """sha256 of a gzip stream's uncompressed content; EOFError on a truncated stream,
-    gzip.BadGzipFile or zlib.error on a corrupt one."""
-    content = hashlib.sha256()
-    with gzip.GzipFile(fileobj=f, mode="rb") as gz:
-        for block in iter(lambda: gz.read(CHUNK), b""):
-            content.update(block)
-    return "sha256:" + content.hexdigest()
-
-
 def _check_content_address(name: str, raw_digest: str) -> None:
     m = BLOB_PATH_RE.match(name)
     if m and "sha256:" + m.group(1) != raw_digest:
         raise ArchiveError(f"{name} has content digest {raw_digest}: the saved image is corrupt")
-
-
-def _verify_oci_layers(oci_path: str, manifest_digest: str, config_digest: str) -> int:
-    """Each layer of the archive's verified manifest, decoded as its media type states,
-    must hash to the matching rootfs.diff_ids entry of the archive's verified config."""
-    with tarfile.open(oci_path, mode="r:*") as tar:
-        manifest = json.loads(oci_digest._blob(tar, manifest_digest))
-        if (manifest.get("config") or {}).get("digest") != config_digest:
-            raise ArchiveError(f"archive manifest {manifest_digest} does not reference config {config_digest}")
-        rootfs = json.loads(oci_digest._blob(tar, config_digest)).get("rootfs")
-        if not isinstance(rootfs, dict) or rootfs.get("type") != "layers":
-            raise ArchiveError("archive config rootfs is not of type layers")
-        diff_ids, layers = rootfs.get("diff_ids"), manifest.get("layers")
-        if not isinstance(diff_ids, list) or not diff_ids:
-            raise ArchiveError("archive config has no rootfs.diff_ids")
-        if not isinstance(layers, list) or len(layers) != len(diff_ids):
-            raise ArchiveError(f"archive manifest lists {len(layers) if isinstance(layers, list) else 'no'} layers, config lists {len(diff_ids)} diff_ids")
-        for i, (desc, want) in enumerate(zip(layers, diff_ids)):
-            if not isinstance(want, str) or not DIGEST_RE.match(want):
-                raise ArchiveError(f"archive config diff_id {i} {want!r} is not a sha256 digest")
-            if not isinstance(desc, dict):
-                raise ArchiveError(f"archive layer {i} descriptor is not an object")
-            media_type, size = desc.get("mediaType"), desc.get("size")
-            if media_type != OCI_TAR_LAYER and media_type not in OCI_GZIP_LAYERS:
-                raise ArchiveError(f"archive layer {i} has unsupported media type {media_type!r}; this checker verifies uncompressed and gzip layers only")
-            if "urls" in desc:
-                raise ArchiveError(f"archive layer {i} is a foreign layer (urls); its content is not in the archive")
-            data = oci_digest._blob(tar, desc.get("digest"))  # missing or tampered blob is rejected
-            if isinstance(size, bool) or not isinstance(size, int) or size != len(data):
-                raise ArchiveError(f"archive layer {i} descriptor size {size!r} is not its blob size {len(data)}")
-            if media_type in OCI_GZIP_LAYERS:
-                if not data.startswith(GZIP_MAGIC):
-                    raise ArchiveError(f"archive layer {i} is {media_type} but its blob is not a gzip stream")
-                try:
-                    content_digest = _gunzip_digest(io.BytesIO(data))
-                except (EOFError, OSError, zlib.error) as e:
-                    raise ArchiveError(f"archive layer {i} gzip stream is truncated or corrupt: {e}") from e
-            else:
-                if data.startswith(GZIP_MAGIC) or data.startswith(ZSTD_MAGIC):
-                    raise ArchiveError(f"archive layer {i} is {media_type} but its blob is compressed")
-                content_digest = "sha256:" + hashlib.sha256(data).hexdigest()
-            if content_digest != want:
-                raise ArchiveError(
-                    f"archive layer {i} ({desc.get('digest')}) has uncompressed digest {content_digest}, config diff_id is {want}: "
-                    "the archive manifest does not carry its config's layers"
-                )
-        return len(layers)
 
 
 def _saved_manifest_entry(tar: tarfile.TarFile, tag: str | None) -> dict:
@@ -191,11 +123,10 @@ def _index_manifests(tar: tarfile.TarFile, index: dict, depth: int = 0) -> list[
 
 
 def verify(oci_path: str, saved_path: str, docker_id: str, tag: str | None = None) -> dict:
-    archive = oci_digest.inspect(oci_path)
+    archive = oci_digest.inspect(oci_path)  # blobs, descriptor sizes and the layer-to-diff_id binding (GB2C-06) verified here
     manifest_digest, config_digest = archive["manifest_digest"], archive["config_digest"]
     if manifest_digest == config_digest:
         raise ArchiveError("archive manifest and config digests are equal; the archive is not a valid image")
-    _verify_oci_layers(oci_path, manifest_digest, config_digest)
     if not isinstance(docker_id, str) or not DIGEST_RE.match(docker_id):
         raise ArchiveError(f"Docker image Id {docker_id!r} is not a sha256 digest")
     if docker_id == config_digest:

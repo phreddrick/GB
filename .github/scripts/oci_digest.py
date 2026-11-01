@@ -25,31 +25,44 @@ digest-update workflow need, read from the archive itself and verified:
   layer_digests       the manifest's layer blob digests, in order (the
                       referenced content of the image together with the
                       manifest and config blobs).
-  diff_ids            the config's rootfs.diff_ids as written (bound to the
-                      layers by docker_image_identity._verify_oci_layers,
-                      which the image checks and oci_layout_dir.py run).
+  diff_ids            the config's rootfs.diff_ids, in order; each is proven to
+                      be the digest of the matching layer's uncompressed tar
+                      stream before the record is returned (GB2C-06).
   platform, user, entrypoint, labels, layer_count, compressed_size, annotations
 
-Every blob the record is derived from is re-hashed and compared with the digest
-that references it; an archive whose index references more than one manifest,
-references an index instead of a manifest, or whose bytes do not match their
-digests is rejected (exit 1). A layout directory is read the same way through
-directory file descriptors (O_DIRECTORY|O_NOFOLLOW at every component, fstat on
-what was opened; GB2C-07): a symlink anywhere in the layout, including its root,
-is refused, so nothing outside the directory is ever read. Standard library
-only.
+No record is returned unless the whole image is internally consistent: the
+index references exactly one image manifest (not an index), every blob the
+record is derived from is re-hashed and compared with the digest that
+references it, every descriptor's size equals its blob's size, the config has a
+rootfs of type `layers` whose ordered diff_ids are sha256 digests and as many
+as the manifest's layers, each layer descriptor has a supported media type
+(OCI tar, OCI tar+gzip or the Docker gzip rootfs type; zstd, non-distributable,
+foreign `urls` and unknown types are rejected, never accepted unverified) and
+its blob, decoded as that media type states, hashes to the diff_id in the same
+position (_verify_layers; the GB2C-06 reviewer's archive, image A's config with
+image B's layers and every blob hash correct, is rejected here, for every
+caller: the image checks, the scanner materialiser and policy, the publish
+push, the publish record and the kind job). Any failure is exit 1. A layout
+directory is read the same way through directory file descriptors
+(O_DIRECTORY|O_NOFOLLOW at every component, fstat on what was opened;
+GB2C-07): a symlink anywhere in the layout, including its root, is refused, so
+nothing outside the directory is ever read. Standard library only.
 """
 from __future__ import annotations
 
 import argparse
 import contextlib
 import errno
+import gzip
 import hashlib
+import io
 import json
 import os
+import re
 import stat
 import sys
 import tarfile
+import zlib
 
 IMAGE_MANIFEST = "application/vnd.oci.image.manifest.v1+json"
 DOCKER_MANIFEST = "application/vnd.docker.distribution.manifest.v2+json"
@@ -57,6 +70,14 @@ INDEX_TYPES = {
     "application/vnd.oci.image.index.v1+json",
     "application/vnd.docker.distribution.manifest.list.v2+json",
 }
+DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+# Layer encodings this validator can decode to the DiffID (the digest of the
+# uncompressed tar stream, OCI image-spec config.md). Anything else fails closed.
+OCI_TAR_LAYER = "application/vnd.oci.image.layer.v1.tar"
+OCI_GZIP_LAYERS = {"application/vnd.oci.image.layer.v1.tar+gzip", "application/vnd.docker.image.rootfs.diff.tar.gzip"}
+GZIP_MAGIC = b"\x1f\x8b"
+ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
+CHUNK = 1 << 20
 
 
 class ArchiveError(Exception):
@@ -234,6 +255,68 @@ def _blob(tar, digest: str) -> bytes:
     return data
 
 
+def _gunzip_digest(f) -> str:
+    """sha256 of a gzip stream's uncompressed content; EOFError on a truncated stream,
+    gzip.BadGzipFile or zlib.error on a corrupt one."""
+    content = hashlib.sha256()
+    with gzip.GzipFile(fileobj=f, mode="rb") as gz:
+        for block in iter(lambda: gz.read(CHUNK), b""):
+            content.update(block)
+    return "sha256:" + content.hexdigest()
+
+
+def _descriptor_size(what: str, desc: dict, data: bytes) -> None:
+    size = desc.get("size")
+    if isinstance(size, bool) or not isinstance(size, int) or size != len(data):
+        raise ArchiveError(f"{what} descriptor size {size!r} is not its blob size {len(data)}")
+
+
+def _verify_layers(src, manifest: dict, config: dict) -> list[str]:
+    """Each layer of the verified manifest, decoded as its media type states, must hash to
+    the matching rootfs.diff_ids entry of the verified config (GB2C-06; this is the
+    reviewed check formerly in docker_image_identity._verify_oci_layers, now run by inspect
+    for every caller). Returns the layer blob digests in manifest order."""
+    rootfs = config.get("rootfs")
+    if not isinstance(rootfs, dict) or rootfs.get("type") != "layers":
+        raise ArchiveError("archive config rootfs is not of type layers")
+    diff_ids, layers = rootfs.get("diff_ids"), manifest.get("layers")
+    if not isinstance(diff_ids, list) or not diff_ids:
+        raise ArchiveError("archive config has no rootfs.diff_ids")
+    if not isinstance(layers, list) or len(layers) != len(diff_ids):
+        raise ArchiveError(f"archive manifest lists {len(layers) if isinstance(layers, list) else 'no'} layers, config lists {len(diff_ids)} diff_ids")
+    digests: list[str] = []
+    for i, (desc, want) in enumerate(zip(layers, diff_ids)):
+        if not isinstance(want, str) or not DIGEST_RE.match(want):
+            raise ArchiveError(f"archive config diff_id {i} {want!r} is not a sha256 digest")
+        if not isinstance(desc, dict):
+            raise ArchiveError(f"archive layer {i} descriptor is not an object")
+        media_type = desc.get("mediaType")
+        if media_type != OCI_TAR_LAYER and media_type not in OCI_GZIP_LAYERS:
+            raise ArchiveError(f"archive layer {i} has unsupported media type {media_type!r}; this checker verifies uncompressed and gzip layers only")
+        if "urls" in desc:
+            raise ArchiveError(f"archive layer {i} is a foreign layer (urls); its content is not in the archive")
+        data = _blob(src, desc.get("digest"))  # missing or tampered blob is rejected
+        _descriptor_size(f"archive layer {i}", desc, data)
+        if media_type in OCI_GZIP_LAYERS:
+            if not data.startswith(GZIP_MAGIC):
+                raise ArchiveError(f"archive layer {i} is {media_type} but its blob is not a gzip stream")
+            try:
+                content_digest = _gunzip_digest(io.BytesIO(data))
+            except (EOFError, OSError, zlib.error) as e:
+                raise ArchiveError(f"archive layer {i} gzip stream is truncated or corrupt: {e}") from e
+        else:
+            if data.startswith(GZIP_MAGIC) or data.startswith(ZSTD_MAGIC):
+                raise ArchiveError(f"archive layer {i} is {media_type} but its blob is compressed")
+            content_digest = "sha256:" + hashlib.sha256(data).hexdigest()
+        if content_digest != want:
+            raise ArchiveError(
+                f"archive layer {i} ({desc.get('digest')}) has uncompressed digest {content_digest}, config diff_id is {want}: "
+                "the archive manifest does not carry its config's layers"
+            )
+        digests.append(desc["digest"])
+    return digests
+
+
 def _open(path: str):
     """A context manager yielding the layout source: a directory (opened as a confined
     descriptor, never through a symlinked root) or a tarball."""
@@ -257,12 +340,15 @@ def _open(path: str):
 
 
 def inspect(path: str) -> dict:
-    """The verified identity record of an OCI layout tarball or directory."""
+    """The verified identity record of an OCI layout tarball or directory. Returns only
+    when every check in the module docstring passed; raises ArchiveError otherwise."""
     with _open(path) as tar:
         layout = json.loads(_read(tar, "oci-layout"))
-        if layout.get("imageLayoutVersion") != "1.0.0":
+        if not isinstance(layout, dict) or layout.get("imageLayoutVersion") != "1.0.0":
             raise ArchiveError(f"unexpected oci-layout {layout!r}")
         index = json.loads(_read(tar, "index.json"))
+        if not isinstance(index, dict):
+            raise ArchiveError("index.json is not an object")
         manifests = index.get("manifests")
         if not isinstance(manifests, list) or len(manifests) != 1:
             raise ArchiveError(
@@ -270,6 +356,8 @@ def inspect(path: str) -> dict:
                 "a multi-platform build or attestation index is not the reviewed single-manifest form"
             )
         entry = manifests[0]
+        if not isinstance(entry, dict):
+            raise ArchiveError("index.json manifest descriptor is not an object")
         media_type = entry.get("mediaType")
         if media_type in INDEX_TYPES:
             raise ArchiveError("index.json references an image index, not an image manifest; build with provenance=false, sbom=false and one platform")
@@ -277,32 +365,42 @@ def inspect(path: str) -> dict:
             raise ArchiveError(f"unexpected manifest media type {media_type!r}")
         manifest_digest = entry.get("digest")
         manifest_bytes = _blob(tar, manifest_digest)
+        _descriptor_size("index.json manifest", entry, manifest_bytes)
         manifest = json.loads(manifest_bytes)
+        if not isinstance(manifest, dict):
+            raise ArchiveError("manifest is not an object")
         if manifest.get("mediaType", media_type) != media_type:
             raise ArchiveError("manifest mediaType disagrees with index.json")
-        config_ref = manifest.get("config", {})
+        config_ref = manifest.get("config")
+        if not isinstance(config_ref, dict):
+            raise ArchiveError("manifest config descriptor is not an object")
         config_digest = config_ref.get("digest")
-        config = json.loads(_blob(tar, config_digest))
-        layers = manifest.get("layers", [])
+        config_bytes = _blob(tar, config_digest)
+        _descriptor_size("manifest config", config_ref, config_bytes)
+        config = json.loads(config_bytes)
+        if not isinstance(config, dict):
+            raise ArchiveError("config is not an object")
+        layers = manifest.get("layers")
         if not isinstance(layers, list) or not layers:
             raise ArchiveError("manifest has no layers")
-        for layer in layers:
-            _blob(tar, layer.get("digest"))
+        # GB2C-06: the manifest's ordered layers must decode to the config's diff_ids;
+        # without this, manifest, config and filesystem were never proven to be one image.
+        layer_digests = _verify_layers(tar, manifest, config)
         cfg = config.get("config", {}) or {}
         return {
             "archive": path,
             "manifest_digest": manifest_digest,
             "manifest_media_type": media_type,
             "config_digest": config_digest,
-            "layer_digests": [l.get("digest") for l in layers],
-            "diff_ids": (config.get("rootfs") or {}).get("diff_ids") if isinstance(config.get("rootfs"), dict) else None,
+            "layer_digests": layer_digests,
+            "diff_ids": list(config["rootfs"]["diff_ids"]),
             "platform": {"os": config.get("os"), "architecture": config.get("architecture")},
             "user": cfg.get("User"),
             "entrypoint": cfg.get("Entrypoint"),
             "cmd": cfg.get("Cmd"),
             "labels": cfg.get("Labels") or {},
             "layer_count": len(layers),
-            "compressed_size": int(len(manifest_bytes)) + int(config_ref.get("size", 0)) + sum(int(l.get("size", 0)) for l in layers),
+            "compressed_size": len(manifest_bytes) + len(config_bytes) + sum(int(l["size"]) for l in layers),
             "annotations": entry.get("annotations") or {},
         }
 
@@ -317,7 +415,7 @@ def main(argv: list[str]) -> int:
     except ArchiveError as e:
         print(f"oci_digest: FAIL {e}", file=sys.stderr)
         return 1
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+    except (OSError, tarfile.TarError, json.JSONDecodeError, KeyError, TypeError, ValueError, AttributeError, EOFError, zlib.error) as e:
         print(f"oci_digest: FAIL malformed archive content: {e}", file=sys.stderr)
         return 1
     if args.field:

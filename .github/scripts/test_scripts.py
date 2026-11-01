@@ -6,7 +6,10 @@ registry, no runner, no cluster):
 
 Covers oci_digest (a synthetic OCI layout archive, corrupted blobs, an
 attestation index, the same archive extracted as a directory and read through
-descriptor-confined opens that follow no symlink, GB2C-07), oci_layout_dir
+descriptor-confined opens that follow no symlink, GB2C-07; and, since the
+GB2C-06 binding moved into the shared validator, inspect() itself refusing
+every archive or directory whose manifest layers do not decode to the config's
+rootfs.diff_ids, SharedValidatorLayerTests), oci_layout_dir
 (the scanner input: safe extraction of the verified archive into a fresh layout
 directory that reads back as the same image; unsafe members, pre-existing
 destinations and tampering rejected; both workflows wired to it, hosted run
@@ -88,7 +91,7 @@ def make_oci_archive(path: str, *, manifests: int = 1, index_entry: bool = False
     if layers is None:  # deterministic, but distinct per archive name (gb-server.oci.tar and gbctl.oci.tar differ)
         layers = [_layer_tar("usr/local/bin/" + os.path.basename(path).split(".")[0], b"\x7fELF-" + os.path.basename(path).encode() * 16)]
     if blobs is None:
-        blobs = [gzip.compress(l, mtime=0) if media_type in docker_image_identity.OCI_GZIP_LAYERS else l for l in layers]
+        blobs = [gzip.compress(l, mtime=0) if media_type in oci_digest.OCI_GZIP_LAYERS else l for l in layers]
     if diff_ids is None:
         diff_ids = [_digest(l) for l in layers]
     if rootfs is ...:
@@ -128,6 +131,20 @@ def make_oci_archive(path: str, *, manifests: int = 1, index_entry: bool = False
         for d, data in stored.items():
             add(f"blobs/sha256/{d[7:]}", data)
     return {"manifest_digest": _digest(manifest), "config_digest": _digest(config), "diff_ids": diff_ids}
+
+
+def gb2c06_archive(path: str, **labels) -> dict:
+    """The independent reviewer's GB2C-06 counterexample: image A's config (and therefore
+    A's rootfs.diff_ids) with a manifest that references image B's gzip layer; every blob
+    and the manifest hash correctly, so per-blob digest checks alone accept it."""
+    return make_oci_archive(path, layers=[LAYER_B], diff_ids=[_digest(LAYER_A)], **labels)
+
+
+def blobs_hash_to_their_names(path: str) -> bool:
+    """True when every blobs/sha256/<hex> member of the tarball hashes to <hex>."""
+    with tarfile.open(path) as tar:
+        names = [m.name for m in tar if m.name.startswith("blobs/sha256/")]
+        return bool(names) and all(hashlib.sha256(tar.extractfile(n).read()).hexdigest() == n[len("blobs/sha256/"):] for n in names)
 
 
 # --------------------------------------------------------------- oci_digest --
@@ -175,6 +192,244 @@ class OciDigestTests(unittest.TestCase):
         self.assertEqual(out.stdout.strip(), want["manifest_digest"])
         out = subprocess.run([sys.executable, os.path.join(HERE, "oci_digest.py"), os.path.join(self.tmp, "none.tar")], capture_output=True, text=True)
         self.assertEqual(out.returncode, 1)
+
+
+class SharedValidatorLayerTests(unittest.TestCase):
+    """GB2C-06 in the shared validator: oci_digest.inspect() returns no record unless the
+    manifest's ordered layers decode to the config's rootfs.diff_ids, so every direct caller
+    (image-checks.sh, oci_layout_dir.py, trivy_policy.py, publish-push.sh, publish_record.py,
+    kind-e2e.sh) refuses an archive whose manifest, config and filesystem are not one image.
+    Every test here calls inspect() directly, never the Docker image checker."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.archive = os.path.join(self.tmp, "img.oci.tar")
+        self.cli = [sys.executable, os.path.join(HERE, "oci_digest.py")]
+
+    def make(self, **kw) -> dict:
+        return make_oci_archive(self.archive, **kw)
+
+    def assertRejected(self, fragment: str, path: str | None = None) -> oci_digest.ArchiveError:
+        with self.assertRaises(oci_digest.ArchiveError) as cm:
+            oci_digest.inspect(path or self.archive)
+        self.assertIn(fragment, str(cm.exception))
+        return cm.exception
+
+    @staticmethod
+    def desc(media_type, blob: bytes, **extra) -> dict:
+        d = {"mediaType": media_type, "digest": _digest(blob), "size": len(blob), **extra}
+        return {k: v for k, v in d.items() if v is not ...}
+
+    # ------------------------------------------------------------- accepted --
+    def test_valid_single_layer_gzip_image(self):
+        for media_type in sorted(oci_digest.OCI_GZIP_LAYERS):
+            with self.subTest(media_type=media_type):
+                want = self.make(layers=[LAYER_A], media_type=media_type)
+                rec = oci_digest.inspect(self.archive)
+                self.assertEqual((rec["manifest_digest"], rec["config_digest"]), (want["manifest_digest"], want["config_digest"]))
+                self.assertEqual(rec["diff_ids"], [_digest(LAYER_A)])
+                self.assertEqual(rec["layer_digests"], [_digest(gzip.compress(LAYER_A, mtime=0))])
+                self.assertEqual(rec["layer_count"], 1)
+                self.assertEqual(rec["manifest_media_type"], oci_digest.IMAGE_MANIFEST)
+
+    def test_valid_uncompressed_image(self):
+        want = self.make(layers=[LAYER_A], media_type=TAR_LAYER)
+        rec = oci_digest.inspect(self.archive)
+        self.assertEqual(rec["manifest_digest"], want["manifest_digest"])
+        self.assertEqual(rec["layer_digests"], rec["diff_ids"])  # uncompressed: the blob digest is the DiffID
+        self.assertEqual(rec["diff_ids"], [_digest(LAYER_A)])
+
+    def test_valid_ordered_multi_layer_image(self):
+        layers = [LAYER_A, LAYER_C, LAYER_B]
+        want = self.make(layers=layers)
+        rec = oci_digest.inspect(self.archive)
+        self.assertEqual(rec["manifest_digest"], want["manifest_digest"])
+        self.assertEqual(rec["diff_ids"], [_digest(l) for l in layers])
+        self.assertEqual(rec["layer_digests"], [_digest(gzip.compress(l, mtime=0)) for l in layers])
+        self.assertEqual(rec["layer_count"], 3)
+        self.assertEqual(rec["compressed_size"], sum(len(gzip.compress(l, mtime=0)) for l in layers) + self.config_and_manifest_bytes())
+        # Mixed encodings, one descriptor at a time, are also accepted when each decodes to its diff_id.
+        blobs = [gzip.compress(LAYER_A, mtime=0), LAYER_C, gzip.compress(LAYER_B, mtime=0)]
+        self.make(layers=layers, blobs=blobs, descriptors=[self.desc(GZIP_LAYER, blobs[0]), self.desc(TAR_LAYER, blobs[1]),
+                                                           self.desc("application/vnd.docker.image.rootfs.diff.tar.gzip", blobs[2])])
+        self.assertEqual(oci_digest.inspect(self.archive)["diff_ids"], [_digest(l) for l in layers])
+
+    def config_and_manifest_bytes(self) -> int:
+        with tarfile.open(self.archive) as tar:
+            index = json.load(tar.extractfile("index.json"))
+            entry = index["manifests"][0]
+            manifest = json.load(tar.extractfile("blobs/sha256/" + entry["digest"][7:]))
+            return entry["size"] + manifest["config"]["size"]
+
+    # ------------------------------------------------------- the GB2C-06 case --
+    def test_reviewer_config_a_with_layer_b_rejected_by_inspect(self):
+        """The counterexample: configuration A, filesystem layer B, correct blob and manifest
+        hashes. inspect() itself refuses it, with no Docker image checker involved."""
+        gb2c06_archive(self.archive)
+        self.assertTrue(blobs_hash_to_their_names(self.archive), "the attack is invisible to per-blob digest checks")
+        e = self.assertRejected("the archive manifest does not carry its config's layers")
+        self.assertIn(_digest(LAYER_B), str(e))  # the layer's real content digest
+        self.assertIn(_digest(LAYER_A), str(e))  # the config's diff_id
+        # The CLI form that image-checks.sh, publish-push.sh and kind-e2e.sh run.
+        for args in ([self.archive], [self.archive, "--field", "config_digest"], [self.archive, "--field", "manifest_digest"]):
+            with self.subTest(args=args[1:]):
+                r = subprocess.run(self.cli + args, capture_output=True, text=True)
+                self.assertEqual((r.returncode, r.stdout), (1, ""))
+                self.assertIn("oci_digest: FAIL", r.stderr)
+                self.assertIn("does not carry its config's layers", r.stderr)
+
+    def test_layer_binding_is_load_bearing(self):
+        """Mutation guard: with the layer check removed, the same archive is accepted, so the
+        regression above depends on _verify_layers being called by inspect()."""
+        gb2c06_archive(self.archive)
+        with mock.patch.object(oci_digest, "_verify_layers", return_value=[_digest(gzip.compress(LAYER_B, mtime=0))]):
+            oci_digest.inspect(self.archive)
+        self.assertRejected("does not carry its config's layers")
+
+    # ------------------------------------------------------------- rejected --
+    def test_reversed_layers_rejected(self):
+        self.make(layers=[LAYER_A, LAYER_B], diff_ids=[_digest(LAYER_B), _digest(LAYER_A)])
+        self.assertTrue(blobs_hash_to_their_names(self.archive))
+        e = self.assertRejected("archive layer 0 ")
+        self.assertIn("does not carry its config's layers", str(e))
+
+    def test_incorrect_diff_id_rejected(self):
+        bogus = "sha256:" + "5" * 64
+        self.make(layers=[LAYER_A], diff_ids=[bogus])
+        self.assertRejected(f"config diff_id is {bogus}")
+        self.make(layers=[LAYER_A, LAYER_B], diff_ids=[_digest(LAYER_A), bogus])
+        self.assertRejected("archive layer 1 ")
+
+    def test_layer_count_mismatch_rejected(self):
+        self.make(layers=[LAYER_A, LAYER_B], diff_ids=[_digest(LAYER_A)])
+        self.assertRejected("archive manifest lists 2 layers, config lists 1 diff_ids")
+        self.make(layers=[LAYER_A], diff_ids=[_digest(LAYER_A), _digest(LAYER_B)])
+        self.assertRejected("archive manifest lists 1 layers, config lists 2 diff_ids")
+
+    def test_invalid_rootfs_rejected(self):
+        good = [_digest(LAYER_A)]
+        for label, rootfs in (("other type", {"type": "other", "diff_ids": good}), ("missing type", {"diff_ids": good}),
+                              ("not an object", "layers"), ("absent", None)):
+            with self.subTest(label=label):
+                self.make(layers=[LAYER_A], rootfs=rootfs)
+                self.assertRejected("rootfs is not of type layers")
+
+    def test_missing_or_malformed_diff_ids_rejected(self):
+        for label, rootfs in (("missing", {"type": "layers"}), ("empty", {"type": "layers", "diff_ids": []}),
+                              ("not a list", {"type": "layers", "diff_ids": _digest(LAYER_A)})):
+            with self.subTest(label=label):
+                self.make(layers=[LAYER_A], rootfs=rootfs)
+                self.assertRejected("has no rootfs.diff_ids")
+        for label, bad in (("upper case", "sha256:" + "A" * 64), ("short", "sha256:abc"), ("no algorithm", "0" * 64),
+                           ("sha512", "sha512:" + "0" * 128), ("integer", 5), ("null", None)):
+            with self.subTest(label=label):
+                self.make(layers=[LAYER_A], diff_ids=[bad])
+                self.assertRejected("is not a sha256 digest")
+
+    def test_corrupt_or_truncated_compressed_layer_rejected(self):
+        gz = gzip.compress(LAYER_A, mtime=0)
+        mid = len(gz) // 2
+        for label, blob, fragment in (("truncated", gz[:-12], "truncated or corrupt"), ("truncated body", gz[:mid], "truncated or corrupt"),
+                                      ("corrupt deflate", gz[:12] + bytes([gz[12] ^ 0xFF]) + gz[13:], "truncated or corrupt"),
+                                      ("bad crc", gz[:-8] + bytes([gz[-8] ^ 0xFF]) + gz[-7:], "truncated or corrupt"),
+                                      ("trailing garbage", gz + b"garbage", "archive layer 0"),
+                                      ("not gzip at all", LAYER_A, "is not a gzip stream")):
+            with self.subTest(label=label):
+                self.make(layers=[LAYER_A], blobs=[blob])
+                self.assertTrue(blobs_hash_to_their_names(self.archive))
+                self.assertRejected(fragment)
+
+    def test_incorrect_descriptor_size_rejected(self):
+        gz = gzip.compress(LAYER_A, mtime=0)
+        for label, size in (("too large", len(gz) + 1), ("too small", len(gz) - 1), ("string", str(len(gz))), ("bool", True), ("missing", ...)):
+            with self.subTest(label=label):
+                self.make(layers=[LAYER_A], descriptors=[self.desc(GZIP_LAYER, gz, size=size)])
+                self.assertRejected("archive layer 0 descriptor size")
+        self.make(layers=[LAYER_A], config_size_delta=1)
+        self.assertRejected("manifest config descriptor size")
+        self.make(layers=[LAYER_A], manifest_size_delta=-1)
+        self.assertRejected("index.json manifest descriptor size")
+
+    def test_unsupported_or_foreign_layer_formats_rejected(self):
+        gz = gzip.compress(LAYER_A, mtime=0)
+        zstd = b"\x28\xb5\x2f\xfd" + b"\0" * 32
+        cases = (
+            ("zstd media type", self.desc("application/vnd.oci.image.layer.v1.tar+zstd", zstd), zstd, "unsupported media type"),
+            ("non-distributable", self.desc("application/vnd.oci.image.layer.nondistributable.v1.tar+gzip", gz), gz, "unsupported media type"),
+            ("unknown", self.desc("application/octet-stream", LAYER_A), LAYER_A, "unsupported media type"),
+            ("missing media type", self.desc(..., LAYER_A), LAYER_A, "unsupported media type"),
+            ("foreign layer", self.desc(GZIP_LAYER, gz, urls=["https://example.invalid/l"]), gz, "foreign layer"),
+            ("zstd bytes as tar", self.desc(TAR_LAYER, zstd), zstd, "its blob is compressed"),
+            ("gzip bytes as tar", self.desc(TAR_LAYER, gz), gz, "its blob is compressed"),
+            ("descriptor not an object", "sha256:" + "0" * 64, gz, "descriptor is not an object"),
+        )
+        for label, desc, blob, fragment in cases:
+            with self.subTest(label=label):
+                self.make(layers=[LAYER_A], blobs=[blob], descriptors=[desc])
+                self.assertRejected(fragment)
+
+    def test_missing_or_corrupted_referenced_blob_rejected(self):
+        want = self.make(layers=[LAYER_A])
+        base = _members_of(self.archive)
+        layer_name = "blobs/sha256/" + _digest(gzip.compress(LAYER_A, mtime=0))[7:]
+        config_name = "blobs/sha256/" + want["config_digest"][7:]
+        for label, name in (("layer", layer_name), ("config", config_name)):
+            with self.subTest(label=f"missing {label}"):
+                _tar_with(self.archive, [m for m in base if m[0] != name])
+                self.assertRejected("is missing from the archive")
+            with self.subTest(label=f"corrupted {label}"):
+                _tar_with(self.archive, [m if m[0] != name else (name, "file", b"X" + m[2][1:]) for m in base])
+                self.assertRejected("corrupt or tampered")
+
+    # --------------------------------------------- tarball and directory alike --
+    def test_equivalent_tarball_and_layout_directory_agree(self):
+        self.make(layers=[LAYER_A, LAYER_C])
+        dest = os.path.join(self.tmp, "layout")
+        oci_layout_dir.materialise(self.archive, dest)
+        a, d = oci_digest.inspect(self.archive), oci_digest.inspect(dest)
+        self.assertEqual((a.pop("archive"), d.pop("archive")), (self.archive, dest))
+        self.assertEqual(a, d)
+
+    def test_invalid_tarball_and_layout_directory_both_rejected(self):
+        gb2c06_archive(self.archive)
+        self.assertRejected("does not carry its config's layers")
+        dest = os.path.join(self.tmp, "layout")
+        with self.assertRaises(oci_digest.ArchiveError):
+            oci_layout_dir.materialise(self.archive, dest)  # the materialiser never produces such a directory
+        self.assertFalse(os.path.lexists(dest))
+        # The same bytes laid out as a directory by other means are refused by the same check.
+        os.makedirs(os.path.join(dest, "blobs", "sha256"))
+        for name, _, data in _members_of(self.archive):
+            with open(os.path.join(dest, name), "wb") as f:
+                f.write(data)
+        self.assertRejected("does not carry its config's layers", dest)
+        # A valid layout whose layer blob is replaced after materialisation is refused too.
+        self.make(layers=[LAYER_A])
+        dest2 = os.path.join(self.tmp, "layout2")
+        oci_layout_dir.materialise(self.archive, dest2)
+        blob = os.path.join(dest2, "blobs", "sha256", _digest(gzip.compress(LAYER_A, mtime=0))[7:])
+        with open(blob, "wb") as f:
+            f.write(gzip.compress(LAYER_B, mtime=0))
+        self.assertRejected("corrupt or tampered", dest2)
+
+    def test_confinement_and_canonical_path_rules_still_apply(self):
+        """GB2C-07/07R are unchanged by the move: the strengthened validator still reads a
+        directory only through descriptor-confined opens of a canonically spelled root."""
+        self.make(layers=[LAYER_A])
+        real = os.path.join(self.tmp, "real")
+        oci_layout_dir.materialise(self.archive, real)
+        oci_digest.inspect(real)
+        link = os.path.join(self.tmp, "link")
+        os.symlink(real, link)
+        for spelled in (link, link + "/", link + "/.", real + "/", real + "//", os.path.join(self.tmp, ".", "real"), real + "/../real"):
+            with self.subTest(path=spelled):
+                with self.assertRaises(oci_digest.ArchiveError):
+                    oci_digest.inspect(spelled)
+        moved = os.path.join(self.tmp, "moved")
+        shutil.move(os.path.join(real, "blobs"), moved)
+        os.symlink(moved, os.path.join(real, "blobs"))
+        self.assertRejected("symlink", real)
 
 
 # ----------------------------------------------------------- oci_layout_dir --

@@ -10,8 +10,9 @@ The archive stays the artifact of record (it is what is published); the
 directory is a scanner input derived from it under these rules:
 
   * the archive is verified first with oci_digest.inspect (single manifest,
-    every blob re-hashed) and docker_image_identity._verify_oci_layers (its
-    ordered layers decode to the config's rootfs.diff_ids, GB2C-06);
+    every blob re-hashed, descriptor sizes, and its ordered layers decoded to
+    the config's rootfs.diff_ids, GB2C-06; the shared validator returns no
+    record otherwise, so nothing weaker is ever extracted);
   * DEST_DIR must not exist yet (it is created with mode 0700; a pre-existing
     path is refused, never reused or emptied) and must not contain ':' or '@',
     which Trivy would cut off as an image reference;
@@ -43,7 +44,6 @@ import stat
 import sys
 import tarfile
 
-import docker_image_identity
 import oci_digest
 from oci_digest import ArchiveError
 
@@ -88,8 +88,7 @@ def materialise(archive: str, dest: str) -> dict:
         raise ArchiveError(f"destination {dest!r} contains ':' or '@', which the scanner would treat as an image reference")
     if os.path.lexists(dest):
         raise ArchiveError(f"destination {dest} already exists; refusing to reuse it")
-    source = oci_digest.inspect(archive)  # the archive must be one internally consistent image first
-    docker_image_identity._verify_oci_layers(archive, source["manifest_digest"], source["config_digest"])
+    source = oci_digest.inspect(archive)  # the archive must be one internally consistent image first (layers bound to diff_ids)
     referenced = {source["manifest_digest"], source["config_digest"], *source["layer_digests"]}
     parent = os.path.dirname(os.path.abspath(dest))
     if not os.path.isdir(parent):
@@ -146,7 +145,7 @@ def materialise(archive: str, dest: str) -> dict:
                 st = os.lstat(os.path.join(root, f))
                 if not stat.S_ISREG(st.st_mode) or (p not in LAYOUT_FILES and not BLOB_RE.match(p)):
                     raise ArchiveError(f"unexpected entry {p!r} in the layout directory")
-        result = oci_digest.inspect(dest)  # the directory must read as the same image
+        result = oci_digest.inspect(dest)  # the directory must read, and verify in full, as the same image
         for key in ("manifest_digest", "config_digest", "diff_ids", "layer_digests", "manifest_media_type"):
             if result[key] != source[key]:
                 raise ArchiveError(f"layout directory {key} {result[key]!r} differs from the archive's {source[key]!r}")

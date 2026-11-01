@@ -14,7 +14,11 @@ index, uncompressed layers, Id = config digest) and the legacy layout
 
 OciLayerIdentityTests (GB2C-06) build OCI archives whose blobs and manifest are
 internally consistent but whose layers do not decode to the config's
-rootfs.diff_ids, including the independent reviewer's A/B reproduction.
+rootfs.diff_ids, including the independent reviewer's A/B reproduction. The
+binding itself now lives in the shared validator (oci_digest._verify_layers,
+run by oci_digest.inspect for every caller); these tests prove that verify()
+still refuses each such archive through it, and test_scripts.py
+SharedValidatorLayerTests prove the same for inspect() called directly.
 """
 from __future__ import annotations
 
@@ -314,7 +318,9 @@ class OciLayerIdentityTests(unittest.TestCase):
         gzip layer, valid blob and manifest hashes, compared with a legitimate save of A by A's
         config digest. The pre-fix checker exited 0."""
         self.archive([_desc(GZIP_LAYER, self.b.layer_gz)], [self.b.layer_gz])
-        oci_digest.inspect(self.oci)  # internally valid: every blob hashes to its digest
+        with self.assertRaises(ArchiveError) as cm:  # every blob hashes to its digest, yet the shared validator refuses it
+            oci_digest.inspect(self.oci)
+        self.assertIn("the archive manifest does not carry its config's layers", str(cm.exception))
         self.assertRejected("the archive manifest does not carry its config's layers")
         for saved in (self.a.saved_legacy, self.a.saved_containerd, self.a.saved_classic):
             with self.subTest(saved=saved.__name__):
@@ -395,10 +401,11 @@ class OciLayerIdentityTests(unittest.TestCase):
             with self.subTest(label=label):
                 self.archive([desc], [gz])
                 self.assertRejected(fragment)
-        self.archive(["sha256:" + "0" * 64], [gz])  # oci_digest.inspect raises AttributeError: a CLI failure
+        self.archive(["sha256:" + "0" * 64], [gz])  # a descriptor that is not an object: refused by the shared validator
+        self.assertRejected("archive layer 0 descriptor is not an object")
         bad_desc = self.run_cli()
         self.assertEqual((bad_desc.returncode, bad_desc.stdout), (1, ""))
-        self.assertIn("docker_image_identity: FAIL malformed image content", bad_desc.stderr)
+        self.assertIn("docker_image_identity: FAIL archive layer 0 descriptor is not an object", bad_desc.stderr)
         cfg = json.loads(self.a.config)
         cfg["rootfs"]["diff_ids"] = ["sha256:" + "A" * 64]
         bad = json.dumps(cfg).encode()
