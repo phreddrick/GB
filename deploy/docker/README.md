@@ -1,6 +1,6 @@
 # Container images (Phase 2)
 
-**Status: specification only. No image has been built, run or published. Nothing here is approved for deployment.** The first real build is the GitHub Actions job of the next Phase 2 stage; the development host runs no container runtime by policy, so the Dockerfile has only been checked statically.
+**Status: specification plus CI artifacts. No image has been published and nothing here is approved for deployment.** The development host runs no container runtime by policy, so the Dockerfile has only been checked statically there. Phase 2C added the hosted build: the `docker build from checkout (no push)` job of `.github/workflows/ci.yml` builds both targets with buildx (context `go/`, `linux/amd64`, `provenance=false`, `sbom=false`, `SOURCE_DATE_EPOCH` = commit time, layer timestamps rewritten, no remote cache) and runs `.github/scripts/image-checks.sh` on them; `image-scan`, `image-sbom` and `kind-e2e` consume the archives; the manual `publish-images.yml` is the only path to GHCR. Whether a hosted run has executed yet is recorded in `docs/testing/phase2c-handoff.md`, not here.
 
 ## Targets
 
@@ -53,11 +53,11 @@ The distroless amd64 image config (fetched the same way) declares `User: 65532`,
 
 ## Reproducibility
 
-`-trimpath -buildvcs=false -ldflags '-s -w -buildid='`, `CGO_ENABLED=0`, `GOFLAGS=-mod=readonly`, `go mod verify` before compilation, digest-pinned bases. Image-level reproducibility (identical image digest from identical inputs) additionally needs the CI job to pass `SOURCE_DATE_EPOCH` and `--provenance=false --sbom=false` or an equivalent rewrite step; that is specified with the CI job, not here.
+`-trimpath -buildvcs=false -ldflags '-s -w -buildid='`, `CGO_ENABLED=0`, `GOFLAGS=-mod=readonly`, `go mod verify` before compilation, digest-pinned bases. The CI job (Phase 2C) passes `SOURCE_DATE_EPOCH` (the commit's committer time), `rewrite-timestamp=true` on the exporters, `provenance=false` and `sbom=false`, and sets the OCI labels `source`, `revision`, `version` and `created` (the commit time, not the build time). Distinguish: the **source build** is repeatable; the **binary** is expected to be byte-identical across builds of one commit; the **layers and manifest** are expected to be identical as well once timestamps are rewritten; the **published digest** is the digest of that single `linux/amd64` manifest. Identical digests from `ci` and from the publish run of the same commit are recorded and compared in the handoff, never asserted, and are not claimed until observed. On pull requests the checked-out commit is GitHub's merge commit, so its time, revision label and digest differ from the branch head's; comparisons are meaningful on master builds.
 
-## Unverified until the CI build exists
+## Unverified until the first hosted run of the Phase 2C workflows
 
-- That the Dockerfile builds at all (BuildKit syntax, `COPY --chown` on distroless, `go mod verify` under `-mod=readonly`).
-- That the resulting binary starts as 65532 with a read-only root and a mounted volume (the kind job's first assertion).
-- That `kubectl port-forward` reaches the admin listener inside the pod (see `docs/operations/storage-and-network-validation.md`).
-- Image size, Trivy result, SBOM.
+- That the Dockerfile builds at all (BuildKit syntax, `COPY --chown` on distroless, `go mod verify` under `-mod=readonly`): the `docker` job.
+- That the resulting binary starts as 65532 with a read-only root and a mounted volume: `image-checks.sh` (Docker, tmpfs) and `kind-e2e.sh` (restricted Pod Security, PVC).
+- That `kubectl port-forward` reaches the admin listener inside the pod: `kind-e2e.sh` (kind only; the home-lab path is `docs/operations/storage-and-network-validation.md`).
+- Image size, digests, Trivy result, SBOM: the `image-build-record`, `trivy-reports` and `sboms` artifacts of that run.

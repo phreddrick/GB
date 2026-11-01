@@ -7,6 +7,8 @@ python3 deploy/kustomize/tests/validate.py             # structure checks only, 
 python3 deploy/kustomize/tests/safety-check.py         # no recovery/deletion automation in the artifacts; --selftest plants violations
 ```
 
+In GitHub Actions (Phase 2C) the `manifests` job of `.github/workflows/ci.yml` runs `run.sh` **unchanged** after asserting its SHA-256 against the reviewed digest (the same constant `safety-check.py` pins), with `kustomize` v5.8.1 installed through the Go module proxy, and then asserts the sentinel contract: `validate.py --require-published-image` must fail with `UNPUBLISHED` while the dev image is the all-zero digest and must pass once a published digest is pinned. `digest-update-pr.yml` runs `run.sh --require-published-image` on every digest candidate before a pull request is opened.
+
 Tooling (nothing is installed on the host): `kubectl kustomize` (kustomize v5.8.1 embedded in kubectl 1.36.4) or the `kustomize` CLI; Python 3 with PyYAML; `go run github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0` (module cache only; run outside the module so `go/go.sum` is untouched). kubeconform fetches the Kubernetes 1.36.4 strict schemas from `yannh/kubernetes-json-schema` over the network and reads the CRD schemas from `../schemas` (provenance in `../schemas/README.md`).
 
 What `validate.py` checks, per environment (`dev`, `ci`) across its two entry points:

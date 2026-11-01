@@ -1178,10 +1178,10 @@ CI never touches the home-lab cluster. Argo CD never builds. The only artefacts 
 | Image scan | Trivy | fail on critical-fixable |
 | Contract test | previous engine image with new gateway; previous client bundle with new gateway | fail |
 | Kubernetes e2e | `kind` with the `ci` entry points (13.3) | fail |
-| Publish | push to GHCR on `master` (the repository's default branch) and tags; job-scoped `packages: write` | |
-| Deploy PR | update `apps/dev` digests | human merge |
+| Publish | push to GHCR with job-scoped `packages: write` (`publish-images.yml`). **Phase 2C: manual `workflow_dispatch` on `master` only**, typed confirmation, environment `ghcr-publish`, one successful `push` run of `ci.yml` on `master` for the same commit resolved through the workflow-runs API (`ci_provenance.py`); the scanned bytes are pushed unchanged and verified by digest; the publish record is validated (`publish_record.py`) and a half-published pair is reported as `partial`, never as a release. Publication on every master push is Decision 31 (pending) | |
+| Deploy PR | update `apps/dev` digests (`digest-update-pr.yml`: registry and source-commit verification, one-line edit, strict offline validation, duplicate check, pull request opened with `gh`) | human merge; Argo CD sync separately approved |
 
-No kubeconfig for the home lab exists in CI. GHCR uses the repository's `GITHUB_TOKEN`.
+No kubeconfig for the home lab exists in CI. GHCR uses the repository's `GITHUB_TOKEN`; no personal access token exists. Phase 2C status and the hosted tests still to run: `docs/testing/phase2c-handoff.md`.
 
 ### 13.2 Test tiers and where they run
 
@@ -1396,7 +1396,7 @@ Each phase is written to be assigned as one or several agent tasks. Common field
 - **Architectural decisions:** ADR-0005 (Kustomize, one entry point per Application, manifests in the GB repository, platform Application), ADR-0006 (image registry, digest pinning, scanning), ADR-0007 (node placement and storage: RWOP, retention), ADR-0008 (explicit universe bootstrap, no hooks).
 - **Dependencies:** Phase 1.
 - **Risks:** Argo CD repo-server access to GitHub (verify early); Argo CD write access is a privilege expansion that `k8s-helpers` wants paired with Pod Security enforcement on `gb-dev`; RWOP might not work as documented (fallback defined, and the access mode is immutable per PVC, so the test precedes the first sync); the admin port is on the pod network under a NetworkPolicy whose enforcement must be verified live (Cilium host paths included); `workload.home-apps` nodes may be the wrong place for a game server (Decision 5); CR-18 means any non-orderly stop is a recovery case.
-- **Status (2026-10-30):** Phase 2A read-only assessment done (READY WITH PREREQUISITES); Phase 2B produced `deploy/docker/Dockerfile`, `deploy/kustomize/`, the offline validation (including `safety-check.py`), ADR-0005 to ADR-0008 (Proposed), two draft runbooks (`bootstrap.md`, `deploy.md`) and two operator planning checklists (`storage-and-network-validation.md`, `dev-volume-recovery.md`, not approved for execution; the executable recovery helper library introduced during review remediation was retired on 2026-10-30 after the fourth independent review), with **nothing built, published, applied or synced**. Next stages: CI validation and image publication, independent review, `k8s-helpers` change, disposable storage and network tests, approved synchronisation.
+- **Status (2026-10-30):** Phase 2A read-only assessment done (READY WITH PREREQUISITES); Phase 2B produced `deploy/docker/Dockerfile`, `deploy/kustomize/`, the offline validation (including `safety-check.py`), ADR-0005 to ADR-0008 (Proposed), two draft runbooks (`bootstrap.md`, `deploy.md`) and two operator planning checklists (`storage-and-network-validation.md`, `dev-volume-recovery.md`, not approved for execution; the executable recovery helper library introduced during review remediation was retired on 2026-10-30 after the fourth independent review), with **nothing built, published, applied or synced**. Phase 2C (2026-10-30, `docs/testing/phase2c-handoff.md`) added the GitHub Actions workflows: `ci` modernised (Node 24 actions pinned to commits, `ubuntu-26.04`) and extended with the two-target buildx build and image checks, the `manifests` job running the unchanged offline validation, Trivy and Syft, and the disposable kind end-to-end job; `publish-images.yml` (manual, master only, `packages: write` in one job) and `digest-update-pr.yml`; **no hosted run, no image and no publication exist until the Phase 2C pull request runs and the owner dispatches the first publication.** Next stages: hosted validation of the Phase 2C pull request, independent review, first publication (owner), digest pull request, `k8s-helpers` change, disposable storage and network tests, approved synchronisation.
 - **Owner approval:** required (cluster and `k8s-helpers` changes; each sync separately approved per their rules).
 
 #### Phase 3a: State ownership and transactional recovery
@@ -1982,6 +1982,13 @@ Each decision: description, why it matters, options, recommended default, conseq
     Consequences: node loss needs an operator step; forced takeover requires confirmed evidence that the former writer has stopped (pod gone, node down, Longhorn shows the volume detached) and is never performed on a heartbeat timeout alone.
     Phase: 2, 11.3, 11.4. Timing: before Phase 2 (RWOP validation and lease are in scope); the Longhorn policy question goes to `k8s-helpers`. (**Status 2026-10-30:** RWOP designed in the manifests, **unvalidated** on the cluster (no RWOP volume has ever existed there); the throwaway test and the RWO fallback are in `docs/operations/storage-and-network-validation.md` and ADR-0007; the advisory lease stays Phase 3a; `do-nothing` kept.)
 
+31. **Automatic image publication on `master`, and workflow-created pull requests.** (Added 2026-10-30, Phase 2C.)
+    Why: 13.1 planned "push to GHCR on master"; Phase 2C implemented publication as a manual, confirmed `workflow_dispatch` so that the first publications are explicit owner decisions and so that no untrusted change can reach a privileged job before review. Whether to keep it manual, and whether the repository should let GitHub Actions open the digest pull requests, are owner settings.
+    Options: (a) keep manual publication (recommended until the first two or three publications have been reviewed end to end: build record equals publish record, digest pull request merged, `gb-dev` synced); (b) add `push: branches: [master]` to `publish-images.yml` with the same preflight and environment protection, so every merged commit publishes `<sha>` tags and moves `master`; (c) publish on Git tags only. For pull requests: (i) enable "Allow GitHub Actions to create and approve pull requests" in the repository Actions settings (the digest job then opens them with `GITHUB_TOKEN`; per GitHub's `GITHUB_TOKEN` documentation their `ci` run starts approval-required and a maintainer selects "Approve workflows to run"; `docs/operations/bootstrap.md` section 2), or (ii) keep it off and open the pull request by hand from the branch the job pushes (the job fails visibly with the compare URL).
+    Recommended: (a) now, revisit for (b) with environment protection (required reviewer or deployment branch rule) once the manual path has been exercised; (i) for pull requests, since the token is job-scoped and the pull request still passes every gate.
+    Consequences: (b) means a merge publishes without a further human step; the `ghcr-publish` environment protection is then the control. Neither option deploys anything: Argo CD sync stays manual.
+    Phase: 2C. Timing: after the first publication.
+
 ### 22.3 Summary by timing
 
 | Timing | Decisions |
@@ -1991,6 +1998,7 @@ Each decision: description, why it matters, options, recommended default, conseq
 | Before Phase 4b to 4c | 7 identity store, 21 protocol, 22 contracts, 24 static deployment, 26 reconnect semantics, 27 client authentication |
 | UX milestone (Phase 7a) | 19 framework, 20 process (schedule now, hold later), 23 client state, 25 feature set, 28 browsers and accessibility |
 | Before Phase 5, 6, 8, 9 | 1 extraction gates, 13 automation, 5 (prod storage), 18 backup target, 12 journal |
+| After the first publication (Phase 2C) | 31 automatic master publication and workflow-created pull requests |
 
 Nothing in the UX-milestone group blocks Phases 0 to 4b; Phase 4c proceeds on provisional defaults that are designed to be cheap to change.
 

@@ -6,3 +6,5 @@
 /source/makeuniv
 /source/racegen
 *.swp
+# Python bytecode caches (the workflow helper tests under .github/scripts import their modules)
+__pycache__/
