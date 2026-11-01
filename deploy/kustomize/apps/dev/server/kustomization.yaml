@@ -18,7 +18,7 @@ images:
   # that must be replaced by the digest the CI publish job prints (Stage 3)
   # before this entry point may be synced. It is not a real digest.
   - name: ghcr.io/phreddrick/gb-server
-    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    digest: sha256:a2e433228760d9556e1824aad3fc4b09321a50d7dd8e225bf69e489a9432535a
 
 configMapGenerator:
   - name: gb-engine-config
