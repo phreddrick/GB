@@ -4,8 +4,22 @@
 Each case copies deploy/kustomize to a temporary directory, applies one
 mutation, runs the copied validate.py and requires: exit status 1, no Python
 traceback, and the specific security or structure reason in the output. The
-unmodified tree must pass (exit 0, the UNPUBLISHED sentinel as the only
-warning) and --require-published-image must reject the sentinel.
+unmodified tree must pass (exit 0) in whichever of the two legitimate image
+states apps/dev/server is in, and both states are always exercised, one on
+the real tree and the other on a disposable copy whose only change is the
+server image digest (GB2C digest-update run 41269189437, 2026-11-01):
+
+  * unpublished: the digest is the documented all-zero UNPUBLISHED sentinel;
+    normal validation passes with that one warning and
+    --require-published-image rejects the tree for that reason alone;
+  * published: the digest is sha256: plus 64 lower-case hex digits other than
+    the sentinel; normal validation passes with no warning and
+    --require-published-image passes.
+
+Anything else in the digest field (a tag, a rename, a malformed or
+upper-case digest, a missing or duplicate entry) is a baseline failure, not a
+third state, and a copy carrying a malformed digest must be rejected by the
+validator in both modes. The real tree's digest is never rewritten in place.
 
 Usage: python3 deploy/kustomize/tests/mutations.py [-k substring] [-v]
 """
@@ -33,6 +47,17 @@ DEVSRV = "apps/dev/server/kustomization.yaml"
 DEVPLAT = "apps/dev/platform/kustomization.yaml"
 SA = "base/platform/serviceaccount.yaml"
 
+IMAGE = "ghcr.io/phreddrick/gb-server"
+SENTINEL = "sha256:" + "0" * 64
+DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+# A well-formed digest that is not the sentinel, used only on a disposable copy
+# while the repository still carries the sentinel, so that the strict mode's
+# acceptance path is tested before the first publication as well as after it.
+FIXTURE_DIGEST = "sha256:" + "0123456789abcdef" * 4
+# Well-formed to the eye but not a digest the validator may accept (upper-case
+# hex): used on a disposable copy to prove the format check is load-bearing.
+MALFORMED_DIGEST = "sha256:" + "0123456789ABCDEF" * 4
+
 PROM_PEER_YAML = """        - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: cattle-monitoring-system
@@ -57,6 +82,35 @@ def add_platform_resource(filename: str, body: str):
     def apply(tree: Path) -> None:
         (tree / "base/platform" / filename).write_text(body)
         replace(PLAT, "  - podmonitor.yaml\n", f"  - podmonitor.yaml\n  - {filename}\n")(tree)
+    return apply
+
+
+def dev_image_digest(tree: Path) -> str:
+    """The digest apps/dev/server pins for IMAGE, or a RuntimeError naming why
+    the entry point is not in a recognised shape (exactly one `images` entry
+    for IMAGE, carrying `name` and `digest` and nothing else)."""
+    try:
+        import yaml
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("PyYAML is required to read the dev entry point") from exc
+    doc = yaml.safe_load((tree / DEVSRV).read_text())
+    images = doc.get("images") if isinstance(doc, dict) else None
+    entries = [i for i in (images or []) if isinstance(i, dict) and i.get("name") == IMAGE]
+    if len(entries) != 1:
+        raise RuntimeError(f"{DEVSRV} has {len(entries)} images entries for {IMAGE}, expected exactly one")
+    if set(entries[0]) != {"name", "digest"} or not isinstance(entries[0]["digest"], str):
+        raise RuntimeError(f"{DEVSRV} images entry for {IMAGE} must carry name and a string digest only (got {sorted(entries[0])})")
+    return entries[0]["digest"]
+
+
+def set_dev_digest(old: str, new: str):
+    """Rewrite the one `digest: <old>` line of apps/dev/server to `new` in a copy."""
+    def apply(tree: Path) -> None:
+        p = tree / DEVSRV
+        s = p.read_text()
+        if s.count(f"digest: {old}\n") != 1:
+            raise RuntimeError(f"{DEVSRV} does not contain exactly one line 'digest: {old}'")
+        p.write_text(s.replace(f"digest: {old}\n", f"digest: {new}\n", 1))
     return apply
 
 
@@ -119,6 +173,46 @@ def run_validator(tree: Path, extra_args: list[str]) -> tuple[int, str]:
     return proc.returncode, proc.stdout + proc.stderr
 
 
+def image_baseline(tree: Path, digest: str) -> int:
+    """Run normal and strict validation on a tree whose dev image digest is
+    `digest`; print one line per mode and return the number of failed
+    expectations. The sentinel must warn once and be refused by strict mode
+    for that reason only; a well-formed digest must pass both modes with no
+    warning and with the validator's own digest check reported; anything
+    else must be refused by both modes by that digest check alone."""
+    failures = 0
+    kind = "sentinel" if digest == SENTINEL else "published" if DIGEST_RE.match(digest) else "malformed"
+    pinned = f"[dev] image is {IMAGE} pinned by digest (got '{IMAGE}@{digest}')"
+
+    for mode, args in (("normal validation", []), ("--require-published-image", ["--require-published-image"])):
+        code, out = run_validator(tree, args)
+        clean = "Traceback" not in out and "internal error" not in out
+        fails = re.findall(r"^FAIL .*$", out, re.M)
+        if kind == "sentinel" and not args:
+            ok = code == 0 and clean and out.count("WARN ") == 1 and "UNPUBLISHED sentinel" in out
+            what = "passes with the UNPUBLISHED warning as its only warning"
+        elif kind == "sentinel":
+            ok = code == 1 and clean and len(fails) == 1 and "UNPUBLISHED sentinel" in fails[0]
+            what = "rejects the sentinel, for that reason only"
+        elif kind == "published":
+            ok = code == 0 and clean and not fails and out.count("WARN ") == 0 and "UNPUBLISHED" not in out and f"PASS  {pinned}" in out
+            what = f"accepts the pinned digest {digest[:19]}... with no warning"
+        else:
+            ok = code == 1 and clean and len(fails) == 1 and fails[0] == f"FAIL  {pinned}" and "UNPUBLISHED" not in out
+            what = f"rejects the malformed digest {digest[:19]}... by the digest check alone"
+        print(f"{'ok  ' if ok else 'FAIL'}  baseline[{kind}]: {mode} {what} (exit {code})")
+        failures += 0 if ok else 1
+    return failures
+
+
+def malformed_baseline(tmp: Path, current: str) -> int:
+    """Both modes must refuse a copy whose only change is a malformed digest."""
+    tree = tmp / "baseline-malformed"
+    shutil.copytree(ROOT, tree)
+    set_dev_digest(current, MALFORMED_DIGEST)(tree)
+    return image_baseline(tree, MALFORMED_DIGEST)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-k", default="", help="run only cases whose name contains this substring")
@@ -130,15 +224,39 @@ def main() -> int:
         base = Path(tmp) / "pristine"
         shutil.copytree(ROOT, base)
 
-        code, out = run_validator(base, [])
-        ok = code == 0 and "Traceback" not in out and out.count("WARN ") == 1 and "UNPUBLISHED" in out
-        print(f"{'ok  ' if ok else 'FAIL'}  baseline: unmodified tree passes with only the UNPUBLISHED warning (exit {code})")
-        failures += 0 if ok else 1
-
-        code, out = run_validator(base, ["--require-published-image"])
-        ok = code == 1 and "Traceback" not in out and "UNPUBLISHED sentinel" in out
-        print(f"{'ok  ' if ok else 'FAIL'}  strict: --require-published-image rejects the sentinel digest (exit {code})")
-        failures += 0 if ok else 1
+        # Baseline: which legitimate image state is the real tree in? The
+        # other state, and a malformed digest, are exercised on copies that
+        # differ from the tree in the digest only.
+        baseline_checks = 6
+        try:
+            digest = dev_image_digest(base)
+        except Exception as exc:  # noqa: BLE001
+            digest = None
+            print(f"FAIL  baseline: cannot read the dev image digest: {exc}")
+        if digest == SENTINEL:
+            state = "unpublished (UNPUBLISHED sentinel)"
+            print(f"      {DEVSRV} pins the UNPUBLISHED sentinel; a published digest is tested on a copy")
+            failures += image_baseline(base, SENTINEL)
+            other = Path(tmp) / "baseline-published-fixture"
+            shutil.copytree(ROOT, other)
+            set_dev_digest(SENTINEL, FIXTURE_DIGEST)(other)
+            failures += image_baseline(other, FIXTURE_DIGEST)
+            failures += malformed_baseline(Path(tmp), SENTINEL)
+        elif digest is not None and DIGEST_RE.match(digest):
+            state = "published digest"
+            print(f"      {DEVSRV} pins {digest}; the UNPUBLISHED sentinel is tested on a copy")
+            failures += image_baseline(base, digest)
+            other = Path(tmp) / "baseline-sentinel"
+            shutil.copytree(ROOT, other)
+            set_dev_digest(digest, SENTINEL)(other)
+            failures += image_baseline(other, SENTINEL)
+            failures += malformed_baseline(Path(tmp), digest)
+        else:
+            state = "INVALID"
+            baseline_checks = 1
+            if digest is not None:
+                print(f"FAIL  baseline: {DEVSRV} pins {digest!r}, which is neither the UNPUBLISHED sentinel nor sha256: plus 64 lower-case hex digits")
+            failures += 1
 
         for name, mutate, reason in CASES:
             if args.k and args.k not in name:
@@ -166,7 +284,7 @@ def main() -> int:
                         if line.startswith(("FAIL", "Traceback", "  failure")) or "Error" in line:
                             print(f"        {line[:200]}")
     print()
-    print(f"mutations.py: {len(CASES)} mutation cases + 2 baseline checks, {failures} unexpected outcome(s)")
+    print(f"mutations.py: {len(CASES)} mutation cases + {baseline_checks} baseline checks (dev image state: {state}), {failures} unexpected outcome(s)")
     return 1 if failures else 0
 
 
