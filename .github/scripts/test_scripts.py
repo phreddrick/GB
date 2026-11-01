@@ -13,8 +13,9 @@ rootfs.diff_ids, SharedValidatorLayerTests), oci_layout_dir
 (the scanner input: safe extraction of the verified archive into a fresh layout
 directory that reads back as the same image; unsafe members, pre-existing
 destinations and tampering rejected; both workflows wired to it, hosted run
-41250221737), set_image_digest (the real dev entry point text, invalid
-and sentinel digests, tags, duplicate entries, no-op), trivy_policy (fixable
+41250221737), set_image_digest (the real dev entry point text in both
+of its starting states, sentinel and published; invalid and sentinel digests,
+tags, duplicate entries, no-op, published-to-published replacement), trivy_policy (fixable
 and unfixable CRITICAL findings, secrets, identity assertion) and
 workflow_policy_check (the repository's own workflows must pass; synthetic
 violations of each rule must fail). The release-safety regressions for the
@@ -29,6 +30,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -54,6 +56,10 @@ DEV_ENTRY = os.path.join(REPO, "deploy", "kustomize", "apps", "dev", "server", "
 IMAGE = "ghcr.io/phreddrick/gb-server"
 GOOD = "sha256:" + "ab" * 32
 GOOD2 = "sha256:" + "cd" * 32
+# A published-digest fixture (the first published server digest, publish-images
+# run 41266551465). Tests derive both starting states from it and the sentinel;
+# the repository's own entry point may pin any later digest.
+PUBLISHED = "sha256:a2e433228760d9556e1824aad3fc4b09321a50d7dd8e225bf69e489a9432535a"
 
 
 # ----------------------------------------------------------------- helpers --
@@ -930,62 +936,132 @@ class ScannerInputWiringTests(unittest.TestCase):
 
 # --------------------------------------------------------- set_image_digest --
 class SetImageDigestTests(unittest.TestCase):
+    """set_image_digest against the real dev entry point in both of its
+    legitimate starting states. The repository's file carries either the
+    UNPUBLISHED sentinel or some published digest (PR #6, run 41272917978: the
+    first published digest made fixtures that assumed the sentinel vacuous),
+    so setUp only requires the live value to be one of those two kinds, and
+    every test runs on two deterministic fixtures derived from the live text
+    by rewriting its one digest line: the sentinel and PUBLISHED. No test
+    depends on which digest the repository pins today."""
+
     def setUp(self):
         with open(DEV_ENTRY, encoding="utf-8") as f:
             self.text = f.read()
+        # The live entry point must have the expected shape (exactly one images
+        # entry for IMAGE with exactly one digest line and no tag or rename) and
+        # pin either the sentinel or a well-formed, non-zero, lower-case digest.
+        _, self.current = set_image_digest.locate(self.text.splitlines(keepends=True), IMAGE)
+        if self.current != set_image_digest.SENTINEL:
+            set_image_digest.validate_digest(self.current)
+        # entry_with() must reproduce the live text exactly from its own digest,
+        # which proves the fixtures below differ from the live file in that one
+        # value only, whatever digest the repository pins.
+        self.assertEqual(self.entry_with(self.current), self.text, "entry_with() must reconstruct the live entry point from its current digest")
+        self.starts = {"sentinel": self.entry_with(set_image_digest.SENTINEL), "published": self.entry_with(PUBLISHED)}
 
-    def test_replaces_only_the_digest_line(self):
-        new, old, dig = set_image_digest.set_digest(self.text, IMAGE, GOOD)
-        self.assertEqual(old, set_image_digest.SENTINEL)
-        self.assertEqual(dig, GOOD)
-        a, b = self.text.splitlines(), new.splitlines()
+    def entry_with(self, digest):
+        """The live text with its single digest line set to `digest`; nothing else changes."""
+        m = re.findall(r"^(\s+digest:\s*)(\S+)(\s*)$", self.text, re.M)
+        self.assertEqual(len(m), 1, "the dev entry point must carry exactly one digest line")
+        return re.sub(r"^(\s+digest:\s*)(\S+)(\s*)$", lambda mm: mm.group(1) + digest + mm.group(3), self.text, count=1, flags=re.M)
+
+    def assert_one_line_changed(self, before, after, old, new):
+        a, b = before.splitlines(), after.splitlines()
         self.assertEqual(len(a), len(b))
         changed = [i for i in range(len(a)) if a[i] != b[i]]
         self.assertEqual(len(changed), 1)
         self.assertIn("digest:", a[changed[0]])
-        self.assertEqual(b[changed[0]], a[changed[0]].replace(set_image_digest.SENTINEL, GOOD))
-        # Idempotent and detectable as a no-op.
-        new2, old2, _ = set_image_digest.set_digest(new, IMAGE, GOOD)
-        self.assertEqual(new2, new)
-        self.assertEqual(old2, GOOD)
-        # And replaceable again by a later digest.
-        new3, old3, _ = set_image_digest.set_digest(new, IMAGE, GOOD2)
-        self.assertEqual(old3, GOOD)
-        self.assertIn(GOOD2, new3)
+        self.assertEqual(b[changed[0]], a[changed[0]].replace(old, new))
+
+    def test_replaces_only_the_digest_line(self):
+        for state, start in (("sentinel", set_image_digest.SENTINEL), ("published", PUBLISHED)):
+            with self.subTest(start=state):
+                text = self.starts[state]
+                new, old, dig = set_image_digest.set_digest(text, IMAGE, GOOD)
+                self.assertEqual(old, start)
+                self.assertEqual(dig, GOOD)
+                self.assert_one_line_changed(text, new, start, GOOD)
+                # Idempotent and detectable as a no-op.
+                new2, old2, _ = set_image_digest.set_digest(new, IMAGE, GOOD)
+                self.assertEqual(new2, new)
+                self.assertEqual(old2, GOOD)
+                # And a published digest is replaceable by a later published digest.
+                new3, old3, _ = set_image_digest.set_digest(new, IMAGE, GOOD2)
+                self.assertEqual(old3, GOOD)
+                self.assert_one_line_changed(new, new3, GOOD, GOOD2)
+                self.assertNotIn(start, new3)
+        # A published start is a no-op only for its own digest.
+        text = self.starts["published"]
+        same, old, _ = set_image_digest.set_digest(text, IMAGE, PUBLISHED)
+        self.assertEqual((same, old), (text, PUBLISHED))
 
     def test_invalid_digests(self):
         for bad in ["sha256:" + "0" * 64, "sha256:" + "ab" * 31, "sha256:" + "AB" * 32, "ab" * 32, "sha512:" + "ab" * 32,
                     "sha256:" + "ab" * 32 + "\n", f"{IMAGE}@sha256:" + "ab" * 32, "", "latest"]:
-            with self.subTest(bad=bad), self.assertRaises(ValueError):
-                set_image_digest.set_digest(self.text, IMAGE, bad)
+            for state, text in self.starts.items():
+                with self.subTest(bad=bad, start=state), self.assertRaises(ValueError):
+                    set_image_digest.set_digest(text, IMAGE, bad)
+        # And a file whose current value is neither the sentinel nor a digest is refused as malformed.
+        for bad in ["sha256:" + "AB" * 32, "sha256:abc", "latest"]:
+            with self.subTest(current=bad), self.assertRaises(set_image_digest.ShapeError):
+                set_image_digest.set_digest(self.entry_with(bad), IMAGE, GOOD)
 
     def test_wrong_image_name(self):
-        with self.assertRaises(set_image_digest.ShapeError):
-            set_image_digest.set_digest(self.text, "ghcr.io/phreddrick/gbctl", GOOD)
+        for state, text in self.starts.items():
+            with self.subTest(start=state), self.assertRaises(set_image_digest.ShapeError):
+                set_image_digest.set_digest(text, "ghcr.io/phreddrick/gbctl", GOOD)
 
     def test_tag_entry_refused(self):
-        tagged = self.text.replace("    digest: " + set_image_digest.SENTINEL, "    newTag: v1\n    digest: " + set_image_digest.SENTINEL)
-        with self.assertRaises(set_image_digest.ShapeError):
-            set_image_digest.set_digest(tagged, IMAGE, GOOD)
+        for state, text in self.starts.items():
+            digest_line = f"    digest: {set_image_digest.SENTINEL if state == 'sentinel' else PUBLISHED}\n"
+            self.assertEqual(text.count(digest_line), 1)
+            variants = {
+                "newTag beside the digest": text.replace(digest_line, "    newTag: v1\n" + digest_line),
+                "newTag instead of the digest": text.replace(digest_line, "    newTag: v1\n"),
+                "newName beside the digest": text.replace(digest_line, digest_line + "    newName: ghcr.io/other/gb-server\n"),
+            }
+            for what, tagged in variants.items():
+                with self.subTest(start=state, variant=what):
+                    self.assertNotEqual(tagged, text, "the negative fixture was not constructed")
+                    self.assertIn("newTag: v1" if "newTag" in what else "newName:", tagged)
+                    with self.assertRaises(set_image_digest.ShapeError):
+                        set_image_digest.set_digest(tagged, IMAGE, GOOD)
 
     def test_duplicate_entry_refused(self):
-        dup = self.text.replace("images:\n", "images:\n  - name: ghcr.io/phreddrick/gb-server\n    digest: " + GOOD2 + "\n", 1)
-        with self.assertRaises(set_image_digest.ShapeError):
-            set_image_digest.set_digest(dup, IMAGE, GOOD)
+        for state, text in self.starts.items():
+            dup = text.replace("images:\n", "images:\n  - name: ghcr.io/phreddrick/gb-server\n    digest: " + GOOD2 + "\n", 1)
+            with self.subTest(start=state):
+                self.assertNotEqual(dup, text)
+                with self.assertRaises(set_image_digest.ShapeError):
+                    set_image_digest.set_digest(dup, IMAGE, GOOD)
 
     def test_cli_exit_codes(self):
-        tmp = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, tmp)
-        p = os.path.join(tmp, "kustomization.yaml")
-        shutil.copy(DEV_ENTRY, p)
-        cli = [sys.executable, os.path.join(HERE, "set_image_digest.py"), "--file", p, "--image", IMAGE]
-        self.assertEqual(subprocess.run(cli + ["--check"], capture_output=True, text=True).stdout.strip(), set_image_digest.SENTINEL)
-        self.assertEqual(subprocess.run(cli + ["--digest", "sha256:dead"], capture_output=True).returncode, 1)
-        self.assertEqual(subprocess.run(cli + ["--digest", GOOD], capture_output=True).returncode, 0)
-        self.assertEqual(subprocess.run(cli + ["--digest", GOOD], capture_output=True).returncode, 3)
-        with open(p, encoding="utf-8") as f:
-            self.assertIn(GOOD, f.read())
-        self.assertEqual(subprocess.run(cli[:-2] + ["--image", "ghcr.io/other/x", "--digest", GOOD2], capture_output=True).returncode, 2)
+        for state, start in (("sentinel", set_image_digest.SENTINEL), ("published", PUBLISHED)):
+            with self.subTest(start=state):
+                tmp = tempfile.mkdtemp()
+                self.addCleanup(shutil.rmtree, tmp)
+                p = os.path.join(tmp, "kustomization.yaml")
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(self.starts[state])
+                cli = [sys.executable, os.path.join(HERE, "set_image_digest.py"), "--file", p, "--image", IMAGE]
+                self.assertEqual(subprocess.run(cli + ["--check"], capture_output=True, text=True).stdout.strip(), start)
+                self.assertEqual(subprocess.run(cli + ["--digest", "sha256:dead"], capture_output=True).returncode, 1)
+                self.assertEqual(subprocess.run(cli + ["--digest", set_image_digest.SENTINEL], capture_output=True).returncode, 1)
+                with open(p, encoding="utf-8") as f:
+                    self.assertEqual(f.read(), self.starts[state], "a refused digest must write nothing")
+                if state == "published":
+                    self.assertEqual(subprocess.run(cli + ["--digest", start], capture_output=True).returncode, 3)
+                self.assertEqual(subprocess.run(cli + ["--digest", GOOD], capture_output=True).returncode, 0)
+                self.assertEqual(subprocess.run(cli + ["--digest", GOOD], capture_output=True).returncode, 3)
+                with open(p, encoding="utf-8") as f:
+                    written = f.read()
+                self.assertIn(GOOD, written)
+                self.assertNotIn(start, written)
+                self.assertEqual(subprocess.run(cli + ["--check"], capture_output=True, text=True).stdout.strip(), GOOD)
+                self.assertEqual(subprocess.run(cli + ["--digest", GOOD2], capture_output=True).returncode, 0)
+                self.assertEqual(subprocess.run(cli + ["--check"], capture_output=True, text=True).stdout.strip(), GOOD2)
+                self.assertEqual(subprocess.run(cli[:-2] + ["--image", "ghcr.io/other/x", "--digest", GOOD2], capture_output=True).returncode, 2)
 
 
 # ------------------------------------------------------------- trivy_policy --
