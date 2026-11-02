@@ -1,6 +1,6 @@
 # Bootstrap: prerequisites before the first `gb-dev` synchronisation
 
-> **DRAFT. NOT YET APPROVED FOR DEPLOYMENT.** Written in Phase 2B (2026-10-30) from the read-only Phase 2A assessment. Every step that changes GitHub settings, the `k8s-helpers` repository, Argo CD or the cluster is an owner action that needs its own approval under the `k8s-helpers` rules. Nothing in this document has been executed.
+> **DRAFT. NOT YET APPROVED FOR DEPLOYMENT.** Written in Phase 2B (2026-10-30) from the read-only Phase 2A assessment; corrected 2026-11-01 after the read-only Phase 2D Checkpoint 1 preflight (results in `docs/testing/phase2-validation.md` section 1) and again the same day after the independent review of Checkpoint 2 (GB2D-01: the namespace precedes the Helm upgrade; GB2D-02: sync gates; GB2D-03: bounded RWOP observation). Every step that changes GitHub settings, the `k8s-helpers` repository, Argo CD or the cluster is an owner action that needs its own approval under the `k8s-helpers` rules. Nothing in this document has been executed.
 
 This document lists what must exist before `gb-dev-platform` and `gb-dev-server` can be created and synced, who owns each item, and how to verify it read-only. The synchronisation itself, universe initialisation, restarts, recovery and acceptance are in `deploy.md`; the storage and network tests are in `storage-and-network-validation.md`.
 
@@ -56,17 +56,17 @@ curl -fsS 'https://ghcr.io/token?scope=repository:phreddrick/gb-server:pull' | j
 curl -fsS -H "Authorization: Bearer $(cat /tmp/t)" https://ghcr.io/v2/phreddrick/gb-server/tags/list
 ```
 
-Until the digest-update pull request is merged, the dev entry point carries the all-zero sentinel digest and `deploy/kustomize/tests/run.sh --require-published-image` fails by design (the `manifests` job of `ci` asserts exactly that). Merging the digest pull request changes Git only; synchronisation stays a separately approved manual step (`deploy.md` section 2).
+Status 2026-11-01: the first image was published by run 41266551465 (`ghcr.io/phreddrick/gb-server@sha256:a2e433228760d9556e1824aad3fc4b09321a50d7dd8e225bf69e489a9432535a`, built from `46b7bc0`), both packages are public (anonymous `tags/list` works), and the digest pull request (#6) was merged on 2026-11-01, so `deploy/kustomize/apps/dev/server/kustomization.yaml` pins that digest and `deploy/kustomize/tests/run.sh --require-published-image` passes. While the sentinel was pinned, strict mode failed by design; the `manifests` job of `ci` handles both states. Merging the digest pull request changed Git only; synchronisation stays a separately approved manual step (`deploy.md` section 2).
 
 ## 3. Argo CD: repository access
 
-The repository is public: the Applications can source `https://github.com/phreddrick/GB.git` anonymously once the `gb` AppProject lists that URL in `sourceRepos`; no credential Secret is needed. If the `k8s-helpers` owner prefers SSH, a **read-only deploy key** is created following their `docs/argocd/GITLAB-ACCESS.md` procedure (a hand-made Secret in `argocd` labelled `argocd.argoproj.io/secret-type: repository`, never in Git); personal access tokens are not acceptable there. Verify read-only after registration: `argocd repo list` or `kubectl -n argocd get secret -l argocd.argoproj.io/secret-type=repository -o name` (names only).
+The repository is public: the Applications can source `https://github.com/phreddrick/GB.git` anonymously once the `gb` AppProject lists that URL in `sourceRepos`; no credential Secret is needed. Verified 2026-11-01: the only repository Secret in `argocd` is `repo-gitlab-k8s-helpers`; the prepared `gb` project (section 4) registers nothing. If the `k8s-helpers` owner prefers SSH, a **read-only deploy key** is created following their `docs/argocd/GITLAB-ACCESS.md` procedure (a hand-made Secret in `argocd` labelled `argocd.argoproj.io/secret-type: repository`, never in Git); personal access tokens are not acceptable there. Verify read-only after registration: `argocd repo list` or `kubectl -n argocd get secret -l argocd.argoproj.io/secret-type=repository -o name` (names only).
 
 Repo-server egress to github.com is assumed from the fact that GitLab fetches already work and the `argocd` NetworkPolicies are ingress-only; the first `argocd app get` will confirm it.
 
 ## 4. Argo CD: AppProject and controller RBAC (`k8s-helpers` pull request)
 
-Minimum change set, mirroring their Copilot pilot commit:
+Status 2026-11-01: verified read-only that none of this exists yet (AppProjects `default` and `homelab-apps` only; five Applications, all sourcing `k8s-helpers` from GitLab; no `gb-dev` in the managed-namespace list; no Role in `gb-dev`). The change set below was **prepared the same day on the `k8s-helpers` branch `feature/argocd-gb-dev-onboarding-isolated` (a dedicated worktree, never the shared checkout) for independent review; nothing is merged, upgraded or applied.** It mirrors the live conventions (Homebox, Plex and Copilot Gateway) rather than the earlier draft of this section:
 
 1. `argocd/projects/gb.yaml`:
    - `sourceRepos: [https://github.com/phreddrick/GB.git]`
@@ -74,23 +74,46 @@ Minimum change set, mirroring their Copilot pilot commit:
    - `clusterResourceWhitelist: []` (nothing cluster-scoped; the Namespace is not managed)
    - `namespaceResourceWhitelist`: `v1 ServiceAccount`, `v1 ConfigMap`, `v1 Service`, `apps StatefulSet`, `networking.k8s.io NetworkPolicy`, `networking.k8s.io Ingress`, `traefik.io Middleware`, `monitoring.coreos.com PodMonitor`. Not `Secret`, not `PersistentVolumeClaim` (the StatefulSet controller creates it).
    - the same deny-all sync window with `manualSync: true`, `orphanedResources: {warn: true}`.
-2. `argocd/applications/gb-dev-platform.yaml` and `gb-dev-server.yaml`: project `gb`, `repoURL` as above, `targetRevision: master`, `path: deploy/kustomize/apps/dev/platform` and `.../server`, destination `gb-dev`, `syncPolicy.syncOptions: [ApplyOutOfSyncOnly=true, FailOnSharedResource=true, Validate=true]`, no `automated`, no finalizers, `revisionHistoryLimit: 10`. The header comment lists the out-of-band dependencies: Namespace `gb-dev`, Secret `gb-server-secrets`, the DNS record.
-3. `argocd/bootstrap/values.yaml`: add to `resource.inclusions` for both cluster URLs: `apps StatefulSet, ControllerRevision`; `"" ServiceAccount`; `networking.k8s.io NetworkPolicy`; `monitoring.coreos.com PodMonitor`.
-4. `values-security.yaml`: managed namespaces `homebox,copilot,gb-dev`; a `gb-dev` Role for `argocd-application-controller` with `get,list,watch,create,update,patch,delete` on exactly the kinds in item 1 plus `get,list,watch` on `pods`, `persistentvolumeclaims`, `controllerrevisions` and `events`; a read-only Role for `argocd-server` as in `homebox`. No Namespace verbs.
-5. `scripts/validate-argocd-install.py` and its tests, `argocd/README.md`, `docs/argocd/OWNERSHIP.md` (GB row).
+2. `argocd/applications/gb-dev-platform.yaml` and `gb-dev-server.yaml`: project `gb`, `repoURL` as above, `targetRevision: master`, `path: deploy/kustomize/apps/dev/platform` and `.../server` (plain Kustomize: no `directory`, `kustomize`, `helm` or plugin options), destination `gb-dev`, the **four** established sync options `syncPolicy.syncOptions: [ApplyOutOfSyncOnly=true, FailOnSharedResource=true, Validate=true, Prune=false]` (`Prune=false` is the Application-level default every `k8s-helpers` Application has carried since Plex: a manual sync never prunes, even when asked), **no `automated` block** (manual sync only, no self-heal), no finalizers, `revisionHistoryLimit: 10`. The header comment lists the out-of-band dependencies: Namespace `gb-dev`, Secret `gb-server-secrets`, the DNS record.
+3. `argocd/bootstrap/values.yaml`: add to `resource.inclusions` for both cluster URLs: `apps StatefulSet, ControllerRevision`; `"" ServiceAccount`; `networking.k8s.io NetworkPolicy`; `monitoring.coreos.com PodMonitor`. **The inclusion list is global:** Argo CD's cluster cache lists every included kind in every managed namespace and fails to load if any list is forbidden (`resource.respectRBAC` is deliberately unset there), so the same kinds become visible, read-only, in `homebox`, `copilot`, `plex`, `jellyfin` and `ollama`, and every existing observe Role must gain `get,list,watch` on them (item 4). Inclusion changes what Argo CD sees; it authorises no write.
+4. `values-security.yaml`: managed namespaces `homebox,copilot,plex,jellyfin,ollama,gb-dev` (the existing five retained, `gb-dev` appended; the live list already contained `plex`, `jellyfin` and `ollama` on 2026-11-01). In `gb-dev`: the controller observe Role identical to the other namespaces (`get,list,watch` on every included kind, including `pods`, `persistentvolumeclaims`, `controllerrevisions`); a separate `argocd-application-controller-sync` Role with `create,patch,update` on exactly the eight kinds in item 1 (`create` is required because nothing exists yet and cannot be limited by `resourceNames`; it is confined to `gb-dev` and these kinds); **no `delete`** (the `k8s-helpers` barrier behind `Prune=false`; removing objects is an operator action, `deploy.md` section 7), no Secret, PersistentVolumeClaim, Pod or Namespace verb, nothing cluster-wide; an `argocd-server-observe` Role as in `homebox` (`get` on those kinds, pods and pod logs, `list` events). **No new cluster-wide grant for either ServiceAccount:** the server's `namespaces` `get` keeps `homebox` as its only `resourceName` (the review of 2026-11-01 found no evidence that the UI needs the Namespace object for `gb-dev`; whether it shows anything less without it is **UNVERIFIED** and would be a separate, evidenced change). Every other Role is unchanged apart from the read-only additions of item 3. **All six `gb-dev` objects are namespaced:** Helm creates no namespace, so section 5's namespace must exist, be `Active` and carry its labels **before** the Helm upgrade below.
+5. `scripts/validate-argocd-install.py` and `tests/test_validate_argocd_install.py` (exact project, Applications, inclusions, grants, managed namespaces, file inventory), `argocd/README.md` ("Galactic Bloodshed (gb-dev) onboarding"), `docs/argocd/OWNERSHIP.md` (GB row), `docs/network.md` (Pi-hole identity).
 
-Operator actions after merge: `helm upgrade` Argo CD with the new values (shared component: quiet window, `helm rollback` is the fallback), then `kubectl apply` of the project and the two Applications from the merged commit. Verify read-only:
+Operator sequence (GB2D-01; each step is its own approval; the `k8s-helpers` `argocd/README.md` onboarding section carries the same order):
+
+1. Separate owner authorisation to create namespace `gb-dev`; the operator creates and labels it as in section 5.
+2. Verify read-only that `gb-dev` exists, is `Active` and carries the restricted Pod Security labels; record its UID. **If the namespace is absent, not `Active`, or its identity or labels cannot be verified, stop here: the Helm upgrade must not run**, because the render contains three Roles and three RoleBindings in `gb-dev` and Helm would fail or leave the release half-applied.
+3. Independent review and merge of the `k8s-helpers` branch (the merge may also come before step 1; the Helm upgrade may not come before steps 1 and 2).
+4. Separate approval for the shared Argo CD Helm upgrade.
+5. `helm upgrade` Argo CD with the reviewed values files (shared component: quiet window, `helm rollback` is the fallback; the step reloads the cluster cache for every existing Application and restarts the server, repo-server and controller pods because `argocd-cm` changed).
+6. Verify before continuing: every Argo CD component Running and Ready, the five existing Applications still Synced / Healthy, no `forbidden` list error in the controller log, the six `gb-dev` Roles and RoleBindings present.
+7. `kubectl apply` of the project, then the two Applications, from the merged commit (creates nothing in `gb-dev`, syncs nothing).
+8. The identity-verified permission check below, against the direct RKE2 API.
+
+**Verifying the controller's permissions (read-only, identity-verified).** The Rancher proxy context `local` (`https://rancher.home.spukhaus.com/k8s/clusters/local`) **discards impersonation**: through it, `kubectl auth can-i ... --as=system:serviceaccount:argocd:argocd-application-controller` answers for the admin user, so every check returns `yes` and proves nothing (observed 2026-11-01: `kubectl auth whoami --as=...` still reported the admin identity, and a non-existent ServiceAccount was told it may create namespaces). Run the checks only against the direct RKE2 API with the admin kubeconfig that `k8s-helpers/docs/argocd/INSTALLATION-RUNBOOK.md` uses (`KUBECONFIG=~/.kube/rke2-admin.yaml`), and prove the identity first; never print or copy that file. If that kubeconfig is unavailable, or using it would bypass a tooling or policy restriction, the result is **UNVERIFIED** and this prerequisite is not met.
 
 ```sh
-kubectl auth can-i create statefulsets -n gb-dev --as=system:serviceaccount:argocd:argocd-application-controller   # yes
-kubectl auth can-i create statefulsets -n homebox --as=system:serviceaccount:argocd:argocd-application-controller  # no
-kubectl auth can-i patch namespaces --as=system:serviceaccount:argocd:argocd-application-controller                # no
+export KUBECONFIG=~/.kube/rke2-admin.yaml                       # direct RKE2 API, never the Rancher proxy
+C=system:serviceaccount:argocd:argocd-application-controller
+kubectl auth whoami --as=$C                                      # must name $C, not the admin
+kubectl auth can-i create namespaces --as=system:serviceaccount:argocd:no-such-account   # must be "no"
+kubectl auth can-i create statefulsets -n gb-dev --as=$C         # yes
+kubectl auth can-i patch statefulsets -n gb-dev --as=$C          # yes
+kubectl auth can-i create secrets -n gb-dev --as=$C              # no
+kubectl auth can-i create persistentvolumeclaims -n gb-dev --as=$C   # no
+kubectl auth can-i create statefulsets -n homebox --as=$C        # no
+kubectl auth can-i patch namespaces --as=$C                      # no
+kubectl auth can-i get namespaces/gb-dev --as=system:serviceaccount:argocd:argocd-server   # no (not granted; homebox only)
 kubectl -n argocd get appproject gb -o yaml; kubectl -n argocd get application gb-dev-platform gb-dev-server
 ```
 
+If the first two lines do not behave as shown, impersonation is not being honoured and nothing after them is evidence. Ask the same way whether the controller may remove a StatefulSet in `gb-dev` (the removal verb on `statefulsets`): the answer must be `no`. That line is deliberately kept out of the code block, because this repository's offline safety check (`deploy/kustomize/tests/safety-check.py`, S3) rejects any deletion verb inside a fenced block of an operational document.
+
 ## 5. Namespace and Secret (operator, out of band)
 
-Namespace, before anything else:
+Status 2026-11-01: neither exists (verified read-only). No existing namespace on the cluster carries a `pod-security.kubernetes.io/enforce` label, and the cluster-wide admission default remains unknown, so the label below is the enforcement.
+
+Namespace, before anything else, and **in particular before the Helm upgrade of section 4** (the Argo CD values render Roles inside `gb-dev`; Helm does not create it). Separate owner authorisation first, then:
 
 ```sh
 kubectl create namespace gb-dev
@@ -98,6 +121,13 @@ kubectl label namespace gb-dev \
   pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=latest \
   pod-security.kubernetes.io/warn=restricted pod-security.kubernetes.io/audit=restricted
 # optional, lab convention: field.cattle.io/projectId=<Rancher project> if GB should appear in a Rancher project
+```
+
+Verify, read-only, and record the UID before section 4 step 5 may run; stop if any line disagrees:
+
+```sh
+kubectl get namespace gb-dev -o jsonpath='{.status.phase}{"\n"}{.metadata.uid}{"\n"}'      # Active, then the UID to record
+kubectl get namespace gb-dev -o jsonpath='{.metadata.labels}{"\n"}'                           # the three pod-security labels, enforce=restricted
 ```
 
 The manifests are written for `restricted` (non-root 65532, seccomp RuntimeDefault, no escalation, drop ALL, read-only root). The cluster-wide Pod Security default is unknown (the admission config file is not readable by the operator account), so the label is the enforcement.
@@ -118,7 +148,7 @@ The server reads the whole file with trailing newlines trimmed, so the files mus
 
 ## 6. DNS and TLS
 
-- Pi-hole local DNS: add exactly `gb-dev.home.spukhaus.com. A 10.0.0.20` (the Traefik LoadBalancer VIP). No wildcard, no CNAME (lab convention from `k8s-helpers/docs/argocd/INGRESS-DESIGN.md`). Verify: `getent hosts gb-dev.home.spukhaus.com` from a lab host.
+- Pi-hole local DNS: add exactly `gb-dev.home.spukhaus.com. A 10.0.0.20` (the Traefik LoadBalancer VIP). No wildcard, no CNAME (lab convention from `k8s-helpers/docs/argocd/INGRESS-DESIGN.md`). Verify: `getent hosts gb-dev.home.spukhaus.com` from a lab host. Status 2026-11-01: the lab resolver is `10.0.0.42` (Pi-hole, identified by its `version.bind` answer); `dig @10.0.0.42 gb-dev.home.spukhaus.com` returns NOERROR with no address (the query falls through to the public `spukhaus.com` zone), while `homebox.home.spukhaus.com` resolves to `10.0.0.20` from the same server. The record does not exist yet; `10.0.0.20` is still the address of Service `kube-system/rke2-traefik` (MetalLB pool `home-lab`).
 - TLS: nothing to create. The Ingress annotation `cert-manager.io/cluster-issuer: letsencrypt-production-cloudflare` makes ingress-shim request `gb-dev-tls` through Cloudflare DNS-01 on first sync. Verify afterwards: `kubectl -n gb-dev get certificate gb-dev-tls` Ready.
 - No DNS record and no certificate is created in Phase 2B.
 
@@ -133,6 +163,8 @@ kubectl get nodes -l workload.home-apps=true                                    
 kubectl -n cattle-monitoring-system get prometheus -o jsonpath='{.items[0].spec.podMonitorNamespaceSelector}'  # {}
 ```
 
+Verified 2026-11-01 (read-only, Checkpoint 1): both CRDs present; `traefik` the only and default IngressClass, served by the RKE2 Traefik DaemonSet (`kubernetescrd` and `kubernetesingress` providers, no cross-namespace Middleware references, so the Middleware must live in `gb-dev`, which it does); ClusterIssuer Ready (ACMEAccountRegistered, production ACME server; seven certificates issued by it are Ready); StorageClass `longhorn` as expected; nodes `backup` and `wkr1` labelled, Ready and untainted; Prometheus `podMonitorNamespaceSelector` and `podMonitorSelector` both `{}`; Cilium v1.19.6 with `enable-policy=default` and Kubernetes NetworkPolicy enabled; the Traefik, Prometheus and CoreDNS pod labels equal the selectors in `base/platform`. A manifest that matches the cluster's labels is not a demonstration that the policy is enforced; that is `storage-and-network-validation.md` section 2.
+
 ## 8. Workstation tooling for the operator
 
-`kubectl` (context `local`), `gbctl` (built from this repository: `cd go && go build ./cmd/gbctl`), `GBCTL_TOKEN_FILE` pointing at the 0600 copy from section 5. No container runtime is needed or allowed on the control-plane workstation.
+`kubectl` with two kubeconfigs, used for different purposes: the Rancher proxy context `local` for ordinary reads, port-forwards and approved mutations, and the direct RKE2 admin kubeconfig (`~/.kube/rke2-admin.yaml`, the `k8s-helpers` convention) **only** for the identity-verified RBAC checks of section 4, because the proxy discards impersonation; neither file is ever printed, copied into a document or committed. `gbctl` (built from this repository: `cd go && go build ./cmd/gbctl`), `GBCTL_TOKEN_FILE` pointing at the 0600 copy from section 5. Status 2026-11-01: `gbctl` is not built and `~/.config/gb` does not exist on the workstation. No container runtime is needed or allowed on the control-plane workstation.

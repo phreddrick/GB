@@ -12,11 +12,17 @@ resources:
   - ../../../base/server
 
 images:
-  # Deployments reference a digest, never a tag (ADR-0006). No image has
-  # been published yet (Phase 2B builds nothing): the all-zero value below
-  # is a documented sentinel that the validator reports as UNPUBLISHED and
-  # that must be replaced by the digest the CI publish job prints (Stage 3)
-  # before this entry point may be synced. It is not a real digest.
+  # Deployments reference a digest, never a tag (ADR-0006). The digest below
+  # is the immutable manifest digest of the first image published in Phase 2C
+  # by the manual publish-images.yml run 41266551465 (built from commit
+  # 46b7bc0011df) and verified by digest against GHCR by that run, by the
+  # digest-update-pr.yml run that proposed it (pull request #6, merged
+  # 2026-11-01) and by the ci manifests job. It is only ever replaced by the
+  # pull request that digest-update-pr.yml opens from a `published` record;
+  # the validator rejects a tag, a malformed value and the all-zero
+  # UNPUBLISHED sentinel in strict mode (deploy/kustomize/tests/run.sh
+  # --require-published-image). Merging deploys nothing: synchronisation is a
+  # separately approved manual step (docs/operations/deploy.md).
   - name: ghcr.io/phreddrick/gb-server
     digest: sha256:a2e433228760d9556e1824aad3fc4b09321a50d7dd8e225bf69e489a9432535a
 
