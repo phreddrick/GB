@@ -302,6 +302,8 @@ Verified on disposable copies of the tree (section 19): the cumulative content o
 
 ## 18. Remaining live prerequisites (unchanged by Phase 2C)
 
+> **Sequencing clarification, 2026-11-01 (Phase 2D Checkpoint 2 review, GB2D-01).** The list referenced below is a prerequisite inventory, not an execution order. The authoritative sequence is `docs/operations/bootstrap.md` section 4: namespace `gb-dev`, created out of band and verified `Active` with the restricted Pod Security labels, comes **before** the Argo CD `helm upgrade`.
+
 Everything in `phase2b-handoff.md` section 9 still stands: the `k8s-helpers` pull request (AppProject, Applications, controller RBAC, resource inclusions, managed namespace), the operator-created `gb-dev` Namespace with Pod Security labels and Secret `gb-server-secrets`, the DNS record, the RWOP throwaway test and the NetworkPolicy and port-forward checks of `storage-and-network-validation.md`, the recovery rehearsal of `dev-volume-recovery.md` (both checklists NOT APPROVED FOR EXECUTION), and a published digest merged into `apps/dev/server`. Phase 2C supplies the last item's mechanism; it performs none of them.
 
 ## 19. Independent review remediation (Codex, 2026-10-30): GB2C-01 to GB2C-05

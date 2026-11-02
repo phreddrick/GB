@@ -145,6 +145,8 @@ Not run: any container build (no runtime on the host), any cluster, DNS, certifi
 
 ## 9. Outstanding infrastructure and operational prerequisites (none satisfied by this stage)
 
+> **Sequencing clarification, 2026-11-01 (Phase 2D Checkpoint 2 review, GB2D-01).** Items 2 and 3 below are the 2026-10-30 inventory of prerequisites, not an execution order, and are kept as written. The authoritative Phase 2D deployment sequence is `docs/operations/bootstrap.md` section 4: namespace `gb-dev` must be created out of band and verified `Active` with the restricted Pod Security labels **before** the Argo CD `helm upgrade`, because the proposed values render Roles and RoleBindings inside that namespace. The `k8s-helpers` merge may precede the namespace; the Helm upgrade may not.
+
 1. CI image publication job with job-scoped `packages: write`, Trivy, SBOM, kind job, digest-bump pull request (`gate-change-reviewed`); package visibility set to public by the owner after the first push.
 2. `k8s-helpers` pull request: AppProject `gb`, two Applications, `resource.inclusions`, managed namespaces, controller Role in `gb-dev`, validator and docs; then `helm upgrade` Argo CD and `kubectl apply` of the project and Applications (owner-approved).
 3. Namespace `gb-dev` with PSS labels; Secret `gb-server-secrets`; Pi-hole A record; workstation `GBCTL_TOKEN_FILE`.
