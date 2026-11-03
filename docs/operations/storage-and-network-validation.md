@@ -14,7 +14,7 @@ Why before the first sync: the tests use a disposable namespace, a disposable cl
 | **RWO** (the fallback, weaker) | a second Pod **on the same node** may be able to use the claim; a second node is refused by the attach/detach controller | Experiment 1 would admit the contender; Experiment 2 shows the node-level refusal |
 | **Persistence** | data written by the first writer is present, unchanged, after a legitimate handoff | Experiment 3: the replacement writer verifies the marker and checksum before any write |
 
-Expectation going in: Longhorn supports RWOP since v1.11.0 (installed v1.12.1, CSI provisioner v5.3.0, attacher v4.12.0, Kubernetes 1.36). Status on this cluster: **unvalidated**; no RWOP volume was present in the inventories inspected on 2026-10-30 and 2026-11-01 (an inventory does not show history).
+Expectation going in: Longhorn supports RWOP since v1.11.0 (installed v1.12.1, CSI provisioner v5.3.0, attacher v4.12.0, Kubernetes 1.36). Status on this cluster: **validated 2026-11-03** (P1 to P11 executed under per-step owner approval, optional P7 skipped; Experiment 1 RWOP EXCLUSION, SCHEDULER LEVEL; Checkpoint 0 PASS; Experiment 3 PERSISTENCE OK; cleanup and retirement complete; decision 1.9 RWOP CONFIRMED). Results and evidence index: `docs/testing/phase2-validation.md` sections 2 to 4 and 9. Before that, no RWOP volume had been present in the inventories inspected on 2026-10-30 and 2026-11-01 (an inventory does not show history). The checklist below is kept as the reviewed procedure; it is not re-run for `gb-dev` and remains NOT APPROVED FOR EXECUTION as a runnable sequence.
 
 ### 1.2 Outcome classification (decided before anything runs)
 
