@@ -117,7 +117,7 @@ type Status struct {
 
 // PersistenceNote is repeated in every status so operators are never
 // misled about crash consistency.
-const PersistenceNote = "turns, segments and the shutdown flush commit the whole world, the schedule, the turn's news, stored telegrams and allocated numbers in one bbolt transaction with a commit record (crash-atomic; CR-18 implemented, independent acceptance pending); a failed turn writes nothing and memory is reloaded from the last commit; live notifications are best-effort after the commit; player commands between turns still write per record and are not atomic (CR-11, CR-17, Phase 3a)"
+const PersistenceNote = "turns, segments and the shutdown flush commit the whole world, the schedule, the turn's news, stored telegrams and allocated numbers in one bbolt transaction with a validated commit record (crash-atomic; CR-18 implemented, independent acceptance pending); a turn whose transaction is confirmed not committed wrote nothing and memory is reloaded from the last commit, a confirmed committed turn stands even if notification delivery then fails, and an outcome the engine cannot confirm is reported as uncertain; live notifications are best-effort after the commit; player commands between turns still write per record and are not atomic (CR-11, CR-17, Phase 3a)"
 
 // Sentinel errors shared by the engine, the transport and the admin layer.
 var (
@@ -151,10 +151,13 @@ var (
 	// gbctl status) at the next start.
 	ErrShutdownTimeout = errors.New("shutdown timed out while the actor was busy; a turn may still be running and may still commit; the store will hold either the previous or the completed commit (see commit_seq at the next start)")
 	// ErrHaltedNotFlushed: shutdown completed while HALTED; in-memory state
-	// was discarded, not flushed. The store holds the last complete commit
-	// (a failed turn never writes); in-memory changes made by player
-	// commands since that commit, other than what those commands wrote per
-	// record themselves, are lost (GB1-09).
+	// was discarded, not flushed. The store holds a complete commit: the
+	// one before a turn whose transaction is known not to have committed,
+	// the new one when a turn committed and only its notification delivery
+	// failed, and whichever the halt reason named when the outcome was
+	// uncertain. In-memory changes made by player commands since that
+	// commit, other than what those commands wrote per record themselves,
+	// are lost (GB1-09).
 	ErrHaltedNotFlushed = errors.New("engine was halted: in-memory state was not flushed; the store holds the last complete commit")
 	// ErrShutdownCommitFailed: the shutdown commit failed and the store
 	// still holds the previous commit (nothing of the shutdown flush was

@@ -55,8 +55,38 @@ type ScheduleRecord struct {
 var ErrAlreadyInitialized = errors.New("database already holds an initialised universe")
 
 // ErrCorruptScheduleRecord wraps a schedule record that is present but
-// undecodable or carries negative counters.
+// undecodable, incomplete or carries invalid values. An absent record is
+// not corrupt: GetSchedule returns nil, nil for it.
 var ErrCorruptScheduleRecord = errors.New("corrupt schedule record")
+
+// scheduleRecordFields are the JSON keys a schedule record must carry.
+var scheduleRecordFields = requiredFields{
+	required: []string{"next_update", "next_segment", "num_updates", "num_segments", "update_minutes", "moves_per_update", "saved_at"},
+}
+
+// Validate checks a schedule record's values: non-negative counters, a
+// positive update interval, at least one move per update and non-zero
+// next times.
+func (r *ScheduleRecord) Validate() error {
+	var problems []string
+	add := func(f string, a ...any) { problems = append(problems, fmt.Sprintf(f, a...)) }
+	if r.NumUpdates < 0 || r.NumSegments < 0 {
+		add("negative counters %d/%d", r.NumUpdates, r.NumSegments)
+	}
+	if r.UpdateMinutes <= 0 {
+		add("update_minutes %d is not positive", r.UpdateMinutes)
+	}
+	if r.MovesPerUpdate < 1 {
+		add("moves_per_update %d is below 1", r.MovesPerUpdate)
+	}
+	if r.NextUpdate.IsZero() || r.NextSegment.IsZero() {
+		add("next_update or next_segment is zero")
+	}
+	if len(problems) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%w: %v", ErrCorruptScheduleRecord, problems)
+}
 
 // GetUniverseRecord returns the initialisation record, or nil, nil when the
 // store has none.
@@ -160,17 +190,19 @@ func (s *Store) PutUniverse(sd *model.StarData, stars []*model.Star, planets []*
 }
 
 // GetSchedule returns the persisted schedule, or nil, nil when none exists.
+// A record that is present but JSON null, empty, incomplete, followed by
+// trailing data or invalid is ErrCorruptScheduleRecord.
 func (s *Store) GetSchedule() (*ScheduleRecord, error) {
 	raw, err := s.GetMeta(KeySchedule)
 	if err != nil || raw == nil {
 		return nil, err
 	}
 	var rec ScheduleRecord
-	if err := json.Unmarshal(raw, &rec); err != nil {
+	if err := strictDecode(raw, scheduleRecordFields, &rec); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrCorruptScheduleRecord, err)
 	}
-	if rec.NumUpdates < 0 || rec.NumSegments < 0 {
-		return nil, fmt.Errorf("%w: negative counters %d/%d", ErrCorruptScheduleRecord, rec.NumUpdates, rec.NumSegments)
+	if err := rec.Validate(); err != nil {
+		return nil, err
 	}
 	return &rec, nil
 }

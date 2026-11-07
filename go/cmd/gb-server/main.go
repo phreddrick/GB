@@ -14,8 +14,10 @@
 //	1 configuration or startup error, including a listener that cannot bind
 //	  (nothing was served)
 //	2 shutdown completed while the engine was HALTED: in-memory state was
-//	  discarded, not flushed; the store holds the last complete commit
-//	  (a failed turn never writes, ADR-0009)
+//	  discarded, not flushed; the store holds a complete commit, the one
+//	  named by the halt reason (previous commit after a confirmed aborted
+//	  turn, new commit after a committed turn whose notifications failed,
+//	  or the one commit_seq shows after an uncertain outcome; ADR-0009)
 //	3 shutdown timed out while a turn was running; the turn may still
 //	  commit after the exit: the store will hold either the previous commit
 //	  or the completed one, never a mixture (commit_seq tells which)

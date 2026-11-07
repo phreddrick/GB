@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -26,8 +27,10 @@ import (
 // stored telegrams) and the free-list numbers the turn consumed in ONE
 // bbolt transaction that also writes the commit record below. bbolt's
 // transaction is atomic and fsynced, so the store always holds either the
-// state before the commit or the state after it, never a mixture. A failed
-// or interrupted transaction writes nothing.
+// state before the commit or the state after it, never a mixture. A
+// transaction that did not commit wrote nothing; whether a given commit
+// did commit is established by reading the commit record back (the
+// engine's persistTurn), never assumed from the error path taken.
 //
 // Between a turn's start and its commit the engine refuses every other
 // write to the store (the write fence, SetWriteFence): turn code that
@@ -229,20 +232,82 @@ func (s *Store) GetCommitRecord() (*CommitRecord, error) {
 	return decodeCommitRecord(raw)
 }
 
+// commitRecordFields are the JSON keys a commit record must carry
+// (engine_version is optional).
+var commitRecordFields = requiredFields{
+	required: []string{"schema_version", "commit_seq", "turn", "segment", "kind", "wall_time"},
+	optional: []string{"engine_version"},
+}
+
 func decodeCommitRecord(raw []byte) (*CommitRecord, error) {
-	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-		return nil, fmt.Errorf("%w: record is JSON null", ErrCorruptCommitRecord)
-	}
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
 	var rec CommitRecord
-	if err := dec.Decode(&rec); err != nil {
+	if err := strictDecode(raw, commitRecordFields, &rec); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrCorruptCommitRecord, err)
 	}
 	if err := rec.Validate(); err != nil {
 		return nil, err
 	}
 	return &rec, nil
+}
+
+// requiredFields describes the key set of a strictly decoded record.
+type requiredFields struct {
+	required []string
+	optional []string
+}
+
+// strictDecode decodes one JSON object into v and rejects everything that
+// a lenient json.Unmarshal would accept silently: JSON null, a non-object,
+// a missing required key (a zero value is not a substitute for presence),
+// an unknown key, a key whose value is JSON null, and any non-whitespace
+// data after the document (a second value, a stray bracket, garbage).
+func strictDecode(raw []byte, fields requiredFields, v any) error {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
+		return errors.New("record is empty")
+	}
+	if bytes.Equal(trimmed, []byte("null")) {
+		return errors.New("record is JSON null")
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	var keys map[string]json.RawMessage
+	if err := dec.Decode(&keys); err != nil {
+		return err
+	}
+	if keys == nil {
+		return errors.New("record is not a JSON object")
+	}
+	if tok, err := dec.Token(); !errors.Is(err, io.EOF) {
+		if err != nil {
+			return fmt.Errorf("trailing data after the record: %v", err)
+		}
+		return fmt.Errorf("trailing data after the record: %v", tok)
+	}
+	allowed := make(map[string]bool, len(fields.required)+len(fields.optional))
+	for _, k := range fields.required {
+		allowed[k] = true
+		val, ok := keys[k]
+		if !ok {
+			return fmt.Errorf("missing field %q", k)
+		}
+		if bytes.Equal(bytes.TrimSpace(val), []byte("null")) {
+			return fmt.Errorf("field %q is JSON null", k)
+		}
+	}
+	for _, k := range fields.optional {
+		allowed[k] = true
+	}
+	for k := range keys {
+		if !allowed[k] {
+			return fmt.Errorf("unknown field %q", k)
+		}
+	}
+	dec = json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *WorldCommit) validate() error {
@@ -531,7 +596,7 @@ func (s *Store) WorldDigest() (string, error) {
 			// SavedAt is bookkeeping (rewritten at every restart), not game
 			// state: hash the schedule without it.
 			var sc ScheduleRecord
-			if err := json.Unmarshal(raw, &sc); err == nil {
+			if err := strictDecode(raw, scheduleRecordFields, &sc); err == nil {
 				sc.SavedAt = time.Time{}
 				if canon, err := json.Marshal(&sc); err == nil {
 					write(KeySchedule, canon)

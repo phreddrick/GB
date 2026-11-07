@@ -34,9 +34,12 @@ import (
 //     the commit stands, store and memory are consistent, the engine halts
 //     with a reason that says so.
 //
-// A crash at any point leaves the store at the previous commit by bbolt's
-// guarantees; on restart the schedule says the turn has not happened (the
-// no-catch-up policy applies).
+// A crash at any point leaves the store at a complete commit by bbolt's
+// guarantees: the previous one if the transaction had not committed, the
+// new one if it had. Which one is shown by the durable commit record at the
+// next start; a turn whose commit is absent is simply overdue (the
+// no-catch-up policy applies). Player commands between turns still write
+// per record outside this mechanism (CR-11, CR-17).
 
 // commit kinds (db.CommitKind*), aliased for readability.
 const (
@@ -77,14 +80,58 @@ type turnEffects struct {
 // allocations in one turn stay unique and a failed turn changes nothing in
 // the store. Between turns allocation goes straight to the store, as before.
 type turnAllocator struct {
-	shipLoaded   bool
-	shipFree     []uint32 // remaining free entries, pop order
-	shipPops     []uint32 // consumed this turn, pop order
-	shipMax      uint32
-	commodLoaded bool
-	commodFree   []uint32
-	commodPops   []uint32
-	commodMax    uint32
+	ship   numberAllocator
+	commod numberAllocator
+}
+
+// numberAllocator is the staged state of one number space for one turn.
+// issued is the per-turn reservation set: every number handed out is
+// reserved whether or not the caller has inserted the object yet, so two
+// allocations in one turn can never coincide (a freed highest-numbered
+// object followed by two allocations is the case that needs it).
+type numberAllocator struct {
+	loaded bool
+	free   []uint32 // remaining free entries, pop order (LIFO, as getdeadship in files_shl.c)
+	pops   []uint32 // consumed this turn, pop order; deleted by the commit
+	max    uint32   // highest number known: store, memory and numbers issued this turn
+	issued map[uint32]struct{}
+}
+
+// load primes the allocator from the store's free list and highest number,
+// raised by the highest number already in memory.
+func (a *numberAllocator) load(free []uint32, max, inMemoryMax uint32) {
+	if inMemoryMax > max {
+		max = inMemoryMax
+	}
+	a.free, a.max, a.loaded = free, max, true
+	a.issued = make(map[uint32]struct{})
+}
+
+// next issues one number: the most recently freed entry first, then the
+// next number above everything known or issued. known reports numbers that
+// exist in memory but may not be in the store yet.
+func (a *numberAllocator) next(known func(uint32) bool) uint32 {
+	if len(a.free) > 0 {
+		n := a.free[0]
+		a.free = a.free[1:]
+		a.pops = append(a.pops, n)
+		a.issued[n] = struct{}{}
+		if n > a.max {
+			a.max = n
+		}
+		return n
+	}
+	for {
+		a.max++
+		if _, dup := a.issued[a.max]; dup {
+			continue
+		}
+		if known != nil && known(a.max) {
+			continue
+		}
+		a.issued[a.max] = struct{}{}
+		return a.max
+	}
 }
 
 // beginTurnBody captures the fence baseline, resets the staged allocator,
@@ -158,8 +205,9 @@ func (s *State) allocShipNum() (uint32, error) {
 	if !s.effects.active {
 		return s.store.AllocShipNum()
 	}
-	a := &s.turnAlloc
-	if !a.shipLoaded {
+	a := &s.turnAlloc.ship
+	known := func(n uint32) bool { _, ok := s.ships[n]; return ok }
+	if !a.loaded {
 		free, err := s.store.FreeShipNums()
 		if err != nil {
 			return 0, fmt.Errorf("staged ship allocation: %w", err)
@@ -168,25 +216,15 @@ func (s *State) allocShipNum() (uint32, error) {
 		if err != nil {
 			return 0, fmt.Errorf("staged ship allocation: %w", err)
 		}
+		var memMax uint32
 		for n := range s.ships {
-			if n > max {
-				max = n
+			if n > memMax {
+				memMax = n
 			}
 		}
-		a.shipFree, a.shipMax, a.shipLoaded = free, max, true
+		a.load(free, max, memMax)
 	}
-	if len(a.shipFree) > 0 {
-		n := a.shipFree[0]
-		a.shipFree = a.shipFree[1:]
-		a.shipPops = append(a.shipPops, n)
-		return n, nil
-	}
-	for {
-		a.shipMax++
-		if _, exists := s.ships[a.shipMax]; !exists {
-			return a.shipMax, nil
-		}
-	}
+	return a.next(known), nil
 }
 
 // allocCommodNum is allocShipNum for commodity lots.
@@ -194,8 +232,8 @@ func (s *State) allocCommodNum() (uint32, error) {
 	if !s.effects.active {
 		return s.store.AllocCommodNum()
 	}
-	a := &s.turnAlloc
-	if !a.commodLoaded {
+	a := &s.turnAlloc.commod
+	if !a.loaded {
 		free, err := s.store.FreeCommodNums()
 		if err != nil {
 			return 0, fmt.Errorf("staged commodity allocation: %w", err)
@@ -204,16 +242,9 @@ func (s *State) allocCommodNum() (uint32, error) {
 		if err != nil {
 			return 0, fmt.Errorf("staged commodity allocation: %w", err)
 		}
-		a.commodFree, a.commodMax, a.commodLoaded = free, max, true
+		a.load(free, max, 0)
 	}
-	if len(a.commodFree) > 0 {
-		n := a.commodFree[0]
-		a.commodFree = a.commodFree[1:]
-		a.commodPops = append(a.commodPops, n)
-		return n, nil
-	}
-	a.commodMax++
-	return a.commodMax, nil
+	return a.next(nil), nil
 }
 
 // persistOutcome classifies what persistTurn established.
@@ -262,8 +293,8 @@ func (s *State) persistTurn(kind string) persistResult {
 		Schedule:       s.scheduleRecord(s.sched, now),
 		News:           s.effects.news,
 		Telegrams:      s.effects.telegrams,
-		ShipFreePops:   s.turnAlloc.shipPops,
-		CommodFreePops: s.turnAlloc.commodPops,
+		ShipFreePops:   s.turnAlloc.ship.pops,
+		CommodFreePops: s.turnAlloc.commod.pops,
 		Progress:       s.Progress,
 	}
 	var rec *db.CommitRecord
@@ -297,26 +328,44 @@ func (s *State) persistTurn(kind string) persistResult {
 		failure = fmt.Sprintf("panic: %v", panicVal)
 		label = "panic"
 	}
-	// Classify by the durable record, never by assumption.
+	// Classify by the durable record, never by assumption. The whole
+	// record identity is compared, not only the sequence, so an altered
+	// record with the previous sequence is not mistaken for "unchanged".
 	back, rerr := s.store.GetCommitRecord()
-	var backSeq uint64
-	if back != nil {
-		backSeq = back.CommitSeq
+	uncertain := func(format string, a ...any) persistResult {
+		s.metrics.Commits.Inc(kind, "uncertain")
+		return persistResult{outcome: persistUncertain, rec: back, reason: fmt.Sprintf("commit %s failed (%s) and %s: outcome uncertain", kind, failure, fmt.Sprintf(format, a...))}
 	}
+	expected := &db.CommitRecord{SchemaVersion: db.CommitSchemaVersion, CommitSeq: prevSeq + 1, Turn: c.Schedule.NumUpdates, Segment: c.Schedule.NumSegments,
+		Kind: kind, WallTime: now.UTC(), EngineVersion: c.EngineVersion}
 	switch {
 	case rerr != nil:
-		s.metrics.Commits.Inc(kind, "uncertain")
-		return persistResult{outcome: persistUncertain, reason: fmt.Sprintf("commit %s failed (%s) and the commit record could not be read back (%v): outcome uncertain", kind, failure, rerr)}
-	case backSeq == prevSeq:
+		return uncertain("the commit record could not be read back (%v)", rerr)
+	case back == nil && prev == nil:
+		// Legacy store without a record: the commit would have created
+		// sequence 1; its absence means the transaction did not commit.
+		s.metrics.Commits.Inc(kind, label)
+		return persistResult{outcome: persistNothingWritten, reason: fmt.Sprintf("commit %s failed (%s); the store still holds no commit record, nothing of the turn was written", kind, failure)}
+	case back == nil:
+		return uncertain("the commit record disappeared (was commit_seq %d)", prevSeq)
+	case prev != nil && sameCommitRecord(back, prev):
 		s.metrics.Commits.Inc(kind, label)
 		return persistResult{outcome: persistNothingWritten, reason: fmt.Sprintf("commit %s failed (%s); the store still holds commit_seq %d, nothing of the turn was written", kind, failure, prevSeq)}
-	case backSeq == prevSeq+1 && back.Kind == kind:
+	case sameCommitRecord(back, expected):
 		s.metrics.Commits.Inc(kind, "uncertain")
-		return persistResult{outcome: persistUncertain, rec: back, reason: fmt.Sprintf("commit %s reported a %s after its record (commit_seq %d) became visible; durability on disk is uncertain", kind, failure, backSeq)}
+		return persistResult{outcome: persistUncertain, rec: back, reason: fmt.Sprintf("commit %s reported a %s after its record (commit_seq %d) became visible; durability on disk is uncertain", kind, failure, back.CommitSeq)}
 	default:
-		s.metrics.Commits.Inc(kind, "uncertain")
-		return persistResult{outcome: persistUncertain, rec: back, reason: fmt.Sprintf("commit %s failed (%s) and the commit record changed unexpectedly (%d -> %d, kind %q): outcome uncertain", kind, failure, prevSeq, backSeq, back.Kind)}
+		return uncertain("the commit record changed unexpectedly (commit_seq %d -> %d, kind %q, turn %d/%d)", prevSeq, back.CommitSeq, back.Kind, back.Turn, back.Segment)
 	}
+}
+
+// sameCommitRecord compares the complete identity of two records.
+func sameCommitRecord(a, b *db.CommitRecord) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.SchemaVersion == b.SchemaVersion && a.CommitSeq == b.CommitSeq && a.Turn == b.Turn && a.Segment == b.Segment &&
+		a.Kind == b.Kind && a.WallTime.Equal(b.WallTime) && a.EngineVersion == b.EngineVersion
 }
 
 // setCommitSeq records the last committed sequence for status and metrics.
@@ -346,7 +395,13 @@ func (s *State) reloadFromStore(reason string) error {
 		s.sched = schedule{nextUpdate: rec.NextUpdate, nextSegment: rec.NextSegment, numUpdates: rec.NumUpdates, numSegments: rec.NumSegments}
 	}
 	s.publishSchedule()
-	if cr, err := s.store.GetCommitRecord(); err == nil && cr != nil {
+	cr, err := s.store.GetCommitRecord()
+	if err != nil {
+		// A reload that cannot establish which commit it loaded is not a
+		// successful reload: the caller reports memory as untrusted.
+		return fmt.Errorf("reload commit record: %w", err)
+	}
+	if cr != nil {
 		s.setCommitSeq(cr.CommitSeq)
 	}
 	s.logger.Info("in-memory state reloaded from the store", slog.String("op", "reload"), slog.String("reason", reason),

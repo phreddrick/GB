@@ -65,11 +65,11 @@ func TestStartupRejectsMalformedCommitMetadata(t *testing.T) {
 		expect string // substring of the halt reason
 	}{
 		{"json null", func(t *testing.T, s *db.Store) { validSchedule(t, s); _ = s.PutMeta(db.KeyCommit, []byte("null")) }, "JSON null"},
-		{"empty object", func(t *testing.T, s *db.Store) { validSchedule(t, s); _ = s.PutMeta(db.KeyCommit, []byte("{}")) }, "schema_version 0"},
+		{"empty object", func(t *testing.T, s *db.Store) { validSchedule(t, s); _ = s.PutMeta(db.KeyCommit, []byte("{}")) }, `missing field "schema_version"`},
 		{"missing fields", func(t *testing.T, s *db.Store) {
 			validSchedule(t, s)
 			_ = s.PutMeta(db.KeyCommit, []byte(`{"schema_version":1}`))
-		}, "commit_seq is 0"},
+		}, `missing field "commit_seq"`},
 		{"unknown field", func(t *testing.T, s *db.Store) {
 			validSchedule(t, s)
 			_ = s.PutMeta(db.KeyCommit, commit(`,"bogus":1`))
@@ -110,7 +110,7 @@ func TestStartupRejectsMalformedCommitMetadata(t *testing.T) {
 		{"missing wall time", func(t *testing.T, s *db.Store) {
 			validSchedule(t, s)
 			_ = s.PutMeta(db.KeyCommit, []byte(`{"schema_version":1,"commit_seq":3,"turn":0,"segment":0,"kind":"update"}`))
-		}, "wall_time is missing"},
+		}, `missing field "wall_time"`},
 		{"update record without schedule", func(t *testing.T, s *db.Store) {
 			_ = s.PutMeta(db.KeyCommit, commit(""))
 			_ = s.DeleteMeta(db.KeySchedule)
@@ -608,3 +608,447 @@ func TestBetweenTurnAllocationUnchanged(t *testing.T) {
 }
 
 var _ = net.SessionInfo{}
+
+// ---- Second independent review (R01, R02, R04 corrections) ----
+
+// TestStartupRejectsMetadataReproducedByReview (CR18-R01, second review):
+// the four independently reproduced states plus the schedule variants.
+func TestStartupRejectsMetadataReproducedByReview(t *testing.T) {
+	sched := func(t *testing.T, store *db.Store) {
+		t.Helper()
+		if err := store.PutSchedule(&db.ScheduleRecord{NextUpdate: time.Now().Add(time.Hour), NextSegment: time.Now().Add(time.Hour), UpdateMinutes: 60, MovesPerUpdate: 3, SavedAt: time.Now()}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	validCommit := `{"schema_version":1,"commit_seq":1,"turn":0,"segment":0,"kind":"init","wall_time":"2026-01-01T00:00:00Z"}`
+	validSchedule := `{"next_update":"2026-01-01T01:00:00Z","next_segment":"2026-01-01T00:20:00Z","num_updates":0,"num_segments":0,"update_minutes":60,"moves_per_update":3,"saved_at":"2026-01-01T00:00:00Z"}`
+	cases := []struct {
+		name   string
+		setup  func(t *testing.T, store *db.Store)
+		expect string
+	}{
+		{"commit missing turn and segment", func(t *testing.T, s *db.Store) {
+			sched(t, s)
+			_ = s.PutMeta(db.KeyCommit, []byte(`{"schema_version":1,"commit_seq":1,"kind":"init","wall_time":"2026-01-01T00:00:00Z"}`))
+		}, `missing field "turn"`},
+		{"commit missing segment only", func(t *testing.T, s *db.Store) {
+			sched(t, s)
+			_ = s.PutMeta(db.KeyCommit, []byte(`{"schema_version":1,"commit_seq":1,"turn":0,"kind":"init","wall_time":"2026-01-01T00:00:00Z"}`))
+		}, `missing field "segment"`},
+		{"commit followed by bracket", func(t *testing.T, s *db.Store) { sched(t, s); _ = s.PutMeta(db.KeyCommit, []byte(validCommit+"]")) }, "trailing data"},
+		{"commit followed by second object", func(t *testing.T, s *db.Store) {
+			sched(t, s)
+			_ = s.PutMeta(db.KeyCommit, []byte(validCommit+" {}"))
+		}, "trailing data"},
+		{"commit field null", func(t *testing.T, s *db.Store) {
+			sched(t, s)
+			_ = s.PutMeta(db.KeyCommit, []byte(`{"schema_version":1,"commit_seq":1,"turn":null,"segment":0,"kind":"init","wall_time":"2026-01-01T00:00:00Z"}`))
+		}, `field "turn" is JSON null`},
+		{"commit is an array", func(t *testing.T, s *db.Store) { sched(t, s); _ = s.PutMeta(db.KeyCommit, []byte("[]")) }, "corrupt commit record"},
+		{"schedule null", func(t *testing.T, s *db.Store) { _ = s.PutMeta(db.KeySchedule, []byte("null")) }, "corrupt schedule record: record is JSON null"},
+		{"schedule empty object", func(t *testing.T, s *db.Store) { _ = s.PutMeta(db.KeySchedule, []byte("{}")) }, `corrupt schedule record: missing field "next_update"`},
+		{"schedule missing counters", func(t *testing.T, s *db.Store) {
+			_ = s.PutMeta(db.KeySchedule, []byte(`{"next_update":"2026-01-01T01:00:00Z","next_segment":"2026-01-01T00:20:00Z","update_minutes":60,"moves_per_update":3,"saved_at":"2026-01-01T00:00:00Z"}`))
+		}, `missing field "num_updates"`},
+		{"schedule trailing data", func(t *testing.T, s *db.Store) { _ = s.PutMeta(db.KeySchedule, []byte(validSchedule+"]")) }, "trailing data"},
+		{"schedule unknown field", func(t *testing.T, s *db.Store) {
+			_ = s.PutMeta(db.KeySchedule, []byte(validSchedule[:len(validSchedule)-1]+`,"paused":true}`))
+		}, `unknown field "paused"`},
+		{"schedule zero update interval", func(t *testing.T, s *db.Store) {
+			_ = s.PutSchedule(&db.ScheduleRecord{NextUpdate: time.Now().Add(time.Hour), NextSegment: time.Now().Add(time.Hour), UpdateMinutes: 0, MovesPerUpdate: 3, SavedAt: time.Now()})
+		}, "update_minutes 0 is not positive"},
+		{"schedule zero next times", func(t *testing.T, s *db.Store) {
+			_ = s.PutSchedule(&db.ScheduleRecord{UpdateMinutes: 60, MovesPerUpdate: 3, SavedAt: time.Now()})
+		}, "next_update or next_segment is zero"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store, dbPath := initStore(t)
+			cfg := testConfig(t, dbPath)
+			tc.setup(t, store)
+			before := digest(t, store)
+			rawCommit := rawMeta(t, store, db.KeyCommit)
+			rawSched := rawMeta(t, store, db.KeySchedule)
+			s, err := New(cfg, store, Options{Registry: metrics.NewRegistry()})
+			if err != nil {
+				t.Fatalf("New must start alive and halted, got error: %v", err)
+			}
+			if s.Mode() != ModeHalted {
+				t.Fatalf("mode %s, want HALTED (SERVING would accept corrupt metadata)", s.Mode())
+			}
+			reason, _ := s.HaltDetails()
+			if !strings.HasPrefix(reason, "CORRUPT_STORE") || !strings.Contains(reason, tc.expect) {
+				t.Fatalf("halt reason %q (want CORRUPT_STORE and %q)", reason, tc.expect)
+			}
+			if err := s.TriggerUpdate(ctxT(t, 5*time.Second)); !errors.Is(err, ErrNotServing) {
+				t.Fatalf("turn on a corrupt store: %v", err)
+			}
+			if err := s.Stop(ctxT(t, 10*time.Second)); !errors.Is(err, ErrHaltedNotFlushed) {
+				t.Fatalf("Stop: %v", err)
+			}
+			if d := digest(t, store); d != before {
+				t.Fatal("startup on a corrupt store wrote to it")
+			}
+			if string(rawMeta(t, store, db.KeyCommit)) != string(rawCommit) || string(rawMeta(t, store, db.KeySchedule)) != string(rawSched) {
+				t.Fatal("startup replaced the commit or schedule record of a corrupt store")
+			}
+		})
+	}
+}
+
+// TestValidMetadataStillStarts: representative valid records (including a
+// record written by this binary and the legacy cases) start SERVING.
+func TestValidMetadataStillStarts(t *testing.T) {
+	store, dbPath := initStore(t)
+	cfg := testConfig(t, dbPath)
+	s, err := New(cfg, store, Options{Registry: metrics.NewRegistry()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.TriggerUpdate(ctxT(t, 60*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Stop(ctxT(t, 10*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	s2, err := New(cfg, store, Options{Registry: metrics.NewRegistry()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s2.Stop(ctxT(t, 10*time.Second)) }()
+	if s2.Mode() != ModeServing || s2.Status().NumUpdates != 1 || s2.Status().LastCommitSeq != 3 {
+		t.Fatalf("valid store refused or misread: mode %s status %+v", s2.Mode(), s2.Status())
+	}
+}
+
+// TestCommitRecordDisappearedIsUncertainWithoutPanic (CR18-R02, second
+// review): the record is removed after the transaction committed and the
+// store then panics; classification must not dereference a nil record and
+// must report uncertainty, deliver nothing and halt.
+func TestCommitRecordDisappearedIsUncertainWithoutPanic(t *testing.T) {
+	s, store, _ := newTestEngine(t, true)
+	reg := &fakeRegistry{}
+	s.SetRegistry(reg)
+	s.testHooks = &testHooks{afterCommit: func(string) {
+		if err := store.DeleteMeta(db.KeyCommit); err != nil {
+			t.Errorf("delete record: %v", err)
+		}
+		panic("injected panic after the record was removed")
+	}}
+	err := s.TriggerUpdate(ctxT(t, 60*time.Second))
+	if !errors.Is(err, ErrHalted) || s.Mode() != ModeHalted {
+		t.Fatalf("err=%v mode=%s", err, s.Mode())
+	}
+	reason, _ := s.HaltDetails()
+	if !strings.Contains(reason, "disappeared") || !strings.Contains(reason, "uncertain") || strings.Contains(reason, "nothing of the turn was written") || strings.Contains(reason, "orchestration") {
+		t.Fatalf("halt reason %q", reason)
+	}
+	if strings.Contains(reg.all(), "Finished with update") || strings.Contains(reg.all(), "rolled back") {
+		t.Fatalf("notifications delivered for an unconfirmed turn: %q", reg.all())
+	}
+	if s.Metrics().Commits.Value("update", "uncertain") != 1 || s.Metrics().TurnsTotal.Value("update", "commit_uncertain") != 1 {
+		t.Fatal("metrics")
+	}
+	if s.Metrics().TurnsTotal.Value("update", "ok") != 0 {
+		t.Fatal("turn reported ok")
+	}
+	if err := s.TriggerUpdate(ctxT(t, 5*time.Second)); !errors.Is(err, ErrNotServing) {
+		t.Fatalf("gameplay resumed after an uncertain outcome: %v", err)
+	}
+}
+
+// TestCommitRecordMalformedAfterCommitIsUncertainAndUntrusted: an
+// unreadable record after the failure is uncertain, and because the reload
+// cannot establish the commit either, memory is reported untrusted.
+func TestCommitRecordMalformedAfterCommitIsUncertainAndUntrusted(t *testing.T) {
+	s, store, _ := newTestEngine(t, true)
+	reg := &fakeRegistry{}
+	s.SetRegistry(reg)
+	s.testHooks = &testHooks{afterCommit: func(string) {
+		_ = store.PutMeta(db.KeyCommit, []byte("{garbage"))
+		panic("injected panic after the record was corrupted")
+	}}
+	if err := s.TriggerUpdate(ctxT(t, 60*time.Second)); !errors.Is(err, ErrHalted) {
+		t.Fatalf("err=%v", err)
+	}
+	reason, _ := s.HaltDetails()
+	if !strings.Contains(reason, "could not be read back") || !strings.Contains(reason, "uncertain") || !strings.Contains(reason, "untrusted") || strings.Contains(reason, "nothing of the turn was written") {
+		t.Fatalf("halt reason %q", reason)
+	}
+	if strings.Contains(reg.all(), "Finished with update") {
+		t.Fatalf("notifications delivered: %q", reg.all())
+	}
+	if err := s.Stop(ctxT(t, 10*time.Second)); !errors.Is(err, ErrHaltedNotFlushed) {
+		t.Fatalf("Stop: %v", err)
+	}
+}
+
+// TestCommitRecordAlteredWithSameSequenceIsNotUnchanged: a record rewritten
+// with the previous sequence but different content must not be classified
+// as "nothing written".
+func TestCommitRecordAlteredWithSameSequenceIsNotUnchanged(t *testing.T) {
+	s, store, _ := newTestEngine(t, true)
+	s.testHooks = &testHooks{afterCommit: func(string) {
+		// Same sequence as before the turn (1) but a different identity.
+		_ = store.PutMeta(db.KeyCommit, []byte(`{"schema_version":1,"commit_seq":1,"turn":0,"segment":0,"kind":"shutdown","wall_time":"2026-02-02T00:00:00Z"}`))
+		panic("injected panic after the record was altered")
+	}}
+	if err := s.TriggerUpdate(ctxT(t, 60*time.Second)); !errors.Is(err, ErrHalted) {
+		t.Fatalf("err=%v", err)
+	}
+	reason, _ := s.HaltDetails()
+	if !strings.Contains(reason, "changed unexpectedly") || strings.Contains(reason, "nothing of the turn was written") {
+		t.Fatalf("halt reason %q", reason)
+	}
+	if s.Metrics().Commits.Value("update", "uncertain") != 1 {
+		t.Fatal("metrics")
+	}
+}
+
+// TestReloadFailureAfterTurnFailureCannotResume: when the reload after a
+// failed turn cannot establish the store's state, memory is untrusted,
+// nothing is delivered and gameplay does not resume.
+func TestReloadFailureAfterTurnFailureCannotResume(t *testing.T) {
+	s, store, _ := newTestEngine(t, true)
+	reg := &fakeRegistry{}
+	s.SetRegistry(reg)
+	s.testHooks = &testHooks{midTurn: func(bool) {
+		s.store.SetWriteFence(false) // test-only: corrupt the schedule record under the turn
+		_ = store.PutMeta(db.KeySchedule, []byte("{broken"))
+		s.store.SetWriteFence(true)
+		s.notifyRace(1, "must not be delivered")
+		panic("injected failure before commit")
+	}}
+	if err := s.TriggerUpdate(ctxT(t, 60*time.Second)); !errors.Is(err, ErrHalted) {
+		t.Fatalf("err=%v", err)
+	}
+	reason, _ := s.HaltDetails()
+	if !strings.Contains(reason, "untrusted") || !strings.Contains(reason, "corrupt schedule record") {
+		t.Fatalf("halt reason %q", reason)
+	}
+	if strings.Contains(reg.all(), "must not be delivered") {
+		t.Fatalf("buffered notice delivered after a failed turn: %q", reg.all())
+	}
+	if err := s.TriggerUpdate(ctxT(t, 5*time.Second)); !errors.Is(err, ErrNotServing) {
+		t.Fatalf("gameplay resumed with untrusted memory: %v", err)
+	}
+	if err := s.Resume(ctxT(t, 5*time.Second)); !errors.Is(err, ErrHalted) {
+		t.Fatalf("resume with untrusted memory: %v", err)
+	}
+	if err := s.Stop(ctxT(t, 10*time.Second)); !errors.Is(err, ErrHaltedNotFlushed) {
+		t.Fatalf("Stop: %v", err)
+	}
+}
+
+// allocScenario drives the staged allocators through the review's
+// scenarios for one number space.
+type allocScenario struct {
+	name     string
+	existing []uint32 // objects persisted before the turn
+	freed    []uint32 // objects deleted before the turn, in deletion order (free list is LIFO)
+	count    int      // allocations in the turn, none inserted
+	want     []uint32 // expected numbers in order
+}
+
+var allocScenarios = []allocScenario{
+	{"highest freed, two allocations before insertion", []uint32{1, 2}, []uint32{2}, 2, []uint32{2, 3}},
+	{"multiple free entries consumed LIFO", []uint32{1, 2, 3, 4, 5}, []uint32{3, 5}, 3, []uint32{5, 3, 6}},
+	{"free list exhausted then above the maximum", []uint32{1, 2, 3}, []uint32{2}, 4, []uint32{2, 4, 5, 6}},
+	{"no free list", []uint32{1, 2, 3}, nil, 3, []uint32{4, 5, 6}},
+	{"freed highest two then more", []uint32{1, 2, 3, 4}, []uint32{3, 4}, 4, []uint32{4, 3, 5, 6}},
+}
+
+func seedShips(t *testing.T, store *db.Store, sc allocScenario) {
+	t.Helper()
+	for _, n := range sc.existing {
+		if err := store.PutShip(&model.Ship{Number: n, Owner: 1, Race: 1, Type: model.StypeShuttle, Alive: true, WhatOrbits: model.LevelPlan}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, n := range sc.freed {
+		if err := store.DeleteShip(n); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func seedCommods(t *testing.T, store *db.Store, sc allocScenario) {
+	t.Helper()
+	for _, n := range sc.existing {
+		if err := store.PutCommod(&model.Commodity{Number: n, Owner: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, n := range sc.freed {
+		if err := store.DeleteCommod(n); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func uniqueAll(ns []uint32) bool {
+	seen := map[uint32]bool{}
+	for _, n := range ns {
+		if seen[n] {
+			return false
+		}
+		seen[n] = true
+	}
+	return true
+}
+
+// TestStagedAllocationUniqueWithoutInsertion (CR18-R04, second review):
+// both allocators issue distinct numbers in LIFO free-list order even when
+// nothing is inserted between allocations; a failed turn leaves the free
+// list intact; a committed turn consumes exactly the popped entries and a
+// restart continues above everything issued.
+func TestStagedAllocationUniqueWithoutInsertion(t *testing.T) {
+	for _, space := range []string{"ship", "commodity"} {
+		for _, sc := range allocScenarios {
+			for _, outcome := range []string{"panic", "commit"} {
+				t.Run(space+"/"+sc.name+"/"+outcome, func(t *testing.T) {
+					s, store, cfg := newTestEngine(t, true)
+					if space == "ship" {
+						seedShips(t, store, sc)
+					} else {
+						seedCommods(t, store, sc)
+					}
+					freeBefore := freeList(t, store, space)
+					before := digest(t, store)
+					var got []uint32
+					s.testHooks = &testHooks{midTurn: func(bool) {
+						for i := 0; i < sc.count; i++ {
+							var n uint32
+							var err error
+							if space == "ship" {
+								n, err = s.allocShipNum()
+							} else {
+								n, err = s.allocCommodNum()
+							}
+							if err != nil {
+								t.Errorf("allocation %d: %v", i, err)
+							}
+							got = append(got, n) // deliberately NOT inserted
+						}
+						if outcome == "panic" {
+							panic("injected failure after allocations")
+						}
+					}}
+					err := s.TriggerUpdate(ctxT(t, 60*time.Second))
+					if fmt.Sprint(got) != fmt.Sprint(sc.want) || !uniqueAll(got) {
+						t.Fatalf("allocations %v, want %v (unique, LIFO reuse first)", got, sc.want)
+					}
+					if outcome == "panic" {
+						if !errors.Is(err, ErrHalted) {
+							t.Fatalf("turn: %v", err)
+						}
+						if d := digest(t, store); d != before {
+							t.Fatal("failed turn changed the store")
+						}
+						if fl := freeList(t, store, space); fmt.Sprint(fl) != fmt.Sprint(freeBefore) {
+							t.Fatalf("free list changed by a failed turn: %v -> %v", freeBefore, fl)
+						}
+						return
+					}
+					if err != nil {
+						t.Fatalf("turn: %v", err)
+					}
+					// The commit consumed exactly the popped entries (the first
+					// min(count, len(freed)) allocations) and nothing else.
+					popped := len(sc.freed)
+					if sc.count < popped {
+						popped = sc.count
+					}
+					if fl := freeList(t, store, space); len(fl) != len(freeBefore)-popped {
+						t.Fatalf("free list after commit %v (before %v, popped %d)", fl, freeBefore, popped)
+					}
+					// After a restart the store allocator continues above
+					// every number the store knows; numbers issued but never
+					// inserted were not persisted, so they may be reissued,
+					// but never a duplicate of a persisted object.
+					s2, store2 := reopen(t, s, store, cfg.DBPath)
+					n, err := storeAlloc(store2, space)
+					if err != nil {
+						t.Fatal(err)
+					}
+					for _, e := range sc.existing {
+						if n == e && !contains(sc.freed, e) {
+							t.Fatalf("restart allocation %d duplicates a persisted object", n)
+						}
+					}
+					if err := s2.TriggerSegment(ctxT(t, 60*time.Second)); err != nil {
+						t.Fatal(err)
+					}
+				})
+			}
+		}
+	}
+}
+
+func freeList(t *testing.T, store *db.Store, space string) []uint32 {
+	t.Helper()
+	var fl []uint32
+	var err error
+	if space == "ship" {
+		fl, err = store.FreeShipNums()
+	} else {
+		fl, err = store.FreeCommodNums()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fl
+}
+
+func storeAlloc(store *db.Store, space string) (uint32, error) {
+	if space == "ship" {
+		return store.AllocShipNum()
+	}
+	return store.AllocCommodNum()
+}
+
+func contains(ns []uint32, n uint32) bool {
+	for _, x := range ns {
+		if x == n {
+			return true
+		}
+	}
+	return false
+}
+
+// TestStagedAllocationWithInsertionAndCommitPersistsAll: numbers issued and
+// inserted in one turn (free-list reuse plus fresh numbers) all persist,
+// the free list is consumed, and the restarted store allocates above them.
+func TestStagedAllocationWithInsertionAndCommitPersistsAll(t *testing.T) {
+	s, store, cfg := newTestEngine(t, true)
+	seedShips(t, store, allocScenario{existing: []uint32{1, 2, 3, 4}, freed: []uint32{2, 4}})
+	var got []uint32
+	s.testHooks = &testHooks{midTurn: func(bool) {
+		for i := 0; i < 4; i++ {
+			n, err := s.allocShipNum()
+			if err != nil {
+				t.Errorf("alloc: %v", err)
+			}
+			got = append(got, n)
+			s.newShipForTest(n)
+		}
+	}}
+	if err := s.TriggerUpdate(ctxT(t, 60*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(got) != "[4 2 5 6]" {
+		t.Fatalf("allocations %v, want [4 2 5 6]", got)
+	}
+	for _, n := range got {
+		if sh, _ := store.GetShip(n); sh == nil {
+			t.Fatalf("ship %d not committed", n)
+		}
+	}
+	if fl, _ := store.FreeShipNums(); len(fl) != 0 {
+		t.Fatalf("free list after commit %v", fl)
+	}
+	_, store2 := reopen(t, s, store, cfg.DBPath)
+	if n, _ := store2.AllocShipNum(); n != 7 {
+		t.Fatalf("restart allocation %d, want 7", n)
+	}
+}

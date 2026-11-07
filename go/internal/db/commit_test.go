@@ -378,3 +378,65 @@ func TestCommitWorldPopsExactlyTheStagedFreeNumbers(t *testing.T) {
 		t.Fatalf("store allocator after commit gave %d, want 7", n)
 	}
 }
+
+// TestStrictDecodeOfMetaRecords (CR18-R01, second review): presence of
+// every required field, no null fields, no unknown fields, complete input
+// consumption, and the schedule record's value validation.
+func TestStrictDecodeOfMetaRecords(t *testing.T) {
+	s, _, _ := fixtureStore(t)
+	validSchedule := `{"next_update":"2026-01-01T01:00:00Z","next_segment":"2026-01-01T00:20:00Z","num_updates":0,"num_segments":0,"update_minutes":60,"moves_per_update":3,"saved_at":"2026-01-01T00:00:00Z"}`
+	if err := s.PutMeta(KeySchedule, []byte(validSchedule)); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := s.GetSchedule(); err != nil || rec == nil || rec.UpdateMinutes != 60 {
+		t.Fatalf("valid schedule: %+v %v", rec, err)
+	}
+	if err := s.DeleteMeta(KeySchedule); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := s.GetSchedule(); rec != nil || err != nil {
+		t.Fatalf("absent schedule must be nil, nil: %+v %v", rec, err)
+	}
+	bad := map[string]string{
+		"null":            "null",
+		"empty":           "{}",
+		"array":           "[]",
+		"missing counter": `{"next_update":"2026-01-01T01:00:00Z","next_segment":"2026-01-01T00:20:00Z","num_updates":0,"update_minutes":60,"moves_per_update":3,"saved_at":"2026-01-01T00:00:00Z"}`,
+		"null field":      `{"next_update":null,"next_segment":"2026-01-01T00:20:00Z","num_updates":0,"num_segments":0,"update_minutes":60,"moves_per_update":3,"saved_at":"2026-01-01T00:00:00Z"}`,
+		"trailing":        validSchedule + "]",
+		"second value":    validSchedule + " 1",
+		"unknown field":   validSchedule[:len(validSchedule)-1] + `,"x":1}`,
+		"zero interval":   `{"next_update":"2026-01-01T01:00:00Z","next_segment":"2026-01-01T00:20:00Z","num_updates":0,"num_segments":0,"update_minutes":0,"moves_per_update":3,"saved_at":"2026-01-01T00:00:00Z"}`,
+		"negative":        `{"next_update":"2026-01-01T01:00:00Z","next_segment":"2026-01-01T00:20:00Z","num_updates":-1,"num_segments":0,"update_minutes":60,"moves_per_update":3,"saved_at":"2026-01-01T00:00:00Z"}`,
+		"whitespace only": "   ",
+	}
+	for name, raw := range bad {
+		if err := s.PutMeta(KeySchedule, []byte(raw)); err != nil {
+			t.Fatal(err)
+		}
+		if rec, err := s.GetSchedule(); !errors.Is(err, ErrCorruptScheduleRecord) || rec != nil {
+			t.Errorf("schedule %s: rec=%+v err=%v", name, rec, err)
+		}
+	}
+	validCommit := `{"schema_version":1,"commit_seq":1,"turn":0,"segment":0,"kind":"init","wall_time":"2026-01-01T00:00:00Z"}`
+	for name, raw := range map[string]string{
+		"missing turn and segment": `{"schema_version":1,"commit_seq":1,"kind":"init","wall_time":"2026-01-01T00:00:00Z"}`,
+		"trailing bracket":         validCommit + "]",
+		"null field":               `{"schema_version":1,"commit_seq":1,"turn":0,"segment":null,"kind":"init","wall_time":"2026-01-01T00:00:00Z"}`,
+		"array":                    "[1]",
+	} {
+		if err := s.PutMeta(KeyCommit, []byte(raw)); err != nil {
+			t.Fatal(err)
+		}
+		if rec, err := s.GetCommitRecord(); !errors.Is(err, ErrCorruptCommitRecord) || rec != nil {
+			t.Errorf("commit %s: rec=%+v err=%v", name, rec, err)
+		}
+	}
+	// Whitespace around a valid document is fine; engine_version is optional.
+	if err := s.PutMeta(KeyCommit, []byte("  "+validCommit+"\n")); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := s.GetCommitRecord(); err != nil || rec == nil || rec.Kind != "init" {
+		t.Fatalf("valid commit with whitespace: %+v %v", rec, err)
+	}
+}
