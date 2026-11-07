@@ -465,7 +465,7 @@ func TestAcceptanceScenario(t *testing.T) {
 	if code := <-exitCh; code != 0 {
 		t.Fatalf("shutdown with client exit %d\n%s", code, s.logs.String())
 	}
-	if !s.hasLog("shutdown: flushed") {
+	if !s.hasLog("shutdown: committed") {
 		t.Fatalf("flush not logged\n%s", s.logs.String())
 	}
 

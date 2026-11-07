@@ -31,10 +31,12 @@ const (
 	// mutating player commands and scheduled turns are refused; status works;
 	// Resume returns to ModeServing.
 	ModeQuiesced
-	// ModeHalted: a panic may have left in-memory state inconsistent. All
-	// mutating operations are refused, nothing is flushed, and only a process
-	// restart (which reloads from the store) leaves this mode. Phase 3a
-	// replaces this with reload-on-failure.
+	// ModeHalted: a panic, a failed commit or a failed startup validation
+	// stopped mutating work. All mutating operations are refused, nothing
+	// is flushed, and only a process restart leaves this mode. After a
+	// failed turn the in-memory world has been reloaded from the last commit
+	// (the halt reason says so); after a command panic it may hold the
+	// handler's partial effects, which are never flushed.
 	ModeHalted
 	// ModeStopped: the actor has exited after an orderly shutdown.
 	ModeStopped
@@ -109,12 +111,13 @@ type Status struct {
 	TurnRunning    bool               `json:"turn_running"`
 	TurnStarted    *time.Time         `json:"turn_started,omitempty"`
 	QueueDepth     int                `json:"queue_depth"`
+	LastCommitSeq  uint64             `json:"commit_seq,omitempty"`
 	Persistence    string             `json:"persistence"`
 }
 
 // PersistenceNote is repeated in every status so operators are never
 // misled about crash consistency.
-const PersistenceNote = "per-record flush (not crash-atomic; CR-18, Phase 3a): orderly shutdown preserves state, a kill during a flush may not"
+const PersistenceNote = "turns, segments and the shutdown flush commit the whole world, the schedule and their effects in one bbolt transaction with a commit record (crash-atomic, CR-18 closed); a failed turn is rolled back by reloading the last commit; player commands between turns still write per record (CR-17, Phase 3a)"
 
 // Sentinel errors shared by the engine, the transport and the admin layer.
 var (
@@ -141,14 +144,15 @@ var (
 	// ErrEngineStopped: the actor has shut down.
 	ErrEngineStopped = errors.New("engine stopped")
 	// ErrShutdownTimeout: the actor did not finish within the shutdown
-	// budget (a turn was still running). The store may hold a partially
-	// flushed turn (CR-18).
-	ErrShutdownTimeout = errors.New("shutdown timed out while the actor was busy; the store may hold a partially flushed turn (CR-18)")
+	// budget (a turn was still running). The turn's commit is atomic, so
+	// the store holds either the previous or the completed commit; the
+	// in-memory changes of the interrupted turn are simply not persisted.
+	ErrShutdownTimeout = errors.New("shutdown timed out while the actor was busy; the store holds the last complete commit, the running turn was not persisted")
 	// ErrHaltedNotFlushed: shutdown completed while HALTED; in-memory state
-	// was discarded, not flushed. The store is NOT guaranteed to hold a
-	// complete turn: a panic or failed write during a turn can leave it
-	// partially applied (CR-18, Phase 3a) (GB1-09).
-	ErrHaltedNotFlushed = errors.New("engine was halted: in-memory state was not flushed; the store may already contain partially applied turn changes (CR-18)")
+	// was discarded, not flushed. The store holds the last complete commit
+	// (a failed turn never writes); in-memory changes made by player
+	// commands since that commit are lost (GB1-09).
+	ErrHaltedNotFlushed = errors.New("engine was halted: in-memory state was not flushed; the store holds the last complete commit")
 	// ErrEnrollmentDisabled is returned when the enrollment preview is off
 	// (the default: web enrollment produces unplaced, unplayable races until
 	// Phase 3c, CR-07; Decision 9).

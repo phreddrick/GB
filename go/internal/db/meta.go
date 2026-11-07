@@ -96,12 +96,14 @@ func (s *Store) IsInitialized() (bool, error) {
 
 // PutUniverse writes a freshly generated universe and its record in ONE
 // bbolt transaction, so a crash during initialisation leaves either no
-// universe or a complete one (the transaction is atomic; this is the only
-// multi-record write in Phase 1 with that property, and it does not extend to
-// turn flushes, CR-18). It refuses, inside the same transaction, when the
+// universe or a complete one (turn commits have the same property since
+// CR-18 was closed, see commit.go). It refuses, inside the same transaction, when the
 // store already holds a universe, so two concurrent initialisations cannot
 // both succeed.
 func (s *Store) PutUniverse(sd *model.StarData, stars []*model.Star, planets []*model.Planet, rec *UniverseRecord) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		meta := tx.Bucket(BucketMeta)
 		if meta.Get(KeyUniverse) != nil || tx.Bucket(BucketStars).Stats().KeyN > 0 {
@@ -144,7 +146,12 @@ func (s *Store) PutUniverse(sd *model.StarData, stars []*model.Star, planets []*
 		if err != nil {
 			return err
 		}
-		return meta.Put(KeyUniverse, data)
+		if err := meta.Put(KeyUniverse, data); err != nil {
+			return err
+		}
+		// The initialisation is the first commit (CR-18): sequence 1,
+		// counters 0/0, written atomically with the universe.
+		return putInitCommitRecord(meta, rec.InitializedAt)
 	})
 }
 

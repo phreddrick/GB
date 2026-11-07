@@ -17,6 +17,7 @@ import (
 // read-transaction model (multiple readers, one writer at a time).
 type Store struct {
 	db *bolt.DB
+	fenceState
 }
 
 // Open opens (or creates) the bbolt database at the given path.
@@ -75,6 +76,9 @@ func (s *Store) GetShip(num uint32) (*model.Ship, error) {
 
 // PutShip writes a ship to the database.
 func (s *Store) PutShip(ship *model.Ship) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := json.Marshal(ship)
 		if err != nil {
@@ -86,6 +90,9 @@ func (s *Store) PutShip(ship *model.Ship) error {
 
 // DeleteShip removes a ship record and records its number as free.
 func (s *Store) DeleteShip(num uint32) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BucketShips)
 		if err := b.Delete(ShipKey(num)); err != nil {
@@ -124,6 +131,9 @@ func (s *Store) AllShips() (map[uint32]*model.Ship, error) {
 
 // PutShipsBatch writes many ships in a single transaction (end-of-turn flush).
 func (s *Store) PutShipsBatch(ships map[uint32]*model.Ship) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BucketShips)
 		for _, ship := range ships {
@@ -187,6 +197,9 @@ func (s *Store) GetPlanet(starNum, planetNum uint8) (*model.Planet, error) {
 
 // PutPlanet writes a planet (including its embedded sector grid).
 func (s *Store) PutPlanet(p *model.Planet) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := json.Marshal(p)
 		if err != nil {
@@ -235,6 +248,9 @@ func (s *Store) GetStar(num uint8) (*model.Star, error) {
 
 // PutStar writes a star record.
 func (s *Store) PutStar(star *model.Star) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := json.Marshal(star)
 		if err != nil {
@@ -282,6 +298,9 @@ func (s *Store) GetRace(playerNum int) (*model.Race, error) {
 
 // PutRace writes a race record.
 func (s *Store) PutRace(race *model.Race) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := json.Marshal(race)
 		if err != nil {
@@ -339,6 +358,9 @@ func (s *Store) GetStarData() (*model.StarData, error) {
 
 // PutStarData writes the global StarData record.
 func (s *Store) PutStarData(sd *model.StarData) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := json.Marshal(sd)
 		if err != nil {
@@ -365,6 +387,9 @@ func (s *Store) GetPower() ([model.MaxPlayers]model.Power, error) {
 
 // PutPower writes the power report.
 func (s *Store) PutPower(power [model.MaxPlayers]model.Power) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := json.Marshal(power)
 		if err != nil {
@@ -391,6 +416,9 @@ func (s *Store) GetBlocks() ([model.MaxPlayers]model.Block, error) {
 
 // PutBlocks writes the alliance block records.
 func (s *Store) PutBlocks(blocks [model.MaxPlayers]model.Block) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := json.Marshal(blocks)
 		if err != nil {
@@ -415,6 +443,9 @@ func (s *Store) GetPowerBlocks() (*model.PowerBlocks, error) {
 
 // PutPowerBlocks writes the aggregated block-level power report.
 func (s *Store) PutPowerBlocks(pb *model.PowerBlocks) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := json.Marshal(pb)
 		if err != nil {
@@ -444,6 +475,9 @@ func (s *Store) GetCommod(num uint32) (*model.Commodity, error) {
 
 // PutCommod writes a commodity record.
 func (s *Store) PutCommod(c *model.Commodity) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		data, err := json.Marshal(c)
 		if err != nil {
@@ -483,6 +517,9 @@ func (s *Store) AllocCommodNum() (uint32, error) {
 
 // DeleteCommod removes a commodity and records its number as free.
 func (s *Store) DeleteCommod(num uint32) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		if err := tx.Bucket(BucketCommodities).Delete(CommodKey(num)); err != nil {
 			return err
@@ -509,8 +546,21 @@ func (s *Store) GetMeta(key []byte) ([]byte, error) {
 
 // PutMeta writes a single metadata value.
 func (s *Store) PutMeta(key, value []byte) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(BucketMeta).Put(key, value)
+	})
+}
+
+// DeleteMeta removes a single metadata value (no error when absent).
+func (s *Store) DeleteMeta(key []byte) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(BucketMeta).Delete(key)
 	})
 }
 
@@ -519,19 +569,42 @@ func (s *Store) PutMeta(key, value []byte) error {
 // PushTelegram appends one telegram to the (playerNum, governor) inbox.
 // text should already include a timestamp prefix if desired.
 func (s *Store) PushTelegram(playerNum, governor int, text string) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(BucketTelegrams)
-		seq, err := b.NextSequence()
-		if err != nil {
-			return err
-		}
-		return b.Put(TelegramKeyPG(uint8(playerNum), uint8(governor), seq), []byte(text))
+		return pushTelegramTx(tx.Bucket(BucketTelegrams), playerNum, governor, text)
 	})
+}
+
+// pushTelegramTx appends one telegram inside an open write transaction.
+// Player and governor numbers are clamped to the key's byte range (they
+// are 1..MaxPlayers and 0..MaxGovernors by construction).
+func pushTelegramTx(b *bolt.Bucket, playerNum, governor int, text string) error {
+	seq, err := b.NextSequence()
+	if err != nil {
+		return err
+	}
+	return b.Put(TelegramKeyPG(clampByte(playerNum), clampByte(governor), seq), []byte(text))
+}
+
+// clampByte converts a small non-negative int to uint8 without overflow.
+func clampByte(v int) uint8 {
+	if v < 0 {
+		return 0
+	}
+	if v > 255 {
+		return 255
+	}
+	return uint8(v)
 }
 
 // ReadAndClearTelegrams returns all pending telegrams for (playerNum, governor)
 // and deletes them from the bucket (mirrors the C behaviour of truncating the file).
 func (s *Store) ReadAndClearTelegrams(playerNum, governor int) ([]string, error) {
+	if err := s.writeAllowed(); err != nil {
+		return nil, err
+	}
 	var msgs []string
 	prefix := TelegramPrefix(uint8(playerNum), uint8(governor))
 	err := s.db.Update(func(tx *bolt.Tx) error {
@@ -575,27 +648,37 @@ func (s *Store) HasTelegrams(playerNum, governor int) (bool, error) {
 // AppendNews adds a timestamped news entry of the given type.
 // Returns the sequence number of the new entry.
 func (s *Store) AppendNews(newsType uint8, text string) (uint64, error) {
+	if err := s.writeAllowed(); err != nil {
+		return 0, err
+	}
 	var seq uint64
 	err := s.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(BucketNews)
-		// Find the highest existing seq for this type by seeking to the end.
-		cur := b.Cursor()
-		// Build a key that is just past the maximum possible seq for this type.
-		maxKey := NewsKey(newsType, ^uint64(0))
-		k, _ := cur.Seek(maxKey)
-		if k == nil {
-			k, _ = cur.Last()
-		} else {
-			k, _ = cur.Prev()
-		}
-		if k != nil && len(k) == 9 && k[0] == newsType {
-			seq = binary.BigEndian.Uint64(k[1:])
-		}
-		seq++
-		entry := []byte(text)
-		return b.Put(NewsKey(newsType, seq), entry)
+		var err error
+		seq, err = appendNewsTx(tx.Bucket(BucketNews), newsType, text)
+		return err
 	})
 	return seq, err
+}
+
+// appendNewsTx appends one news entry inside an open write transaction and
+// returns its sequence number.
+func appendNewsTx(b *bolt.Bucket, newsType uint8, text string) (uint64, error) {
+	var seq uint64
+	// Find the highest existing seq for this type by seeking to the end.
+	cur := b.Cursor()
+	// Build a key that is just past the maximum possible seq for this type.
+	maxKey := NewsKey(newsType, ^uint64(0))
+	k, _ := cur.Seek(maxKey)
+	if k == nil {
+		k, _ = cur.Last()
+	} else {
+		k, _ = cur.Prev()
+	}
+	if len(k) == 9 && k[0] == newsType {
+		seq = binary.BigEndian.Uint64(k[1:])
+	}
+	seq++
+	return seq, b.Put(NewsKey(newsType, seq), []byte(text))
 }
 
 // LatestNewsSeq returns the sequence number of the most recent entry for newsType.
@@ -643,6 +726,9 @@ func (s *Store) ReadNewsFrom(newsType uint8, fromSeq uint64) ([]string, uint64, 
 
 // PurgeNews deletes all entries for a given news type.
 func (s *Store) PurgeNews(newsType uint8) error {
+	if err := s.writeAllowed(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BucketNews)
 		cur := b.Cursor()

@@ -1,0 +1,48 @@
+# ADR-0009: Atomic turn commit with a commit record, a write fence during turns, and reload-on-failure (CR-18)
+
+Status: Proposed 2026-11-07 (implemented locally on `feature/cr18-atomic-turn-persistence`; awaiting independent review and owner acceptance; not deployed)
+
+## Context
+
+The independent review of 2026-10-27 recorded CR-18: a turn was flushed in one bbolt transaction per ship batch, star, planet and race, plus separate transactions for power, blocks, star data and the schedule (`flushAll` in `internal/game/turn.go`). A crash, `kill -9`, node loss or shutdown-budget timeout during that flush left some records at turn N+1 and others at turn N, with no stamp to detect it. Turn code also wrote news and stored telegrams to the store while the turn ran, and a panic mid-turn left the in-memory world half advanced and in use by later commands (plan 8.1). Phase 1 closed only the orderly path. The migration plan (section 8) chose, for Phase 3a, a single commit transaction per turn, a commit record, and recovery of any failure between commits by discarding memory and reloading the store (8.2), with crash-injection tests as the exit criterion (8.11).
+
+This ADR records the first, smallest coherent slice of that design: turn-level atomicity and durability. The command staging set with group commit (8.4), per-record commit stamps, the `TURN_FAILED` mode with `RetryTurn`/`SkipTurn` (8.7), the outbox (8.9) and dirty tracking remain Phase 3a work.
+
+## Decision
+
+1. **One transaction per commit.** `db.Store.CommitWorld` writes, in a single bbolt transaction: every ship, star, planet and race from memory, the star data, power, blocks and power blocks, the news lines and stored telegrams the turn produced, the schedule record, and the commit record `meta/commit` `{schema_version, commit_seq, turn, segment, kind, wall_time, engine_version}`. bbolt's transaction is atomic and fsynced: the store holds either the previous commit or the new one. The three callers are the update, the movement segment and the orderly-shutdown flush (kind `update`, `segment`, `shutdown`); universe initialisation writes the first record (kind `init`, sequence 1) in its own transaction.
+2. **Nothing reaches the store during a turn body.** `runTurn` raises the store's **write fence** before the body and lowers it after: every ordinary write method returns `ErrWriteFenced` and counts the refusal (`gb_store_fenced_writes_total`). News, stored telegrams and player-visible notifications produced by turn code are buffered on the actor and written by the commit or released after it. Ship and commodity number allocation stays allowed during a turn (a consumed number on a failed turn is a gap, not an inconsistency); this is the only documented exemption.
+3. **Reload-on-failure.** If the body panics or the commit transaction fails, the buffered effects are dropped, the in-memory world and schedule are reloaded from the store (the last commit) and the engine enters `HALTED` with a reason that says whether memory was reloaded (`in-memory state reloaded from the last commit`) or could not be (`reload from the store failed, in-memory state is untrusted`). Players connected at the time are told the turn was rolled back. Nothing of the failed turn is ever flushed later: the halted shutdown writes nothing, and the store already is the last commit.
+4. **Crash semantics.** A crash at any point leaves the store at the last commit. On restart the schedule record (committed with the world) says the turn has not happened; the existing no-catch-up policy reschedules it and the operator may run `gbctl update`. A turn is never counted twice and never half applied.
+5. **Startup validation (counters only).** A commit record whose turn counter is ahead of the schedule record can only come from a writer that bypassed the commit path; the engine then starts `HALTED` with reason `CORRUPT_STORE…`, alive but not ready, and writes nothing (the dedicated `CORRUPT_STORE` mode of plan 8.7 is deferred; `HALTED` carries it). A schedule ahead of the commit record means turns were persisted by a binary from before this change: accepted with a warning, resynchronised at the next commit. A store without a commit record (the development universe initialised on 2026-11-07) is accepted; its first commit creates the record at sequence 1.
+6. **Observability.** `gb_commits_total{kind,result}`, `gb_commit_duration_seconds{kind}`, `gb_commit_seq`, `gb_store_fenced_writes_total`; `commit_seq` in `gbctl status`; `turn complete` logs the sequence; the status persistence note states the new guarantee and the remaining per-command limitation. `db.Store.WorldDigest` is the logical-state digest of plan 8.8 (world buckets, universe and schedule records without `saved_at`, commit sequence and counters) used by the tests.
+7. **Not changed.** Game rules, turn order and formulas; the per-record writes of player commands between turns (CR-17 remains: the six `store.GetPlanet` sites and the 70 `Put*` sites are untouched, so a command that fails between two of its own writes is still not atomic); ship reload from the store at turn start (CR-11 rule); the no-catch-up schedule policy; the admin API.
+
+## Alternatives considered
+
+- **Wrapping only `flushAll` in one transaction.** Rejected as incomplete: news, telegrams and any future direct write during the body would still leak before the commit, and a panic mid-body would still leave memory half advanced for the next command. The fence and the buffers close the first; reload closes the second.
+- **Staged working copy or copy-on-write for turns** (plan 8.2 table). Rejected for now: a correct deep copy of every model type is error-prone and unnecessary at this world size; reload from the committed store is simpler and is exercised by every startup.
+- **Dirty tracking to write only changed records.** Deferred: writing the whole world (627 planets, 100 stars) in one transaction is one fsync and measured well inside the Phase 3a budget on local disk; dirty tracking belongs with the staging set.
+- **Refusing to start on a schedule ahead of the commit record.** Rejected: it would turn a rollback to the previous image plus a roll-forward into an outage with no repair tool; the condition is not evidence of a half-applied turn.
+- **A `faultinject` build tag for the test hooks.** Rejected for this slice: tests must run under the plain `go test ./...` the gates use; the hooks (`SetCommitFault`, the mid-turn test hook) are exported or package-private and documented as test-only, following the existing `GB_TEST_HOOKS` pattern.
+
+## Consequences
+
+- A completed turn is durable as one consistent state transition; an interrupted turn is never exposed as committed and never leaves a partially updated world. `gb-dev` data stops being disposable for *turn* persistence; it remains disposable for *command* persistence until the staging set and group commit land.
+- Segment commits now also persist star data, power and blocks (previously only full updates did). Star data carries the orbit-chain root that segments rebuild, so this is a correction, not a rules change; the values are idempotent otherwise.
+- Player-visible turn output (bulletins, discoveries, "Finished with update") appears after the commit instead of during the turn. The start banner is still sent before the body.
+- A telegram to a governor who is online when the turn generates it is delivered after the commit and not stored; if that governor disconnects between generation and commit, the live delivery fails silently, as it did before (the C server has the same window).
+- A turn-time code path that writes to the store directly is now a refused, counted and logged defect instead of a silent partial write.
+- The `HALTED` reason after a failed turn distinguishes a reloaded (consistent) memory from an untrusted one; the operator response (restart, then `gbctl status`) is unchanged.
+- Rolling the development deployment back to the pre-ADR image is safe for the store; rolling forward again is accepted with a warning.
+
+## Validation
+
+`go/internal/db/commit_test.go` (commit round trip, injected fault before and after writes rolls back everything, validation, fence coverage of every write method with the allocator exemption, digest stability across reopen) and `go/internal/game/commit_test.go` (T1-style panic after mutations: store digest unchanged, memory reloaded, effects dropped, halted, clean restart, no duplicate turn; commit failure after all records were put; direct write during a turn refused and counted; shutdown commit and its failure; restart preserves counters, digest and commit sequence; universe identity and race identity across commits and restarts; corrupt store refused at startup; legacy and schedule-ahead stores accepted; online/offline telegram handling; 100-star segment commit timing). `go/test/e2e/crash_test.go` kills a real `gb-server` with `SIGKILL` mid-turn and asserts the store equals the last commit, restarts cleanly, and commits the next update. The known-defect entry `persistence/non-atomic-turn-flush` is removed (a reduction). Remaining plan 8.11 items not covered here: T2 (kill inside the bbolt write path; relies on bbolt's documented atomicity), T4–T6 and T11–T12 (command staging and group commit), T7 (disk full in `kind`), T9 (determinism, Phase 3b), T10 (restore, snapshot stream).
+
+## References
+
+- `docs/architecture/go-code-review.md` CR-11, CR-17, CR-18, CR-22, CR-24
+- `docs/architecture/microservices-migration-plan.md` sections 8.1–8.5, 8.7, 8.8, 8.11, Phase 3a
+- `go/internal/db/commit.go`, `go/internal/game/commit.go`, `go/internal/game/lifecycle.go`, `go/internal/game/turn.go`
+- `docs/testing/cr18-handoff.md`

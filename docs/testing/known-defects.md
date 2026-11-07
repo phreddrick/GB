@@ -116,9 +116,8 @@ Found by the Phase 0 golden tests on 2026-10-28; neither is in `go-code-review.m
 | `combat/cew-strength-multiplier` | CR-27 | `TestCEWCallSite` (deterministic call-site test in radiation mode; reference is the C formula `strength*CEW_hit`) | 3 of 4 | 3c |
 | `golden/compatibility` | GD-01 | `TestGolden/compatibility` | 47 of 60 | 3c |
 | `golden/ground_attack/astrength`, `/dstrength` | GD-02 | `TestGolden/ground_attack` | 40 of 40 each | 3d (provisional owner decision: keep `math.Pi`, record the intentional divergence in ADR-0012) |
-| `persistence/non-atomic-turn-flush` | CR-18 | **untested** (explicit): no test can assert crash consistency until the single-transaction commit exists | n/a | 3a |
 
-The CR-18 entry was added in Phase 1 (2026-10-29) so that the remaining crash-consistency risk stays in the same inventory as the parity gaps and is printed by every run. Phase 1 closes only the orderly-shutdown path (`docs/operations/local-server.md` sections 8 and 10); the crash-injection tests T1 to T8 of plan section 8.11 arrive with Phase 3a and will replace the entry with tested ones.
+The CR-18 entry `persistence/non-atomic-turn-flush` (added in Phase 1, 2026-10-29, as an explicit untested entry) was **removed on 2026-11-07** when the single-transaction turn commit, the write fence and reload-on-failure were implemented with their tests (ADR-0009; `go/internal/game/commit_test.go`, `go/internal/db/commit_test.go`, `go/test/e2e/crash_test.go`). The removal is a reduction. The per-command persistence limitation (CR-17) is not an inventory entry: it is a documented limitation in `docs/operations/local-server.md` section 10 until the Phase 3a staging set.
 
 ## Parity-gap report
 

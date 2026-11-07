@@ -15,6 +15,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/phreddrick/GB/go/internal/db"
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
@@ -1388,6 +1389,19 @@ func shipMaxFuel(ship *model.Ship) float64 {
 // If the governor is online the message is sent immediately; otherwise it is
 // stored in the DB for later retrieval with the `read` command.
 func (s *State) pushTelegram(playerNum, governor int, text string) {
+	if s.effects.active {
+		// During a turn: decide live-or-stored now (as the C server does),
+		// but deliver or persist only when the turn commits (commit.go).
+		switch {
+		case s.governorOnline(playerNum, governor):
+			s.notify(playerNum, governor, text)
+		case governor != 0 && s.governorOnline(playerNum, 0):
+			s.notify(playerNum, 0, text)
+		default:
+			s.effects.telegrams = append(s.effects.telegrams, db.TelegramEntry{Player: playerNum, Governor: governor, Text: timestampedMsg(text)})
+		}
+		return
+	}
 	// Try live delivery first (mirrors warn() in GB_server.c).
 	delivered := false
 	if s.registry != nil {
@@ -1430,6 +1444,10 @@ func (s *State) post(newsType uint8, msg string) {
 		default:
 			out = append(out, msg[i])
 		}
+	}
+	if s.effects.active {
+		s.effects.news = append(s.effects.news, db.NewsEntry{Type: newsType, Text: timestampedMsg(string(out))})
+		return
 	}
 	_, _ = s.store.AppendNews(newsType, timestampedMsg(string(out)))
 }

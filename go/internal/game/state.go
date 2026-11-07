@@ -5,10 +5,14 @@
 // Phase 1 lifecycle (lifecycle.go, admin.go, schedule.go): the actor also
 // processes typed administrative requests, recovers panics by halting,
 // restores and persists the turn schedule, publishes an operating mode and a
-// heartbeat for health probes, and shuts down in an orderly sequence. The
-// persistence model is unchanged: a turn is still flushed in many bbolt
-// transactions, so a crash or kill during a flush can leave a mixed-turn
-// store (CR-18, Phase 3a).
+// heartbeat for health probes, and shuts down in an orderly sequence.
+//
+// Persistence (commit.go, CR-18 closed): a turn, a segment and the shutdown
+// flush each commit the whole world, the schedule and the turn's effects in
+// one bbolt transaction with a commit record; a failed turn is rolled back
+// by reloading the last commit. Player commands between turns still write
+// per record (CR-17; the staging set and group commit of plan 8.4 remain
+// Phase 3a work).
 package game
 
 import (
@@ -83,6 +87,10 @@ type State struct {
 
 	// Turn schedule (actor-owned; schedule.go).
 	sched schedule
+
+	// Effects buffered while a turn body runs (commit.go).
+	effects      turnEffects
+	fencedBefore uint64 // store.FencedWrites() at the end of the previous turn
 
 	// Inboxes (other goroutines -> actor goroutine).
 	cmdCh   chan *command      // player commands
@@ -175,10 +183,21 @@ func New(cfg *config.Config, store *db.Store, opts Options) (*State, error) {
 		return nil, fmt.Errorf("check universe: %w", err)
 	}
 	if initialized {
-		if err := s.restoreSchedule(s.now()); err != nil {
-			return nil, err
+		corrupt, err := s.validateStoreCommit()
+		if err != nil {
+			return nil, fmt.Errorf("validate store: %w", err)
 		}
-		s.setMode(ModeServing)
+		if corrupt != "" {
+			// Alive but not serving: the operator inspects the store; nothing
+			// is written and no turn fires (plan 8.7 CORRUPT_STORE, carried by
+			// the HALTED mode until a dedicated mode exists).
+			s.halt(corrupt, "")
+		} else {
+			if err := s.restoreSchedule(s.now()); err != nil {
+				return nil, err
+			}
+			s.setMode(ModeServing)
+		}
 	} else {
 		s.logger.Warn("store holds no universe; waiting for administrative initialisation", slog.String("mode", ModeUninitialized.String()))
 		s.setMode(ModeUninitialized)
@@ -712,23 +731,50 @@ func (s *State) raceByNum(playerNum int) *model.Race {
 	return s.races[playerNum-1]
 }
 
-// notify sends text to a specific governor.
+// notify sends text to a specific governor. During a turn body the notice
+// is held until the turn has committed (commit.go).
 func (s *State) notify(playerNum, governor int, text string) {
+	if s.effects.active {
+		s.effects.notices = append(s.effects.notices, pendingNotice{kind: noticeGovernor, player: playerNum, governor: governor, text: text})
+		return
+	}
 	if s.registry != nil {
 		s.registry.Notify(playerNum, governor, text)
 	}
 }
 
-// notifyRace sends text to all governors of a race.
+// notifyRace sends text to all governors of a race (held during a turn).
 func (s *State) notifyRace(playerNum int, text string) {
+	if s.effects.active {
+		s.effects.notices = append(s.effects.notices, pendingNotice{kind: noticeRace, player: playerNum, text: text})
+		return
+	}
 	if s.registry != nil {
 		s.registry.NotifyRace(playerNum, text)
 	}
 }
 
-// shout sends text to all connected players.
+// shout sends text to all connected players (held during a turn).
 func (s *State) shout(text string) {
+	if s.effects.active {
+		s.effects.notices = append(s.effects.notices, pendingNotice{kind: noticeShout, text: text})
+		return
+	}
 	if s.registry != nil {
 		s.registry.Shout(text)
 	}
+}
+
+// governorOnline reports whether a session for (playerNum, governor) is
+// attached, without sending anything.
+func (s *State) governorOnline(playerNum, governor int) bool {
+	if s.registry == nil {
+		return false
+	}
+	for _, si := range s.registry.ConnectedPlayers() {
+		if si.PlayerNum == playerNum && si.Governor == governor {
+			return true
+		}
+	}
+	return false
 }
