@@ -31,6 +31,7 @@ type Metrics struct {
 	CommitDuration *metrics.Histogram // gb_commit_duration_seconds{kind}
 	CommitSeq      *metrics.Gauge     // gb_commit_seq
 	FencedWrites   *metrics.Counter   // gb_store_fenced_writes_total
+	NoticePanics   *metrics.Counter   // gb_turn_notice_delivery_panics_total
 }
 
 // NewMetrics registers the engine families on r.
@@ -58,7 +59,8 @@ func NewMetrics(r *metrics.Registry) *Metrics {
 		Commits:        metrics.NewCounter(r, "gb_commits_total", "World commits (one bbolt transaction each) by kind and result.", "kind", "result"),
 		CommitDuration: metrics.NewHistogram(r, "gb_commit_duration_seconds", "Duration of the world commit transaction by kind.", metrics.DefaultDurationBuckets, "kind"),
 		CommitSeq:      metrics.NewGauge(r, "gb_commit_seq", "Sequence number of the last committed world state (0 until the first commit)."),
-		FencedWrites:   metrics.NewCounter(r, "gb_store_fenced_writes_total", "Store writes attempted by turn code and refused by the write fence (a defect indicator; the commit still holds)."),
+		FencedWrites:   metrics.NewCounter(r, "gb_store_fenced_writes_total", "Store writes attempted by turn code and refused by the write fence; each occurrence aborts the turn (fail closed)."),
+		NoticePanics:   metrics.NewCounter(r, "gb_turn_notice_delivery_panics_total", "Panics while delivering the notifications of an already committed turn (the commit stands; the engine halts)."),
 	}
 }
 

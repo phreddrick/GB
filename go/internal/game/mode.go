@@ -27,15 +27,17 @@ var AllModes = engine.AllModes
 
 // Sentinel errors (see internal/engine).
 var (
-	ErrHalted             = engine.ErrHalted
-	ErrNotServing         = engine.ErrNotServing
-	ErrEngineBusy         = engine.ErrEngineBusy
-	ErrNotExecuted        = engine.ErrNotExecuted
-	ErrStillRunning       = engine.ErrStillRunning
-	ErrEngineStopped      = engine.ErrEngineStopped
-	ErrShutdownTimeout    = engine.ErrShutdownTimeout
-	ErrHaltedNotFlushed   = engine.ErrHaltedNotFlushed
-	ErrEnrollmentDisabled = engine.ErrEnrollmentDisabled
+	ErrHalted                  = engine.ErrHalted
+	ErrNotServing              = engine.ErrNotServing
+	ErrEngineBusy              = engine.ErrEngineBusy
+	ErrNotExecuted             = engine.ErrNotExecuted
+	ErrStillRunning            = engine.ErrStillRunning
+	ErrEngineStopped           = engine.ErrEngineStopped
+	ErrShutdownTimeout         = engine.ErrShutdownTimeout
+	ErrHaltedNotFlushed        = engine.ErrHaltedNotFlushed
+	ErrShutdownCommitFailed    = engine.ErrShutdownCommitFailed
+	ErrShutdownCommitUncertain = engine.ErrShutdownCommitUncertain
+	ErrEnrollmentDisabled      = engine.ErrEnrollmentDisabled
 )
 
 // PersistenceNote is repeated in every status.

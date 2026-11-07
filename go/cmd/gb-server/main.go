@@ -16,9 +16,11 @@
 //	2 shutdown completed while the engine was HALTED: in-memory state was
 //	  discarded, not flushed; the store holds the last complete commit
 //	  (a failed turn never writes, ADR-0009)
-//	3 shutdown timed out while a turn was running: the store holds either
-//	  the previous commit or the completed one, never a mixture
-//	4 flush or database close reported an error during shutdown
+//	3 shutdown timed out while a turn was running; the turn may still
+//	  commit after the exit: the store will hold either the previous commit
+//	  or the completed one, never a mixture (commit_seq tells which)
+//	4 the shutdown commit failed (store at the previous commit), its
+//	  outcome is uncertain (check commit_seq), or the database close failed
 //	5 a listener failed while serving (for example a missing TLS
 //	  certificate or key); the shutdown sequence still ran and its own
 //	  result is logged as shutdown_exit_code, but the process exits 5
@@ -96,10 +98,22 @@ func run() int {
 	}
 	gameOpts := game.Options{Logger: logger, Registry: registry}
 	if os.Getenv("GB_TEST_HOOKS") == "1" {
-		// Test-only: used by the end-to-end shutdown tests. Never set in
-		// production configuration.
+		// Test-only: used by the end-to-end shutdown and crash tests. Never
+		// set in production configuration.
 		if d, err := time.ParseDuration(os.Getenv("GB_TEST_TURN_DELAY")); err == nil && d > 0 {
 			gameOpts.TestTurnDelay = d
+		}
+		if stage := os.Getenv("GB_TEST_CRASH_IN_COMMIT"); stage == "before-write" || stage == "after-write" {
+			// Kill the process from inside the open commit transaction, at
+			// the named stage, without running deferred functions: the
+			// crash-consistency test for an interrupted write transaction.
+			logger.Warn("TEST HOOK ACTIVE: the process exits inside the next commit transaction", slog.String("stage", stage))
+			store.SetCommitFault(func(st string) error {
+				if st == stage {
+					os.Exit(137)
+				}
+				return nil
+			})
 		}
 	}
 	gameState, err := game.New(cfg, store, gameOpts)
@@ -202,7 +216,7 @@ func shutdown(logger *slog.Logger, cfg *config.Config, srv *gbnet.Server, adm *a
 	switch {
 	case stopErr == nil:
 	case errors.Is(stopErr, engine.ErrShutdownTimeout):
-		logger.Error("actor did not stop within the shutdown budget; exiting while a turn may still be running: its commit is atomic, so the store holds either the previous or the completed commit",
+		logger.Error("actor did not stop within the shutdown budget; exiting while a turn may still be running and may still commit: the store will hold either the previous or the completed commit, never a mixture; compare commit_seq at the next start",
 			slog.String("op", "shutdown"), slog.Int64("budget_ms", budget.Milliseconds()))
 		// Do not close the store under the actor; the OS reclaims the file lock.
 		return exitShutdownTimout
@@ -210,7 +224,7 @@ func shutdown(logger *slog.Logger, cfg *config.Config, srv *gbnet.Server, adm *a
 		logger.Error("engine was halted; in-memory state discarded, not flushed; the store holds the last complete commit", slog.String("op", "shutdown"))
 		code = exitHaltedNoFlush
 	default:
-		logger.Error("flush during shutdown failed", slog.String("op", "shutdown"), slog.String("err", stopErr.Error()))
+		logger.Error("shutdown commit did not succeed", slog.String("op", "shutdown"), slog.String("err", stopErr.Error()))
 		code = exitFlushError
 	}
 

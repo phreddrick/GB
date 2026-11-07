@@ -76,7 +76,7 @@ func (s *Store) GetShip(num uint32) (*model.Ship, error) {
 
 // PutShip writes a ship to the database.
 func (s *Store) PutShip(ship *model.Ship) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutShip"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -90,7 +90,7 @@ func (s *Store) PutShip(ship *model.Ship) error {
 
 // DeleteShip removes a ship record and records its number as free.
 func (s *Store) DeleteShip(num uint32) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("DeleteShip"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -131,7 +131,7 @@ func (s *Store) AllShips() (map[uint32]*model.Ship, error) {
 
 // PutShipsBatch writes many ships in a single transaction (end-of-turn flush).
 func (s *Store) PutShipsBatch(ships map[uint32]*model.Ship) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutShipsBatch"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -152,6 +152,9 @@ func (s *Store) PutShipsBatch(ships map[uint32]*model.Ship) error {
 // AllocShipNum returns the next available ship number, reusing a free slot if
 // possible, otherwise incrementing past the current maximum.
 func (s *Store) AllocShipNum() (uint32, error) {
+	if err := s.writeAllowed("AllocShipNum"); err != nil {
+		return 0, err
+	}
 	var num uint32
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		fb := tx.Bucket(BucketShipFree)
@@ -197,7 +200,7 @@ func (s *Store) GetPlanet(starNum, planetNum uint8) (*model.Planet, error) {
 
 // PutPlanet writes a planet (including its embedded sector grid).
 func (s *Store) PutPlanet(p *model.Planet) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutPlanet"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -248,7 +251,7 @@ func (s *Store) GetStar(num uint8) (*model.Star, error) {
 
 // PutStar writes a star record.
 func (s *Store) PutStar(star *model.Star) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutStar"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -298,7 +301,7 @@ func (s *Store) GetRace(playerNum int) (*model.Race, error) {
 
 // PutRace writes a race record.
 func (s *Store) PutRace(race *model.Race) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutRace"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -358,7 +361,7 @@ func (s *Store) GetStarData() (*model.StarData, error) {
 
 // PutStarData writes the global StarData record.
 func (s *Store) PutStarData(sd *model.StarData) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutStarData"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -387,7 +390,7 @@ func (s *Store) GetPower() ([model.MaxPlayers]model.Power, error) {
 
 // PutPower writes the power report.
 func (s *Store) PutPower(power [model.MaxPlayers]model.Power) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutPower"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -416,7 +419,7 @@ func (s *Store) GetBlocks() ([model.MaxPlayers]model.Block, error) {
 
 // PutBlocks writes the alliance block records.
 func (s *Store) PutBlocks(blocks [model.MaxPlayers]model.Block) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutBlocks"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -443,7 +446,7 @@ func (s *Store) GetPowerBlocks() (*model.PowerBlocks, error) {
 
 // PutPowerBlocks writes the aggregated block-level power report.
 func (s *Store) PutPowerBlocks(pb *model.PowerBlocks) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutPowerBlocks"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -475,7 +478,7 @@ func (s *Store) GetCommod(num uint32) (*model.Commodity, error) {
 
 // PutCommod writes a commodity record.
 func (s *Store) PutCommod(c *model.Commodity) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutCommod"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -490,6 +493,9 @@ func (s *Store) PutCommod(c *model.Commodity) error {
 // AllocCommodNum returns the next available commodity lot number,
 // reusing a free slot if possible. Mirrors getdeadcommod() in files_shl.c.
 func (s *Store) AllocCommodNum() (uint32, error) {
+	if err := s.writeAllowed("AllocCommodNum"); err != nil {
+		return 0, err
+	}
 	var num uint32
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		fb := tx.Bucket(BucketCommodFree)
@@ -517,7 +523,7 @@ func (s *Store) AllocCommodNum() (uint32, error) {
 
 // DeleteCommod removes a commodity and records its number as free.
 func (s *Store) DeleteCommod(num uint32) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("DeleteCommod"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -546,7 +552,7 @@ func (s *Store) GetMeta(key []byte) ([]byte, error) {
 
 // PutMeta writes a single metadata value.
 func (s *Store) PutMeta(key, value []byte) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutMeta"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -556,7 +562,7 @@ func (s *Store) PutMeta(key, value []byte) error {
 
 // DeleteMeta removes a single metadata value (no error when absent).
 func (s *Store) DeleteMeta(key []byte) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("DeleteMeta"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -569,7 +575,7 @@ func (s *Store) DeleteMeta(key []byte) error {
 // PushTelegram appends one telegram to the (playerNum, governor) inbox.
 // text should already include a timestamp prefix if desired.
 func (s *Store) PushTelegram(playerNum, governor int, text string) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PushTelegram"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -602,7 +608,7 @@ func clampByte(v int) uint8 {
 // ReadAndClearTelegrams returns all pending telegrams for (playerNum, governor)
 // and deletes them from the bucket (mirrors the C behaviour of truncating the file).
 func (s *Store) ReadAndClearTelegrams(playerNum, governor int) ([]string, error) {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("ReadAndClearTelegrams"); err != nil {
 		return nil, err
 	}
 	var msgs []string
@@ -648,7 +654,7 @@ func (s *Store) HasTelegrams(playerNum, governor int) (bool, error) {
 // AppendNews adds a timestamped news entry of the given type.
 // Returns the sequence number of the new entry.
 func (s *Store) AppendNews(newsType uint8, text string) (uint64, error) {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("AppendNews"); err != nil {
 		return 0, err
 	}
 	var seq uint64
@@ -726,7 +732,7 @@ func (s *Store) ReadNewsFrom(newsType uint8, fromSeq uint64) ([]string, uint64, 
 
 // PurgeNews deletes all entries for a given news type.
 func (s *Store) PurgeNews(newsType uint8) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PurgeNews"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {

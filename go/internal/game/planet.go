@@ -1129,7 +1129,7 @@ func (s *State) buildToxWC(planet *model.Planet, star *model.Star,
 	}
 	planet.Info[idx].Resource -= uint16(cost)
 
-	shipNum, err := s.store.AllocShipNum()
+	shipNum, err := s.allocShipNum()
 	if err != nil {
 		return
 	}

@@ -2,6 +2,7 @@ package game
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"runtime/debug"
@@ -141,9 +142,11 @@ const (
 // runTurn executes one update or segment on the actor goroutine with panic
 // isolation, mode transitions, metrics and the atomic commit of the result
 // (commit.go). It returns ErrNotServing when the engine is not in
-// ModeServing and ErrHalted when the turn failed (nothing of it persisted;
-// memory reloaded from the last commit; engine HALTED).
-func (s *State) runTurn(kind turnKind, trigger string) error {
+// ModeServing and ErrHalted when the turn did not complete; the halt reason
+// then states exactly what is known (nothing written and memory reloaded,
+// outcome uncertain, or committed but notification delivery failed). No
+// panic escapes to the caller: scheduled turns run without a caller.
+func (s *State) runTurn(kind turnKind, trigger string) (err error) {
 	switch s.Mode() {
 	case ModeServing:
 	case ModeHalted:
@@ -153,6 +156,17 @@ func (s *State) runTurn(kind turnKind, trigger string) error {
 		return ErrNotServing
 	}
 	start := s.now()
+	defer func() {
+		// Safety net for the orchestration itself (never expected): halt
+		// with the truth rather than crash the actor goroutine.
+		if r := recover(); r != nil {
+			s.store.SetWriteFence(false)
+			s.discardTurnEffects()
+			s.turnStartNs.Store(0)
+			s.halt(fmt.Sprintf("panic in turn orchestration (%s): %v; the store holds its last visible commit, in-memory state is untrusted", kind, r), string(debug.Stack()))
+			err = ErrHalted
+		}
+	}()
 	s.setMode(ModeTurnInProgress)
 	s.turnStartNs.Store(start.UnixNano())
 	s.Progress()
@@ -164,7 +178,8 @@ func (s *State) runTurn(kind turnKind, trigger string) error {
 		s.shout(fmt.Sprintf("\n*** DOING MOVEMENT SEGMENT %d/%d ***\n", s.sched.numSegments+1, s.cfg.MovesPerUpdate-1))
 	}
 
-	// From here until the commit, nothing reaches the store or the players.
+	// Phase 1: the turn body. From here until the commit, nothing reaches
+	// the store or the players.
 	s.beginTurnBody()
 	panicked := s.guard("turn "+string(kind), func() {
 		if s.testHooks != nil && s.testHooks.beforeTurn != nil {
@@ -177,36 +192,53 @@ func (s *State) runTurn(kind turnKind, trigger string) error {
 		}
 	}, func(any) { s.metrics.TurnPanics.Inc() })
 	s.endTurnBody()
-	if fenced := s.store.FencedWrites() - s.fencedBefore; fenced > 0 {
-		// A turn code path tried to write to the store directly; the fence
-		// refused it, so the commit below still holds, but it is a defect.
-		s.metrics.FencedWrites.Add(float64(fenced))
-		s.logger.Warn("turn code attempted direct store writes; refused by the write fence", slog.String("op", "turn."+string(kind)), slog.Uint64("count", fenced))
-	}
-	s.fencedBefore = s.store.FencedWrites()
-	if panicked {
+	finish := func(result string) {
 		s.turnStartNs.Store(0)
 		s.metrics.TurnDuration.Observe(s.now().Sub(start).Seconds(), string(kind))
-		s.metrics.TurnsTotal.Inc(string(kind), "panic")
+		s.metrics.TurnsTotal.Inc(string(kind), result)
+	}
+	if panicked {
+		finish("panic")
 		reason, _ := s.HaltDetails()
-		s.failTurn(kind, reason)
+		s.failTurn(kind, reason, true)
+		return ErrHalted
+	}
+	if n, last := s.turnFenceViolations(); n > 0 {
+		// Turn code reached the store directly. The fence refused it, but a
+		// turn whose code bypasses the commit path is not committed: fail
+		// closed, so a refused news line, telegram or record can never be
+		// silently missing from a turn reported as successful.
+		s.metrics.FencedWrites.Add(float64(n))
+		finish("fence_violation")
+		s.failTurn(kind, fmt.Sprintf("turn %s aborted: %d store write(s) by turn code were refused by the write fence (last: %s); the turn was not committed", kind, n, last), true)
 		return ErrHalted
 	}
 
-	rec, err := s.commitWorld(string(kind))
-	d := s.now().Sub(start)
-	s.turnStartNs.Store(0)
-	s.metrics.TurnDuration.Observe(d.Seconds(), string(kind))
-	if err != nil {
-		s.metrics.TurnsTotal.Inc(string(kind), "commit_failed")
-		s.failTurn(kind, "turn "+string(kind)+" commit failed: "+err.Error())
+	// Phase 2: the single commit, classified by the durable record.
+	res := s.persistTurn(string(kind))
+	switch res.outcome {
+	case persistNothingWritten:
+		finish("commit_failed")
+		s.failTurn(kind, res.reason, true)
+		return ErrHalted
+	case persistUncertain:
+		finish("commit_uncertain")
+		s.failTurn(kind, res.reason, false)
 		return ErrHalted
 	}
-	s.metrics.TurnsTotal.Inc(string(kind), "ok")
-	s.releaseTurnEffects()
+	finish("ok")
+
+	// Phase 3: best-effort delivery of the held notifications. The commit
+	// stands whatever happens here.
+	if derr := s.releaseTurnEffects(); derr != nil {
+		s.metrics.NoticePanics.Inc()
+		s.turnStartNs.Store(0)
+		s.halt(fmt.Sprintf("turn %s committed (commit_seq %d) but %v; the store and in-memory state are consistent and nothing was rolled back", kind, res.rec.CommitSeq, derr), "")
+		return ErrHalted
+	}
 	s.logger.Info("turn complete", slog.String("op", "turn."+string(kind)), slog.String("trigger", trigger),
-		slog.Int("turn", s.sched.numUpdates), slog.Int("segment", s.sched.numSegments), slog.Int64("duration_ms", d.Milliseconds()),
-		slog.Uint64("commit_seq", rec.CommitSeq))
+		slog.Int("turn", s.sched.numUpdates), slog.Int("segment", s.sched.numSegments), slog.Int64("duration_ms", s.now().Sub(start).Milliseconds()),
+		slog.Uint64("commit_seq", res.rec.CommitSeq))
 	if s.draining.Load() {
 		s.setMode(ModeQuiesced)
 	} else {
@@ -256,11 +288,23 @@ func (s *State) orderlyShutdown() error {
 		s.setMode(ModeStopped)
 		return nil
 	}
-	rec, err := s.flushForShutdown()
-	if err != nil {
-		s.logger.Error("shutdown: commit failed; the store keeps the previous commit", slog.String("op", "shutdown"), slog.String("err", err.Error()))
-	} else {
+	var (
+		rec *db.CommitRecord
+		err error
+	)
+	if panicked := s.guard("shutdown commit", func() { rec, err = s.flushForShutdown() }, nil); panicked {
+		// flushForShutdown classifies panics inside the store itself; a
+		// panic here is in the orchestration (ship reload, bookkeeping).
+		reason, _ := s.HaltDetails()
+		err = fmt.Errorf("%w: %s", ErrShutdownCommitUncertain, reason)
+	}
+	switch {
+	case err == nil:
 		s.logger.Info("shutdown: committed", slog.String("op", "shutdown"), slog.Uint64("commit_seq", rec.CommitSeq))
+	case errors.Is(err, ErrShutdownCommitFailed):
+		s.logger.Error("shutdown: commit failed; the store holds the previous commit", slog.String("op", "shutdown"), slog.String("err", err.Error()))
+	default:
+		s.logger.Error("shutdown: commit outcome uncertain; check commit_seq at the next start", slog.String("op", "shutdown"), slog.String("err", err.Error()))
 	}
 	s.setMode(ModeStopped)
 	return err
@@ -289,17 +333,27 @@ func (s *State) drainQueues() {
 // flushForShutdown persists in-memory state with the same rules a turn
 // boundary uses: ships are reloaded from the store first (the store is
 // authoritative for ships between turns, CR-11), then the whole world and
-// the schedule are committed in one transaction (commit.go). It therefore
-// preserves exactly what the next turn would have preserved, and carries
-// the same CR-17 caveat for the six planet records that handlers read and
-// write through the store directly. A failed commit writes nothing.
+// the schedule are committed in one transaction (commit.go) and the outcome
+// is classified by the durable record. It therefore preserves exactly what
+// the next turn would have preserved, and carries the same CR-17 caveat for
+// the six planet records that handlers read and write through the store
+// directly. ErrShutdownCommitFailed means the store holds the previous
+// commit; ErrShutdownCommitUncertain means the outcome is not established.
 func (s *State) flushForShutdown() (*db.CommitRecord, error) {
 	ships, err := s.store.AllShips()
 	if err != nil {
-		return nil, fmt.Errorf("reload ships: %w", err)
+		return nil, fmt.Errorf("%w: reload ships: %v", ErrShutdownCommitFailed, err)
 	}
 	s.ships = ships
-	return s.commitWorld(commitShutdown)
+	res := s.persistTurn(commitShutdown)
+	switch res.outcome {
+	case persistCommitted:
+		return res.rec, nil
+	case persistNothingWritten:
+		return nil, fmt.Errorf("%w: %s", ErrShutdownCommitFailed, res.reason)
+	default:
+		return nil, fmt.Errorf("%w: %s", ErrShutdownCommitUncertain, res.reason)
+	}
 }
 
 // Request lifecycle (GB1-01). Every typed request and every player command
@@ -395,7 +449,8 @@ func (s *State) request(ctx context.Context, op adminOp, fn func() error) error 
 
 // testHooks are set only by tests in this package.
 type testHooks struct {
-	beforeTurn func(kind turnKind)
-	midTurn    func(update bool) // inside doTurn, after planets and ships were processed
-	panicVerb  string            // a command verb that panics inside dispatch
+	beforeTurn  func(kind turnKind)
+	midTurn     func(update bool) // inside doTurn, after planets and ships were processed
+	afterCommit func(kind string) // inside persistTurn, right after the transaction committed
+	panicVerb   string            // a command verb that panics inside dispatch
 }

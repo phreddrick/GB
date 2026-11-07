@@ -2,6 +2,7 @@ package db
 
 import (
 	"errors"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -188,6 +189,8 @@ func TestWriteFenceRefusesOrdinaryWritesAndCountsThem(t *testing.T) {
 		{"AppendNews", func() error { _, err := s.AppendNews(0, "n"); return err }},
 		{"PurgeNews", func() error { return s.PurgeNews(0) }},
 		{"PutUniverse", func() error { return s.PutUniverse(c.StarData, c.Stars, nil, &UniverseRecord{}) }},
+		{"AllocShipNum", func() error { _, err := s.AllocShipNum(); return err }},
+		{"AllocCommodNum", func() error { _, err := s.AllocCommodNum(); return err }},
 	}
 	for _, w := range writes {
 		if err := w.fn(); !errors.Is(err, ErrWriteFenced) {
@@ -197,20 +200,17 @@ func TestWriteFenceRefusesOrdinaryWritesAndCountsThem(t *testing.T) {
 	if got := s.FencedWrites(); got != uint64(len(writes)) {
 		t.Fatalf("fenced writes counted %d, want %d", got, len(writes))
 	}
-	// Allocators are exempt (documented), reads work, and the commit itself
-	// is the fence's sanctioned writer.
-	if _, err := s.AllocShipNum(); err != nil {
-		t.Fatalf("AllocShipNum under the fence: %v", err)
+	if got := s.LastFencedWrite(); got != "AllocCommodNum" {
+		t.Fatalf("last fenced write %q", got)
 	}
-	if _, err := s.AllocCommodNum(); err != nil {
-		t.Fatalf("AllocCommodNum under the fence: %v", err)
-	}
+	// Reads work, nothing changed, and the commit itself is the fence's
+	// only sanctioned writer.
 	if _, err := s.GetRace(1); err != nil {
 		t.Fatal(err)
 	}
-	mid, _ := s.WorldDigest()
-	// Only the allocator calls changed the store (free-list / counters).
-	_ = mid
+	if mid, _ := s.WorldDigest(); mid != before {
+		t.Fatal("a fenced write changed the store")
+	}
 	if _, err := s.CommitWorld(c); err != nil {
 		t.Fatalf("CommitWorld under the fence: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestWriteFenceRefusesOrdinaryWritesAndCountsThem(t *testing.T) {
 	}
 	after, _ := s.WorldDigest()
 	if after == before {
-		t.Fatal("digest unchanged although the commit and allocators wrote")
+		t.Fatal("digest unchanged although the commit wrote")
 	}
 }
 
@@ -261,5 +261,120 @@ func TestWorldDigestIsStableAcrossReopenAndSensitiveToContent(t *testing.T) {
 	d4, _ := s2.WorldDigest()
 	if d4 == d1 {
 		t.Fatal("digest blind to a record change")
+	}
+}
+
+// TestCommitRecordValidate (CR18-R01) covers every format rule.
+func TestCommitRecordValidate(t *testing.T) {
+	good := CommitRecord{SchemaVersion: 1, CommitSeq: 5, Turn: 2, Segment: 0, Kind: "update", WallTime: time.Now()}
+	if err := good.Validate(); err != nil {
+		t.Fatalf("valid record rejected: %v", err)
+	}
+	cases := map[string]func(r *CommitRecord){
+		"schema 0":         func(r *CommitRecord) { r.SchemaVersion = 0 },
+		"schema 2":         func(r *CommitRecord) { r.SchemaVersion = 2 },
+		"unknown kind":     func(r *CommitRecord) { r.Kind = "restore" },
+		"empty kind":       func(r *CommitRecord) { r.Kind = "" },
+		"seq 0":            func(r *CommitRecord) { r.CommitSeq = 0 },
+		"seq overflow":     func(r *CommitRecord) { r.CommitSeq = math.MaxUint64 },
+		"negative turn":    func(r *CommitRecord) { r.Turn = -1 },
+		"negative segment": func(r *CommitRecord) { r.Segment = -1 },
+		"init counters":    func(r *CommitRecord) { r.Kind = "init"; r.Turn = 1 },
+		"update segment":   func(r *CommitRecord) { r.Segment = 2 },
+		"zero wall time":   func(r *CommitRecord) { r.WallTime = time.Time{} },
+	}
+	for name, mutate := range cases {
+		r := good
+		mutate(&r)
+		if err := r.Validate(); !errors.Is(err, ErrCorruptCommitRecord) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	// Segment commits may carry a segment counter; shutdown commits too.
+	seg := good
+	seg.Kind = "segment"
+	seg.Segment = 2
+	if err := seg.Validate(); err != nil {
+		t.Errorf("segment record rejected: %v", err)
+	}
+}
+
+// TestGetCommitRecordDistinguishesAbsentFromMalformed (CR18-R01).
+func TestGetCommitRecordDistinguishesAbsentFromMalformed(t *testing.T) {
+	s, _, _ := fixtureStore(t)
+	if err := s.DeleteMeta(KeyCommit); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := s.GetCommitRecord(); rec != nil || err != nil {
+		t.Fatalf("absent record: %+v %v", rec, err)
+	}
+	for name, raw := range map[string]string{
+		"null":          "null",
+		"empty object":  "{}",
+		"missing":       `{"schema_version":1}`,
+		"unknown field": `{"schema_version":1,"commit_seq":1,"turn":0,"segment":0,"kind":"init","wall_time":"2026-01-01T00:00:00Z","extra":true}`,
+		"garbage":       "{",
+	} {
+		if err := s.PutMeta(KeyCommit, []byte(raw)); err != nil {
+			t.Fatal(err)
+		}
+		if rec, err := s.GetCommitRecord(); !errors.Is(err, ErrCorruptCommitRecord) || rec != nil {
+			t.Errorf("%s: rec=%+v err=%v", name, rec, err)
+		}
+	}
+	// CommitWorld refuses to build on a malformed previous record.
+	_, _, c := fixtureStore(t)
+	if _, err := s.CommitWorld(c); !errors.Is(err, ErrCorruptCommitRecord) {
+		t.Fatalf("commit on a malformed previous record: %v", err)
+	}
+}
+
+// TestCommitWorldPopsExactlyTheStagedFreeNumbers (CR18-R04): the commit
+// deletes the staged free entries atomically and refuses a mismatch.
+func TestCommitWorldPopsExactlyTheStagedFreeNumbers(t *testing.T) {
+	s, _, c := fixtureStore(t)
+	for _, n := range []uint32{7, 8, 9} {
+		if err := s.PutShip(&model.Ship{Number: n}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, n := range []uint32{7, 9} { // free list in pop order: [9 7]
+		if err := s.DeleteShip(n); err != nil {
+			t.Fatal(err)
+		}
+	}
+	free, _ := s.FreeShipNums()
+	if len(free) != 2 || free[0] != 9 || free[1] != 7 {
+		t.Fatalf("free list %v", free)
+	}
+	if max, _ := s.MaxShipNum(); max != 8 {
+		t.Fatalf("max ship %d", max)
+	}
+	before, _ := s.WorldDigest()
+	// A mismatch (claiming 7 was popped first) writes nothing.
+	bad := *c
+	bad.ShipFreePops = []uint32{7}
+	if _, err := s.CommitWorld(&bad); !errors.Is(err, ErrFreeListMismatch) {
+		t.Fatalf("mismatched pops: %v", err)
+	}
+	if d, _ := s.WorldDigest(); d != before {
+		t.Fatal("mismatched commit changed the store")
+	}
+	// Claiming more than the list holds writes nothing.
+	bad.ShipFreePops = []uint32{9, 7, 1}
+	if _, err := s.CommitWorld(&bad); !errors.Is(err, ErrFreeListMismatch) {
+		t.Fatalf("over-popped: %v", err)
+	}
+	// The correct pop order is consumed with the commit.
+	c.ShipFreePops = []uint32{9}
+	if _, err := s.CommitWorld(c); err != nil {
+		t.Fatal(err)
+	}
+	free, _ = s.FreeShipNums()
+	if len(free) != 1 || free[0] != 7 {
+		t.Fatalf("free list after commit %v", free)
+	}
+	if n, _ := s.AllocShipNum(); n != 7 {
+		t.Fatalf("store allocator after commit gave %d, want 7", n)
 	}
 }

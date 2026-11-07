@@ -88,9 +88,12 @@ type State struct {
 	// Turn schedule (actor-owned; schedule.go).
 	sched schedule
 
-	// Effects buffered while a turn body runs (commit.go).
-	effects      turnEffects
-	fencedBefore uint64 // store.FencedWrites() at the end of the previous turn
+	// Effects buffered while a turn body runs, the fence baseline captured
+	// at turn start, and the staged number allocations of the running turn
+	// (commit.go).
+	effects   turnEffects
+	fenceBase uint64
+	turnAlloc turnAllocator
 
 	// Inboxes (other goroutines -> actor goroutine).
 	cmdCh   chan *command      // player commands

@@ -54,6 +54,10 @@ type ScheduleRecord struct {
 // holds a universe.
 var ErrAlreadyInitialized = errors.New("database already holds an initialised universe")
 
+// ErrCorruptScheduleRecord wraps a schedule record that is present but
+// undecodable or carries negative counters.
+var ErrCorruptScheduleRecord = errors.New("corrupt schedule record")
+
 // GetUniverseRecord returns the initialisation record, or nil, nil when the
 // store has none.
 func (s *Store) GetUniverseRecord() (*UniverseRecord, error) {
@@ -101,7 +105,7 @@ func (s *Store) IsInitialized() (bool, error) {
 // store already holds a universe, so two concurrent initialisations cannot
 // both succeed.
 func (s *Store) PutUniverse(sd *model.StarData, stars []*model.Star, planets []*model.Planet, rec *UniverseRecord) error {
-	if err := s.writeAllowed(); err != nil {
+	if err := s.writeAllowed("PutUniverse"); err != nil {
 		return err
 	}
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -163,7 +167,10 @@ func (s *Store) GetSchedule() (*ScheduleRecord, error) {
 	}
 	var rec ScheduleRecord
 	if err := json.Unmarshal(raw, &rec); err != nil {
-		return nil, fmt.Errorf("decode schedule record: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrCorruptScheduleRecord, err)
+	}
+	if rec.NumUpdates < 0 || rec.NumSegments < 0 {
+		return nil, fmt.Errorf("%w: negative counters %d/%d", ErrCorruptScheduleRecord, rec.NumUpdates, rec.NumSegments)
 	}
 	return &rec, nil
 }

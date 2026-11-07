@@ -304,7 +304,7 @@ func (s *State) planetDoVN(ship *model.Ship, planet *model.Planet) {
 // spawnVN creates one new VN or Berserker ship on the given planet.
 // Mirrors the ship construction block inside planet_doVN() in VN.c.
 func (s *State) spawnVN(parent *model.Ship, planet *model.Planet, buildType model.ShipType) {
-	shipNum, err := s.store.AllocShipNum()
+	shipNum, err := s.allocShipNum()
 	if err != nil {
 		return
 	}

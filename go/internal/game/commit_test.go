@@ -355,7 +355,7 @@ func TestCommitFailureRollsBackAndHalts(t *testing.T) {
 		t.Fatal("a failed commit changed the store")
 	}
 	reason, _ := s.HaltDetails()
-	if !strings.Contains(reason, "commit failed") || !strings.Contains(reason, "injected I/O error") || !strings.Contains(reason, "reloaded") {
+	if !strings.Contains(reason, "commit update failed") || !strings.Contains(reason, "injected I/O error") || !strings.Contains(reason, "nothing of the turn was written") || !strings.Contains(reason, "reloaded from the last commit") {
 		t.Fatalf("halt reason %q", reason)
 	}
 	if s.Metrics().Commits.Value("update", "error") != 1 || s.Metrics().TurnsTotal.Value("update", "commit_failed") != 1 {
@@ -383,30 +383,83 @@ func TestCommitFailureRollsBackAndHalts(t *testing.T) {
 	}
 }
 
-// TestDirectWriteDuringTurnIsFencedAndCounted: a turn code path that tries
-// to write to the store directly is refused and counted; the commit still
-// holds the whole turn.
+// TestDirectWriteDuringTurnIsFencedAndCounted (CR18-R03): a turn code path
+// that writes to the store directly is refused, counted, and the turn is
+// NOT committed: memory is reloaded, the engine halts with the fence named
+// in the reason, and a later clean turn (after restart) commits normally,
+// unaffected by the historical counter.
 func TestDirectWriteDuringTurnIsFencedAndCounted(t *testing.T) {
-	s, store, _ := newTestEngine(t, true)
+	s, store, cfg := newTestEngine(t, true)
+	before := digest(t, store)
 	var fenceErr error
 	s.testHooks = &testHooks{midTurn: func(bool) {
+		s.races[0].Motto = "must-not-persist"
 		fenceErr = store.PutRace(s.races[0])
 	}}
-	if err := s.TriggerUpdate(ctxT(t, 60*time.Second)); err != nil {
-		t.Fatal(err)
+	err := s.TriggerUpdate(ctxT(t, 60*time.Second))
+	if !errors.Is(err, ErrHalted) || s.Mode() != ModeHalted {
+		t.Fatalf("err=%v mode=%s (a fence violation must abort the turn)", err, s.Mode())
 	}
 	if !errors.Is(fenceErr, db.ErrWriteFenced) {
 		t.Fatalf("direct write during a turn: %v", fenceErr)
 	}
-	if s.Metrics().FencedWrites.Value() != 1 {
-		t.Fatalf("fenced writes metric %v", s.Metrics().FencedWrites.Value())
+	if s.Metrics().FencedWrites.Value() != 1 || s.Metrics().TurnsTotal.Value("update", "fence_violation") != 1 || s.Metrics().Commits.Value("update", "ok") != 0 {
+		t.Fatalf("metrics: fenced=%v fence_violation=%v commits_ok=%v", s.Metrics().FencedWrites.Value(), s.Metrics().TurnsTotal.Value("update", "fence_violation"), s.Metrics().Commits.Value("update", "ok"))
 	}
-	if rec := commitRecord(t, store); rec.Kind != "update" || rec.Turn != 1 {
-		t.Fatalf("commit %+v", rec)
+	reason, _ := s.HaltDetails()
+	if !strings.Contains(reason, "write fence") || !strings.Contains(reason, "PutRace") || !strings.Contains(reason, "not committed") || !strings.Contains(reason, "reloaded from the last commit") {
+		t.Fatalf("halt reason %q", reason)
+	}
+	if d := digest(t, store); d != before {
+		t.Fatal("a turn with a fence violation changed the store")
+	}
+	if rec := commitRecord(t, store); rec.Kind != "init" || rec.CommitSeq != 1 {
+		t.Fatalf("commit record after an aborted turn %+v", rec)
+	}
+	onActor(t, s, func() {
+		if s.races[0].Motto == "must-not-persist" || s.races[0].Turn != 0 {
+			t.Errorf("memory not reloaded after a fence violation: %+v", s.races[0])
+		}
+	})
+	// After a restart the fence counter of the old turn does not abort a
+	// clean turn.
+	s2, store2 := reopen(t, s, store, cfg.DBPath)
+	if err := s2.TriggerUpdate(ctxT(t, 60*time.Second)); err != nil {
+		t.Fatalf("clean turn after restart: %v", err)
+	}
+	if rec := commitRecord(t, store2); rec.Kind != "update" || rec.Turn != 1 || rec.CommitSeq != 2 {
+		t.Fatalf("commit after restart %+v", rec)
 	}
 	// Outside a turn the same write works again.
-	if err := store.PutRace(s.races[0]); err != nil {
+	if err := store2.PutRace(s2.races[0]); err != nil {
 		t.Fatalf("write after the turn: %v", err)
+	}
+}
+
+// TestDirectNewsWriteDuringTurnAbortsTurn: a news or telegram write that
+// bypasses the buffered helpers cannot silently vanish from a turn that is
+// then reported successful; the turn is aborted instead.
+func TestDirectNewsWriteDuringTurnAbortsTurn(t *testing.T) {
+	s, store, _ := newTestEngine(t, true)
+	s.testHooks = &testHooks{midTurn: func(bool) {
+		_, _ = store.AppendNews(model.NewsCombat, "bypassed the buffer")
+		_ = store.PushTelegram(1, 0, "bypassed the buffer")
+	}}
+	if err := s.TriggerUpdate(ctxT(t, 60*time.Second)); !errors.Is(err, ErrHalted) {
+		t.Fatalf("turn with direct news/telegram writes: %v", err)
+	}
+	reason, _ := s.HaltDetails()
+	if !strings.Contains(reason, "2 store write(s)") || !strings.Contains(reason, "PushTelegram") {
+		t.Fatalf("halt reason %q", reason)
+	}
+	if news, _, _ := store.ReadNewsFrom(model.NewsCombat, 0); len(news) != 0 {
+		t.Fatalf("bypassed news persisted: %v", news)
+	}
+	if has, _ := store.HasTelegrams(1, 0); has {
+		t.Fatal("bypassed telegram persisted")
+	}
+	if s.Metrics().TurnsTotal.Value("update", "ok") != 0 {
+		t.Fatal("turn reported successful despite fence violations")
 	}
 }
 

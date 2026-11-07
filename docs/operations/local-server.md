@@ -250,8 +250,8 @@ Exit status (each case is logged with `op=shutdown`):
 | 0 | orderly shutdown after a signal; state flushed and the database closed |
 | 1 | configuration or startup error, including a listener that cannot bind its address; nothing was served |
 | **2** | the engine was `HALTED`: in-memory state was discarded, not flushed. The store holds the last complete commit; after a failed turn the halt reason says that memory had been reloaded from it (nothing of the failed turn was written). In-memory changes made by player commands since that commit are lost |
-| **3** | the shutdown budget expired while a turn was still running: the process exits anyway. The turn's commit is atomic, so the store holds either the previous commit or, if the commit raced the exit, the completed one; never a mixture |
-| **4** | the flush or the database close reported an error |
+| **3** | the shutdown budget expired while a turn was still running: the process exits anyway and the turn may still commit before the process is gone. The commit is atomic, so the store holds either the previous commit or the completed one, never a mixture; `commit_seq` at the next start (or the commit record's turn counter) says which. Nothing here claims the turn was lost or kept |
+| **4** | the shutdown commit failed (the store holds the previous commit), its outcome is uncertain (check `commit_seq` at the next start), or the database close reported an error |
 | **5** | a listener failed while serving (for example a missing or unreadable TLS certificate or key). The shutdown sequence still runs and its own result is logged as `shutdown_exit_code`, but the process exits 5: cleanup never turns a failure into success (GB1-05) |
 | **6** | forced exit: a **second** `SIGINT`/`SIGTERM` arrived during shutdown. The process logs the forced exit and exits at once, without waiting for the engine or closing the database. The store keeps its last complete commit; anything uncommitted in memory is lost. Use it only when the orderly path is stuck (GB1-09) |
 
@@ -275,20 +275,38 @@ restart**, which reloads the store. The same fail-closed path is taken when
 
 **A failed turn is rolled back, not half applied (CR-18, ADR-0009).** While
 a turn body runs, the store refuses every write except the turn's own
-commit (the write fence), and the news, telegrams and messages the turn
-produces are held back. If the body panics, or the single commit
-transaction fails (I/O error, disk full), nothing of the turn is on disk:
-the held effects are dropped, the in-memory world and schedule are
-**reloaded from the last commit**, connected players are told the turn was
-rolled back, and the engine halts with a reason ending in `in-memory state
-reloaded from the last commit`. If that reload itself fails the reason says
-`in-memory state is untrusted` instead. Either way the halted shutdown
-writes nothing and the store is the last commit. After a restart the turn
-is simply overdue: the no-catch-up policy reschedules it and `gbctl update`
-runs it by hand. `gb_turns_total{result="panic"|"commit_failed"}`,
-`gb_commits_total{result="error"}` and `gb_store_fenced_writes_total` (a
-turn code path that tried to write directly; refused, a defect to report)
-show what happened.
+commit (the write fence; number allocation is staged in memory and
+persisted by the commit), and the news, telegrams and messages the turn
+produces are held back. The engine then reports one of four outcomes, each
+decided by reading the durable commit record back, never by assumption:
+
+- **Nothing written.** The body panicked, turn code hit the write fence, or
+  the commit transaction failed or panicked and the record still shows the
+  previous sequence. The held effects and staged allocations are dropped,
+  the in-memory world and schedule are **reloaded from the last commit**,
+  players are told the turn was rolled back, and the halt reason ends in
+  `nothing of the turn was written; in-memory state reloaded from the last
+  commit` (a fence violation names the refused store method).
+- **Uncertain.** The commit record could not be read back, changed in an
+  unexpected way, or advanced although an error was reported (for example
+  a failure after the transaction became visible). The halt reason says
+  `outcome uncertain` and never claims a rollback; memory is reloaded from
+  the store as it is now visible, players are told the outcome is
+  uncertain, and `commit_seq` in `gbctl status` shows what the store holds.
+- **Committed, delivery failed.** The transaction committed but delivering
+  the held notifications panicked. The halt reason says `committed
+  (commit_seq N) ... nothing was rolled back`; store and memory agree.
+- **Reload failed.** In the first two cases, if reloading the store fails,
+  the reason says `in-memory state is untrusted`.
+
+In every case the halted shutdown writes nothing. After a restart a turn
+that was not committed is simply overdue: the no-catch-up policy
+reschedules it and `gbctl update` runs it by hand.
+`gb_turns_total{result="panic"|"fence_violation"|"commit_failed"|"commit_uncertain"}`,
+`gb_commits_total{result="ok"|"error"|"panic"|"uncertain"}`,
+`gb_store_fenced_writes_total` and `gb_turn_notice_delivery_panics_total`
+show what happened. Scheduled turns, `gbctl update`/`segment` and the
+shutdown commit all follow this path.
 
 What a restart gives you after a **command** panic: the store as of the
 last commit plus whatever the panicking command and earlier commands had
@@ -298,32 +316,46 @@ the last commit that no command had written are lost.
 
 `gbctl status` reports `commit_seq`, the sequence number of the last
 commit; a store written before this change reports 0 until its first
-commit. At startup a commit record whose turn counter is **ahead** of the
-schedule record (something wrote the store outside the commit path) makes
-the engine start `HALTED` with reason `CORRUPT_STORE…`, alive, not ready,
-writing nothing; a schedule ahead of the commit record (turns run by an
-older binary) is accepted with a warning and resynchronised at the next
-commit.
+commit. At startup the engine validates the commit metadata and starts
+`HALTED` with reason `CORRUPT_STORE…` (alive, not ready, writing nothing,
+no fresh schedule created) when an existing commit record is JSON null,
+empty, undecodable, of an unsupported schema version or unknown kind, has
+a zero or overflowing sequence or negative counters, when the schedule
+record is undecodable or negative, when a non-init commit record has no
+schedule record, or when the commit record's turn is **ahead** of the
+schedule record (something wrote the store outside the commit path). An
+absent commit record (older store) is accepted; so is an init record
+without a schedule (fresh universe) and a schedule ahead of the commit
+record (turns run by an older binary; warned, resynchronised at the next
+commit).
 
 ## 10. Persistence guarantees and remaining limitations
 
-**Guaranteed (CR-18 closed, ADR-0009):** every update, movement segment and
-orderly-shutdown flush commits the whole world (ships, stars, planets,
-races, star data, power, blocks), the schedule counters and times, and the
-turn's news and stored telegrams in **one bbolt transaction** together with
-a commit record (`meta/commit`: sequence, turn, segment, kind, wall time,
-engine version). A crash, `kill -9`, power loss or budget timeout at any
-point leaves the store at the last commit; a turn is never counted without
-its world and never half applied. The tests in
-`go/internal/game/commit_test.go`, `go/internal/db/commit_test.go` and
-`go/test/e2e/crash_test.go` (a real process killed mid-turn) assert this;
-the known-defect entry `persistence/non-atomic-turn-flush` is gone.
+**Guaranteed (CR-18 implemented, independent acceptance pending; ADR-0009):**
+every update, movement segment and orderly-shutdown flush commits the whole
+world (ships, stars, planets, races, star data, power, blocks), the
+schedule counters and times, the turn's news and stored telegrams and the
+free-list numbers the turn allocated in **one bbolt transaction** together
+with a validated commit record (`meta/commit`: sequence, turn, segment,
+kind, wall time, engine version). A crash, `kill -9`, power loss or budget
+timeout at any point leaves the store at a complete commit (the previous
+or, if the transaction had committed, the new one); a turn is never
+counted without its world and never half applied. The tests in
+`go/internal/game/commit_test.go`, `commit_remediation_test.go`,
+`go/internal/db/commit_test.go` and `go/test/e2e/crash_test.go` (a real
+process killed during the turn body, and one exiting from inside the open
+commit transaction) assert this; the known-defect entry
+`persistence/non-atomic-turn-flush` records the pending acceptance.
 
 **Not yet guaranteed:** player commands between turns still write per
 record (`PutShip`, `PutPlanet`, `PutRace` at about 70 sites) and six
-handlers read planets through the store (CR-17), so a command that fails or
-is interrupted between two of its own writes is not atomic, and a command
-that changes memory without writing is persisted only by the next commit.
+handlers read planets through the store (CR-11, CR-17), so a command that
+fails or is interrupted between two of its own writes is not atomic, a
+command that changes memory without writing is persisted only by the next
+commit, and not every database mutation is turn-atomic. Live notifications
+after a commit are best-effort (a disconnect between generation and
+delivery loses them; a delivery failure halts the engine but never undoes
+the commit).
 Plan 8.4 (command staging set, group commit, acknowledged-after-commit),
 per-record commit stamps and the `TURN_FAILED` / `RetryTurn` operator path
 remain Phase 3a work. Keep the shutdown budget above the longest observed
