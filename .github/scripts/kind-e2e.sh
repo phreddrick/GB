@@ -76,6 +76,14 @@ fi
 for tool in kind kubectl docker curl jq openssl python3 timeout; do
   command -v "$tool" >/dev/null || { echo "kind-e2e: $tool is required" >&2; exit 2; }
 done
+# The rollout-evidence program (CR-43: was the quiesced Pod deleted by the
+# StatefulSet controller itself?) is compiled against an empty EventList
+# before anything is created, so a syntax error in it can never surface only
+# after a cluster exists.
+EVENT_PROGRAM="$HERE/sts-controller-delete-event.jq"
+[ -f "$EVENT_PROGRAM" ] || { echo "kind-e2e: $EVENT_PROGRAM is missing next to this script" >&2; exit 2; }
+jq -e -f "$EVENT_PROGRAM" --arg uid compile-check --arg set gb-engine --arg pod gb-engine-0 --arg since 2000-01-01T00:00:00Z <<<'{"items":[]}' >/dev/null \
+  || { echo "kind-e2e: $EVENT_PROGRAM does not compile or does not evaluate an empty EventList" >&2; exit 2; }
 mkdir -p "$WORK" "$DIAG"
 chmod 700 "$WORK"
 : "${KUBECONFIG:=$WORK/kubeconfig}"
@@ -110,6 +118,7 @@ collect_diagnostics() {
   k logs pod/gb-engine-0 --all-containers=true > "$DIAG/gb-engine-0.log" 2>&1 || true
   k logs pod/gb-engine-0 --all-containers=true --previous > "$DIAG/gb-engine-0.previous.log" 2>&1 || true
   cp -f "$WORK"/*.log "$DIAG"/ 2>/dev/null || true
+  cp -f "$WORK"/events-rollout*.json "$DIAG"/ 2>/dev/null || true
   cp -f "$WORK"/*.json "$DIAG"/ 2>/dev/null || true
 }
 
@@ -360,10 +369,22 @@ pod_uid_r=$(k get pod gb-engine-0 -o jsonpath='{.metadata.uid}')
 [ "$(k get statefulset gb-engine -o jsonpath='{.status.updatedReplicas}')" = "1" ] && [ "$(k get statefulset gb-engine -o jsonpath='{.status.currentRevision}')" = "$(k get statefulset gb-engine -o jsonpath='{.status.updateRevision}')" ] || fail "StatefulSet did not converge on the update revision"
 [ "$(k get pvc world-gb-engine-0 -o jsonpath='{.metadata.uid}')" = "$pvc_uid_1" ] || fail "PVC identity changed across the rolling update"
 [ "$(k get pod gb-engine-0 -o jsonpath='{.status.containerStatuses[0].restartCount}')" = "0" ] || fail "new Pod has restarts"
-# The deletion must be the StatefulSet controller's own: an event on this StatefulSet's UID, from the statefulset-controller, after the rollout began.
+# The deletion must be the StatefulSet controller's own: a SuccessfulDelete event on this StatefulSet's UID, from the
+# statefulset-controller, naming gb-engine-0, at or after the instant the rollout began. sts-controller-delete-event.jq
+# evaluates the four predicates separately (the message case-insensitively: Kubernetes title-cases the verb) and reports
+# the expected and observed value of each one, so a failure names the mismatch.
 k get events --field-selector reason=SuccessfulDelete,involvedObject.name=gb-engine -o json > "$WORK/events-rollout.json"
-jq -e --arg uid "$sts_uid" --arg since "$rollout_started" '.items[] | select(.involvedObject.uid == $uid and (.message | test("delete Pod gb-engine-0 in StatefulSet gb-engine successful")) and ((.source.component // .reportingComponent // "") | test("statefulset-controller")) and (((.lastTimestamp // .eventTime // "") | tostring) >= $since))' "$WORK/events-rollout.json" >/dev/null \
-  || { jq -c '.items[] | {uid: .involvedObject.uid, comp: (.source.component // .reportingComponent), at: (.lastTimestamp // .eventTime), msg: .message}' "$WORK/events-rollout.json"; fail "no SuccessfulDelete event by the statefulset-controller for this StatefulSet after $rollout_started: the Pod was not replaced by the controller"; }
+jq -f "$EVENT_PROGRAM" --arg uid "$sts_uid" --arg set gb-engine --arg pod gb-engine-0 --arg since "$rollout_started" "$WORK/events-rollout.json" > "$WORK/events-rollout-check.json" 2>&1 \
+  || fail "could not evaluate the SuccessfulDelete events (see events-rollout.json in the diagnostics): $(cat "$WORK/events-rollout-check.json" 2>/dev/null)"
+if [ "$(jq -r '.matched | length' "$WORK/events-rollout-check.json")" -lt 1 ]; then
+  candidates=$(jq -r '.candidates | length' "$WORK/events-rollout-check.json")
+  {
+    echo "SuccessfulDelete events on gb-engine: $candidates candidate(s); expected $(jq -c .expected "$WORK/events-rollout-check.json")"
+    jq -r '.candidates[] | "  event \(.name):", (.checks | to_entries[] | "    \(.key): \(if .value.ok then "ok" else "MISMATCH" end)  expected \(.value.expected | tojson)  observed \(.value.observed | tojson)")' "$WORK/events-rollout-check.json"
+  } >&2
+  if [ "$candidates" -eq 0 ]; then why="no SuccessfulDelete event exists on gb-engine at all"; else why="each of the $candidates candidate event(s) listed above fails at least one predicate"; fi
+  fail "no SuccessfulDelete event by the statefulset-controller for StatefulSet uid $sts_uid naming gb-engine-0 at or after $rollout_started ($why): the Pod was not shown to be replaced by the controller"
+fi
 grep -q '"msg":"shutdown: actor draining".*"mode":"QUIESCED"' "$WORK/gb-engine-0.before-rollout.log" || { tail -20 "$WORK/gb-engine-0.before-rollout.log"; fail "the replaced Pod did not shut down from QUIESCED"; }
 grep -q 'shutdown complete' "$WORK/gb-engine-0.before-rollout.log" || { tail -20 "$WORK/gb-engine-0.before-rollout.log"; fail "the replaced Pod did not log an orderly shutdown"; }
 k logs pod/gb-engine-0 > "$WORK/gb-engine-0.after-rollout.log"
