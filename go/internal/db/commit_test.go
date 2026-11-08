@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -438,5 +439,42 @@ func TestStrictDecodeOfMetaRecords(t *testing.T) {
 	}
 	if rec, err := s.GetCommitRecord(); err != nil || rec == nil || rec.Kind != "init" {
 		t.Fatalf("valid commit with whitespace: %+v %v", rec, err)
+	}
+}
+
+// TestOptionalEngineVersionAbsentOrValueNeverNull (CR18-R01, acceptance
+// round): the optional engine_version may be absent or a string, but an
+// explicitly present null is rejected like any other null field.
+func TestOptionalEngineVersionAbsentOrValueNeverNull(t *testing.T) {
+	s, _, _ := fixtureStore(t)
+	base := `"schema_version":1,"commit_seq":1,"turn":0,"segment":0,"kind":"init","wall_time":"2026-01-01T00:00:00Z"`
+	cases := []struct {
+		name string
+		raw  string
+		ok   bool
+		want string
+	}{
+		{"absent", "{" + base + "}", true, ""},
+		{"valid value", "{" + base + `,"engine_version":"v0.1.0@abcdef123456"}`, true, "v0.1.0@abcdef123456"},
+		{"empty string value", "{" + base + `,"engine_version":""}`, true, ""},
+		{"present null", "{" + base + `,"engine_version":null}`, false, ""},
+		{"present null with spaces", "{" + base + `,"engine_version": null }`, false, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := s.PutMeta(KeyCommit, []byte(tc.raw)); err != nil {
+				t.Fatal(err)
+			}
+			rec, err := s.GetCommitRecord()
+			if tc.ok {
+				if err != nil || rec == nil || rec.EngineVersion != tc.want {
+					t.Fatalf("rec=%+v err=%v", rec, err)
+				}
+				return
+			}
+			if !errors.Is(err, ErrCorruptCommitRecord) || rec != nil || !strings.Contains(err.Error(), `optional field "engine_version" is present but JSON null`) {
+				t.Fatalf("rec=%+v err=%v", rec, err)
+			}
+		})
 	}
 }

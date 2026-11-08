@@ -259,8 +259,9 @@ type requiredFields struct {
 // strictDecode decodes one JSON object into v and rejects everything that
 // a lenient json.Unmarshal would accept silently: JSON null, a non-object,
 // a missing required key (a zero value is not a substitute for presence),
-// an unknown key, a key whose value is JSON null, and any non-whitespace
-// data after the document (a second value, a stray bracket, garbage).
+// an unknown key, any key (required or optional) whose value is JSON null,
+// and any non-whitespace data after the document (a second value, a stray
+// bracket, garbage). An optional key may be absent.
 func strictDecode(raw []byte, fields requiredFields, v any) error {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 {
@@ -296,6 +297,9 @@ func strictDecode(raw []byte, fields requiredFields, v any) error {
 	}
 	for _, k := range fields.optional {
 		allowed[k] = true
+		if val, ok := keys[k]; ok && bytes.Equal(bytes.TrimSpace(val), []byte("null")) {
+			return fmt.Errorf("optional field %q is present but JSON null", k)
+		}
 	}
 	for k := range keys {
 		if !allowed[k] {

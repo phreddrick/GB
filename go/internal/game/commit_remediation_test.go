@@ -645,6 +645,10 @@ func TestStartupRejectsMetadataReproducedByReview(t *testing.T) {
 			_ = s.PutMeta(db.KeyCommit, []byte(`{"schema_version":1,"commit_seq":1,"turn":null,"segment":0,"kind":"init","wall_time":"2026-01-01T00:00:00Z"}`))
 		}, `field "turn" is JSON null`},
 		{"commit is an array", func(t *testing.T, s *db.Store) { sched(t, s); _ = s.PutMeta(db.KeyCommit, []byte("[]")) }, "corrupt commit record"},
+		{"commit optional engine_version null", func(t *testing.T, s *db.Store) {
+			sched(t, s)
+			_ = s.PutMeta(db.KeyCommit, []byte(`{"schema_version":1,"commit_seq":1,"turn":0,"segment":0,"kind":"init","wall_time":"2026-01-01T00:00:00Z","engine_version":null}`))
+		}, `optional field "engine_version" is present but JSON null`},
 		{"schedule null", func(t *testing.T, s *db.Store) { _ = s.PutMeta(db.KeySchedule, []byte("null")) }, "corrupt schedule record: record is JSON null"},
 		{"schedule empty object", func(t *testing.T, s *db.Store) { _ = s.PutMeta(db.KeySchedule, []byte("{}")) }, `corrupt schedule record: missing field "next_update"`},
 		{"schedule missing counters", func(t *testing.T, s *db.Store) {

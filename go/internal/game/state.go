@@ -7,10 +7,14 @@
 // restores and persists the turn schedule, publishes an operating mode and a
 // heartbeat for health probes, and shuts down in an orderly sequence.
 //
-// Persistence (commit.go, CR-18 closed): a turn, a segment and the shutdown
-// flush each commit the whole world, the schedule and the turn's effects in
-// one bbolt transaction with a commit record; a failed turn is rolled back
-// by reloading the last commit. Player commands between turns still write
+// Persistence (commit.go, CR-18 implemented, independent acceptance
+// pending): a turn, a segment and the shutdown flush each commit the whole
+// world, the schedule and the turn's effects in one bbolt transaction with
+// a validated commit record; a turn whose
+// transaction is confirmed not committed is rolled back by reloading the
+// last commit, a confirmed committed turn stands even if notification
+// delivery then fails, and an outcome that cannot be confirmed is reported
+// as uncertain (commit.go). Player commands between turns still write
 // per record (CR-17; the staging set and group commit of plan 8.4 remain
 // Phase 3a work).
 package game
