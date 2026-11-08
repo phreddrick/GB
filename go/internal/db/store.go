@@ -538,6 +538,9 @@ func (s *Store) DeleteCommod(num uint32) error {
 
 // GetMeta reads a single metadata value.
 func (s *Store) GetMeta(key []byte) ([]byte, error) {
+	if err := s.metaFault("meta.get"); err != nil {
+		return nil, err
+	}
 	var val []byte
 	err := s.db.View(func(tx *bolt.Tx) error {
 		v := tx.Bucket(BucketMeta).Get(key)

@@ -194,11 +194,18 @@ func (s *State) Quiesce(ctx context.Context) error {
 				Reason:        "operator quiesce (admin API)",
 				EngineVersion: engineVersion(),
 			}
+			intended, encErr := db.EncodeMaintenanceRecord(rec)
+			if encErr != nil {
+				return encErr
+			}
+			before := s.snapshotMetaForWrite()
 			if err := s.store.PutMaintenance(rec); err != nil {
 				// Classify by reading back (a bbolt error after the meta page
 				// was written leaves the record visible): never report
-				// "not written" from the error path alone.
-				detail := s.classifyMaintenanceWriteFailure(rec, err)
+				// "not written" from the error path alone, and never promise
+				// QUIESCED on the strength of a record this process has not
+				// confirmed.
+				detail := s.classifyMaintenanceWriteFailure(intended, before)
 				s.setMaintenance(rec, false, errors.New(detail))
 				s.setMode(ModeQuiesced)
 				s.logger.Error("quiesce: maintenance record write failed; QUIESCED in memory, durability not confirmed",
@@ -227,11 +234,13 @@ func (s *State) Quiesce(ctx context.Context) error {
 // maintenance and the resumed schedule are durable together. Only after
 // that write succeeds does the actor adopt the new schedule, publish it and
 // switch to SERVING (which is what makes /readyz report game_ready). If the
-// write fails the store is failing: the engine is HALTED (fail closed, like
-// a failed turn flush), game readiness stays false, mutating work is
-// refused, and shutdown will not flush memory; the maintenance record, if
-// it existed, is still in the store, so a restart starts QUIESCED, never
-// silently SERVING.
+// write reports an error the store is failing: the engine is HALTED (fail
+// closed, like a failed turn flush), game readiness stays false, mutating
+// work is refused, and shutdown will not flush memory. What the next start
+// will do is then established by reading the store back, never assumed
+// (classifyResumeFailure): a confirmed record still present means QUIESCED;
+// a visible resume means SERVING if it persisted; anything else is reported
+// as not guaranteed.
 func (s *State) Resume(ctx context.Context) error {
 	start := s.now()
 	err := s.request(ctx, opResume, func() error {
@@ -257,11 +266,16 @@ func (s *State) Resume(ctx context.Context) error {
 				}
 			}
 			resumeRec := s.scheduleRecord(next, now)
+			intended, encErr := db.EncodeScheduleRecord(resumeRec)
+			if encErr != nil {
+				return encErr
+			}
+			before := s.snapshotMetaForWrite()
 			if err := s.store.ClearMaintenanceWithSchedule(resumeRec); err != nil {
 				// The transaction reported an error, which does not establish
 				// a rollback: read the store back and say what the next
 				// start will do (CR-43 review P2).
-				detail := s.classifyResumeFailure(resumeRec)
+				detail := s.classifyResumeFailure(intended, before)
 				s.halt("resume: persist schedule and clear maintenance: "+err.Error()+"; "+detail, "")
 				return fmt.Errorf("resume failed and the engine is now HALTED (restart required): %w; %s", err, detail)
 			}

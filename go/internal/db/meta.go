@@ -289,6 +289,15 @@ func (r *MaintenanceRecord) Validate() error {
 	return fmt.Errorf("%w: %v", ErrCorruptMaintenanceRecord, problems)
 }
 
+// EncodeMaintenanceRecord returns exactly the bytes PutMaintenance stores
+// for rec, so a caller can tell by comparison whether a transaction's
+// content is what the store now holds.
+func EncodeMaintenanceRecord(rec *MaintenanceRecord) ([]byte, error) { return json.Marshal(rec) }
+
+// EncodeScheduleRecord returns exactly the bytes PutSchedule,
+// ClearMaintenanceWithSchedule and CommitWorld store for rec.
+func EncodeScheduleRecord(rec *ScheduleRecord) ([]byte, error) { return json.Marshal(rec) }
+
 // GetMaintenance returns the maintenance record, or nil, nil when the store
 // has none. A record that is present but malformed is
 // ErrCorruptMaintenanceRecord.
@@ -317,7 +326,7 @@ func (s *Store) PutMaintenance(rec *MaintenanceRecord) error {
 	if err := s.writeAllowed("PutMaintenance"); err != nil {
 		return err
 	}
-	data, err := json.Marshal(rec)
+	data, err := EncodeMaintenanceRecord(rec)
 	if err != nil {
 		return err
 	}
@@ -351,7 +360,7 @@ func (s *Store) ClearMaintenanceWithSchedule(sched *ScheduleRecord) error {
 	if err := s.writeAllowed("ClearMaintenanceWithSchedule"); err != nil {
 		return err
 	}
-	data, err := json.Marshal(sched)
+	data, err := EncodeScheduleRecord(sched)
 	if err != nil {
 		return err
 	}
@@ -381,7 +390,8 @@ func (s *Store) ClearMaintenanceWithSchedule(sched *ScheduleRecord) error {
 // rolls back), and "maintenance.put.committed" / "maintenance.clear.committed"
 // after the transaction committed (the caller is told of an error although
 // the change is visible: the ambiguous outcome a failed final fsync can
-// produce). Production code never sets it.
+// produce), and "meta.get" before every GetMeta read (a failing read-back).
+// Production code never sets it.
 func (s *Store) SetMetaFault(f func(op string) error) {
 	s.metaFaultFn.Store(&f)
 }

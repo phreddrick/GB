@@ -1,6 +1,7 @@
 package game
 
 import (
+	"bytes"
 	"log/slog"
 	"time"
 
@@ -102,64 +103,105 @@ func (s *State) adoptPersistedSchedule(now time.Time) error {
 	return nil
 }
 
+// storeSnapshot is what the two maintenance writes compare against: the raw
+// bytes of the maintenance and schedule records as the store held them
+// before the transaction, and whether the record present then had been
+// confirmed durable (written by a successful transaction of this process,
+// or read at startup).
+type storeSnapshot struct {
+	maintenance, schedule []byte
+	priorConfirmed        bool
+	readErr               error
+}
+
+func (s *State) snapshotMetaForWrite() storeSnapshot {
+	snap := storeSnapshot{priorConfirmed: s.maintenanceDurable()}
+	var err error
+	if snap.maintenance, err = s.store.GetMeta(db.KeyMaintenance); err != nil {
+		snap.readErr = err
+		return snap
+	}
+	if snap.schedule, err = s.store.GetMeta(db.KeySchedule); err != nil {
+		snap.readErr = err
+	}
+	return snap
+}
+
 // classifyMaintenanceWriteFailure reads the store back after PutMaintenance
-// reported err and returns a sentence saying what the next start will do.
-// It also leaves the in-memory durability claim false in every case: a
-// record that is visible after a failed transaction has not been confirmed
-// durable on disk (bbolt may have written the meta page before a failing
-// fsync), so a repeat quiesce is required to confirm it.
-func (s *State) classifyMaintenanceWriteFailure(rec *db.MaintenanceRecord, err error) string {
-	got, rerr := s.store.GetMaintenance()
+// reported err for the record whose canonical bytes are intended, and
+// returns a sentence saying what the next start will do, as far as the
+// store can show it. A record that is visible after a failed transaction
+// has NOT been confirmed durable (bbolt may have written the meta page
+// before a failing fsync), so the sentence promises QUIESCED only when a
+// record that an earlier successful transaction confirmed (prior) is still
+// there; otherwise it says "likely" and the caller's durability claim stays
+// false until a repeat quiesce succeeds.
+func (s *State) classifyMaintenanceWriteFailure(intended []byte, prior storeSnapshot) string {
+	raw, rerr := s.store.GetMeta(db.KeyMaintenance)
 	switch {
 	case rerr != nil:
 		return "write failed and the store could not be read back (" + rerr.Error() + "): whether the next start is QUIESCED or SERVING is unknown"
-	case got == nil:
+	case raw == nil:
 		return "write failed and the store holds no maintenance record: the next start would be SERVING"
-	case got.SetAt.Equal(rec.SetAt):
-		return "write reported an error but the record is visible in the store: a restart would likely start QUIESCED, but durability on disk is not confirmed"
+	case bytes.Equal(raw, intended):
+		return "write reported an error but this record is visible in the store: a restart would likely start QUIESCED, but durability on disk is not confirmed; re-run quiesce to confirm"
+	case prior.priorConfirmed && bytes.Equal(raw, prior.maintenance):
+		return "write failed; the store still holds the previously confirmed maintenance record: the next start would be QUIESCED from it"
 	default:
-		return "write failed; the store holds an older maintenance record (set " + got.SetAt.UTC().Format(time.RFC3339) + "): the next start would be QUIESCED from that record"
+		return "write failed; the store holds a maintenance record that was never confirmed durable by this process: a restart would likely start QUIESCED, but it is not guaranteed; re-run quiesce to confirm"
 	}
 }
 
 // classifyResumeFailure reads the store back after
-// ClearMaintenanceWithSchedule reported an error for the record want and
-// updates the maintenance view to what the store shows: if the transaction
-// is visible (schedule saved_at equals the resume's), the record is gone and
-// the next start is SERVING, so the durability claim is withdrawn; if the
-// store still holds the previous pair, the previous claim stands; if it
-// cannot be read, the outcome is reported as unknown.
-func (s *State) classifyResumeFailure(want *db.ScheduleRecord) string {
-	m, merr := s.store.GetMaintenance()
-	sc, serr := s.store.GetSchedule()
+// ClearMaintenanceWithSchedule reported an error for the transaction that
+// intended to remove the record and store the schedule bytes intendedSched,
+// compares with the snapshot taken before the transaction, updates the
+// in-memory durability claim to the most pessimistic reading the store
+// supports, and returns the sentence that goes into the halt reason and
+// the error. Visibility after a failed transaction never counts as
+// confirmed durability: an applied-but-reported-failed resume may still be
+// lost by a crash, in which case the previous record reappears.
+func (s *State) classifyResumeFailure(intendedSched []byte, before storeSnapshot) string {
+	withdraw := func(reason string) {
+		s.statusMu.Lock()
+		if s.maint.active {
+			s.maint.durable = false
+			s.maint.err = reason
+		}
+		s.statusMu.Unlock()
+		s.metrics.MaintenanceDurable.Set(0)
+	}
+	recRaw, merr := s.store.GetMeta(db.KeyMaintenance)
+	schedRaw, serr := s.store.GetMeta(db.KeySchedule)
 	switch {
-	case merr != nil || serr != nil:
-		s.statusMu.Lock()
-		if s.maint.active {
-			s.maint.durable = false
-			s.maint.err = "resume failed and the store could not be read back: whether the next start is QUIESCED or SERVING is unknown"
+	case before.readErr != nil || merr != nil || serr != nil:
+		msg := "resume failed and the store could not be read back: whether the next start is QUIESCED or SERVING is unknown"
+		withdraw(msg)
+		return msg
+	case recRaw == nil && bytes.Equal(schedRaw, intendedSched):
+		msg := "resume transaction reported an error but the store shows it applied (maintenance record removed, resumed schedule written); durability on disk is not confirmed: the next start is SERVING if the change persisted, otherwise QUIESCED from the previous record"
+		if before.maintenance == nil {
+			msg = "resume transaction reported an error; the store holds no maintenance record (the quiesce was in memory only) and the resumed schedule is visible: the next start would be SERVING"
 		}
-		s.statusMu.Unlock()
-		s.metrics.MaintenanceDurable.Set(0)
-		return "store read-back failed: next start unknown"
-	case sc != nil && sc.SavedAt.Equal(want.SavedAt) && m == nil:
-		s.statusMu.Lock()
-		s.maint = maintenanceState{active: true, durable: false, setAt: s.maint.setAt, reason: s.maint.reason,
-			err: "resume transaction reported an error but the store shows it applied (maintenance record removed, schedule saved " + sc.SavedAt.UTC().Format(time.RFC3339) + "): the next start will be SERVING"}
-		s.statusMu.Unlock()
-		s.metrics.MaintenanceDurable.Set(0)
-		return "the store shows the resume applied (record removed, schedule written): the next start will be SERVING"
-	case m != nil && (sc == nil || !sc.SavedAt.Equal(want.SavedAt)):
-		return "the store still holds the maintenance record and the previous schedule: the next start will be QUIESCED"
+		withdraw(msg)
+		return msg
+	case bytes.Equal(recRaw, before.maintenance) && bytes.Equal(schedRaw, before.schedule):
+		switch {
+		case recRaw == nil:
+			msg := "the store is unchanged and holds no maintenance record (the quiesce was in memory only): the next start would be SERVING"
+			withdraw(msg)
+			return msg
+		case before.priorConfirmed:
+			return "the store is unchanged and still holds the confirmed maintenance record and the previous schedule: the next start will be QUIESCED"
+		default:
+			msg := "the store is unchanged, but its maintenance record was never confirmed durable by this process: the next start is likely QUIESCED, not guaranteed"
+			withdraw(msg)
+			return msg
+		}
 	default:
-		s.statusMu.Lock()
-		if s.maint.active {
-			s.maint.durable = false
-			s.maint.err = "resume failed and the store is in an unexpected state (record present=" + boolStr(m != nil) + ", schedule applied=" + boolStr(sc != nil && sc.SavedAt.Equal(want.SavedAt)) + "): the next start cannot be predicted from here"
-		}
-		s.statusMu.Unlock()
-		s.metrics.MaintenanceDurable.Set(0)
-		return "unexpected store state after the failed resume: next start unknown"
+		msg := "the store is in an unexpected state after the failed resume (maintenance record present=" + boolStr(recRaw != nil) + ", resumed schedule visible=" + boolStr(bytes.Equal(schedRaw, intendedSched)) + "): the next start cannot be predicted from here"
+		withdraw(msg)
+		return msg
 	}
 }
 

@@ -369,6 +369,194 @@ func TestQuiesceWithFailedMaintenanceWriteIsReportedNotSilent(t *testing.T) {
 	}
 }
 
+// TestQuiesceRetryInSameProcessConfirmsDurability: after a failed (not
+// written) quiesce, a repeat quiesce in the same process writes the record
+// and the claim becomes durable.
+func TestQuiesceRetryInSameProcessConfirmsDurability(t *testing.T) {
+	f := newMaintFixture(t)
+	s, store, _ := f.open()
+	boom := errors.New("injected store failure")
+	store.SetMetaFault(func(op string) error {
+		if op == "maintenance.put" {
+			return boom
+		}
+		return nil
+	})
+	if err := s.Quiesce(ctxT(t, 5*time.Second)); !errors.Is(err, ErrMaintenanceNotDurable) {
+		t.Fatalf("first quiesce: %v", err)
+	}
+	if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable {
+		t.Fatalf("status after the failed write: %+v", st.Maintenance)
+	}
+	store.SetMetaFault(nil)
+	if err := s.Quiesce(ctxT(t, 5*time.Second)); err != nil {
+		t.Fatalf("retry in the same process: %v", err)
+	}
+	m, err := store.GetMaintenance()
+	if err != nil || m == nil {
+		t.Fatalf("the retry must write the record: %v %v", m, err)
+	}
+	if st := s.Status(); st.Maintenance == nil || !st.Maintenance.Durable || st.Maintenance.Error != "" || st.Maintenance.SetAt == nil || !st.Maintenance.SetAt.Equal(m.SetAt) {
+		t.Fatalf("status after the retry: %+v", st.Maintenance)
+	}
+	if s.Metrics().MaintenanceDurable.Value() != 1 {
+		t.Fatal("gb_maintenance_durable must be 1 after the retry")
+	}
+}
+
+// TestMaintenanceClassifierBranches (review round 2): every read-back
+// branch of both classifiers is exercised and asserted against the store.
+func TestMaintenanceClassifierBranches(t *testing.T) {
+	boom := errors.New("injected failure")
+	faultOn := func(store *db.Store, ops ...string) {
+		store.SetMetaFault(func(op string) error {
+			for _, o := range ops {
+				if op == o {
+					return boom
+				}
+			}
+			return nil
+		})
+	}
+
+	t.Run("quiesce read-back failure is reported as unknown", func(t *testing.T) {
+		f := newMaintFixture(t)
+		s, store, _ := f.open()
+		faultOn(store, "maintenance.put", "meta.get")
+		err := s.Quiesce(ctxT(t, 5*time.Second))
+		if !errors.Is(err, ErrMaintenanceNotDurable) || !strings.Contains(err.Error(), "could not be read back") || !strings.Contains(err.Error(), "unknown") {
+			t.Fatalf("quiesce: %v", err)
+		}
+		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "unknown") {
+			t.Fatalf("status: %+v", st.Maintenance)
+		}
+	})
+
+	t.Run("unconfirmed visible record never earns a QUIESCED promise", func(t *testing.T) {
+		f := newMaintFixture(t)
+		s, store, stop := f.open()
+		// 1. visible but reported failed: unconfirmed
+		faultOn(store, "maintenance.put.committed")
+		if err := s.Quiesce(ctxT(t, 5*time.Second)); !errors.Is(err, ErrMaintenanceNotDurable) || !strings.Contains(err.Error(), "likely") {
+			t.Fatalf("first quiesce: %v", err)
+		}
+		// 2. a later quiesce fails before writing: the older record is in the
+		// store but was never confirmed, so the text must not promise QUIESCED.
+		faultOn(store, "maintenance.put")
+		err := s.Quiesce(ctxT(t, 5*time.Second))
+		if !errors.Is(err, ErrMaintenanceNotDurable) || !strings.Contains(err.Error(), "never confirmed durable") || !strings.Contains(err.Error(), "not guaranteed") {
+			t.Fatalf("second quiesce: %v", err)
+		}
+		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "not guaranteed") {
+			t.Fatalf("status: %+v", st.Maintenance)
+		}
+		if s.Metrics().MaintenanceDurable.Value() != 0 {
+			t.Fatal("metric must stay 0")
+		}
+		// 3. a resume that fails before writing with that unconfirmed record:
+		// the store is unchanged but QUIESCED is not guaranteed either.
+		faultOn(store, "maintenance.clear")
+		err = s.Resume(ctxT(t, 5*time.Second))
+		if err == nil || !strings.Contains(err.Error(), "never confirmed durable") || !strings.Contains(err.Error(), "likely QUIESCED, not guaranteed") {
+			t.Fatalf("resume: %v", err)
+		}
+		if s.Mode() != ModeHalted {
+			t.Fatalf("mode %s", s.Mode())
+		}
+		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "not guaranteed") {
+			t.Fatalf("status after the failed resume: %+v", st.Maintenance)
+		}
+		if m, _ := store.GetMaintenance(); m == nil {
+			t.Fatal("the record is still visible in this scenario")
+		}
+		_ = stop()
+	})
+
+	t.Run("resume on an in-memory-only quiesce failing before the write says SERVING", func(t *testing.T) {
+		f := newMaintFixture(t)
+		s, store, _ := f.open()
+		faultOn(store, "maintenance.put")
+		if err := s.Quiesce(ctxT(t, 5*time.Second)); !errors.Is(err, ErrMaintenanceNotDurable) {
+			t.Fatalf("quiesce: %v", err)
+		}
+		faultOn(store, "maintenance.clear")
+		err := s.Resume(ctxT(t, 5*time.Second))
+		if err == nil || !strings.Contains(err.Error(), "holds no maintenance record") || !strings.Contains(err.Error(), "SERVING") {
+			t.Fatalf("resume: %v", err)
+		}
+		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "SERVING") {
+			t.Fatalf("status: %+v", st.Maintenance)
+		}
+	})
+
+	t.Run("resume read-back failure is reported as unknown", func(t *testing.T) {
+		f := newMaintFixture(t)
+		s, store, _ := f.open()
+		if err := s.Quiesce(ctxT(t, 5*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		faultOn(store, "maintenance.clear", "meta.get")
+		err := s.Resume(ctxT(t, 5*time.Second))
+		if err == nil || !strings.Contains(err.Error(), "could not be read back") {
+			t.Fatalf("resume: %v", err)
+		}
+		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "unknown") {
+			t.Fatalf("status: %+v", st.Maintenance)
+		}
+		if s.Metrics().MaintenanceDurable.Value() != 0 {
+			t.Fatal("metric must be 0 when the outcome is unknown")
+		}
+	})
+
+	t.Run("unexpected store state after a failed resume is reported as unpredictable", func(t *testing.T) {
+		f := newMaintFixture(t)
+		s, store, _ := f.open()
+		if err := s.Quiesce(ctxT(t, 5*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		// The failing transaction is preceded by something else removing the
+		// record (not possible on the actor in production; this forces the
+		// branch): the store then matches neither the before nor the intended state.
+		store.SetMetaFault(func(op string) error {
+			if op == "maintenance.clear" {
+				store.SetMetaFault(nil)
+				if err := store.DeleteMeta(db.KeyMaintenance); err != nil {
+					return err
+				}
+				return boom
+			}
+			return nil
+		})
+		err := s.Resume(ctxT(t, 5*time.Second))
+		if err == nil || !strings.Contains(err.Error(), "unexpected state") || !strings.Contains(err.Error(), "cannot be predicted") {
+			t.Fatalf("resume: %v", err)
+		}
+		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "unexpected") {
+			t.Fatalf("status: %+v", st.Maintenance)
+		}
+	})
+
+	t.Run("confirmed failure under a fixed clock is not misclassified", func(t *testing.T) {
+		// Startup and resume share one timestamp here: the classifier must
+		// still recognise the unchanged store (the record is present) and keep
+		// the confirmed claim.
+		f := newMaintFixture(t)
+		clock := time.Now().Truncate(time.Second)
+		s, store, _ := f.openWithClock(func() time.Time { return clock })
+		if err := s.Quiesce(ctxT(t, 5*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		faultOn(store, "maintenance.clear.in-tx")
+		err := s.Resume(ctxT(t, 5*time.Second))
+		if err == nil || !strings.Contains(err.Error(), "next start will be QUIESCED") {
+			t.Fatalf("resume: %v", err)
+		}
+		if st := s.Status(); st.Maintenance == nil || !st.Maintenance.Durable {
+			t.Fatalf("the confirmed claim must stand: %+v", st.Maintenance)
+		}
+	})
+}
+
 // TestQuiesceWriteReportedFailedButVisible (review P2): the transaction
 // committed but reported an error (a failing final fsync has this shape).
 // The engine reads back, finds the record visible, still refuses to claim
@@ -386,7 +574,7 @@ func TestQuiesceWriteReportedFailedButVisible(t *testing.T) {
 		return nil
 	})
 	err := s.Quiesce(ctxT(t, 5*time.Second))
-	if !errors.Is(err, ErrMaintenanceNotDurable) || !errors.Is(err, boom) || !strings.Contains(err.Error(), "visible") {
+	if !errors.Is(err, ErrMaintenanceNotDurable) || !errors.Is(err, boom) || !strings.Contains(err.Error(), "visible") || !strings.Contains(err.Error(), "likely") {
 		t.Fatalf("quiesce with an ambiguous write: %v", err)
 	}
 	if m, _ := store.GetMaintenance(); m == nil {
@@ -409,7 +597,8 @@ func TestQuiesceWriteReportedFailedButVisible(t *testing.T) {
 	if st := s2.Status(); st.Maintenance == nil || !st.Maintenance.Durable {
 		t.Fatalf("a record read at startup is durable by definition: %+v", st.Maintenance)
 	}
-	// Repeating the quiesce on the healthy store confirms durability (no-op on a durable record).
+	// A record read at startup counts as confirmed, so a repeat quiesce is a
+	// no-op here; the same-process retry path is TestQuiesceRetryInSameProcessConfirmsDurability.
 	store2.SetMetaFault(nil)
 	if err := s2.Quiesce(ctxT(t, 5*time.Second)); err != nil {
 		t.Fatalf("repeat quiesce: %v", err)
@@ -586,11 +775,20 @@ func TestResumeWriteFailureHaltsAndKeepsRecord(t *testing.T) {
 // will be SERVING, and the next start is SERVING with the rescheduled times.
 func TestResumeReportedFailedButApplied(t *testing.T) {
 	f := newMaintFixture(t)
+	// The engine reads the clock from the actor goroutine; the test advances
+	// it under a mutex so the race detector sees a synchronised clock.
+	var clockMu sync.Mutex
 	clock := time.Now().Truncate(time.Second)
-	s, store, stop := f.openWithClock(func() time.Time { return clock })
+	nowFn := func() time.Time { clockMu.Lock(); defer clockMu.Unlock(); return clock }
+	s, store, stop := f.openWithClock(nowFn)
 	if err := s.Quiesce(ctxT(t, 5*time.Second)); err != nil {
 		t.Fatal(err)
 	}
+	// The resume happens later than the start, so the schedule it writes
+	// differs from the one the store held (saved_at and the no-catch-up times).
+	clockMu.Lock()
+	clock = clock.Add(2 * time.Hour)
+	clockMu.Unlock()
 	boom := errors.New("fsync reported a failure after the write")
 	store.SetMetaFault(func(op string) error {
 		if op == "maintenance.clear.committed" {
@@ -599,19 +797,19 @@ func TestResumeReportedFailedButApplied(t *testing.T) {
 		return nil
 	})
 	err := s.Resume(ctxT(t, 5*time.Second))
-	if err == nil || !errors.Is(err, boom) || !strings.Contains(err.Error(), "HALTED") || !strings.Contains(err.Error(), "next start will be SERVING") {
+	if err == nil || !errors.Is(err, boom) || !strings.Contains(err.Error(), "HALTED") || !strings.Contains(err.Error(), "SERVING if the change persisted") {
 		t.Fatalf("resume with an ambiguous write: %v", err)
 	}
 	if s.Mode() != ModeHalted {
 		t.Fatalf("mode %s, want HALTED", s.Mode())
 	}
 	reason, _ := s.HaltDetails()
-	if !strings.Contains(reason, "next start will be SERVING") {
-		t.Fatalf("halt reason must carry the classification: %q", reason)
+	if !strings.Contains(reason, "SERVING if the change persisted") || !strings.Contains(reason, "not confirmed") {
+		t.Fatalf("halt reason must carry the qualified classification: %q", reason)
 	}
 	st := s.Status()
-	if st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "SERVING") || !strings.Contains(st.Maintenance.Error, "applied") {
-		t.Fatalf("status must withdraw the durability claim: %+v", st.Maintenance)
+	if st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "SERVING if the change persisted") || !strings.Contains(st.Maintenance.Error, "applied") {
+		t.Fatalf("status must withdraw the durability claim without promising SERVING: %+v", st.Maintenance)
 	}
 	if h := s.Health(time.Now()); h.Ready || h.MaintenanceDurable {
 		t.Fatalf("health %+v", h)
@@ -623,8 +821,8 @@ func TestResumeReportedFailedButApplied(t *testing.T) {
 		t.Fatal("the record is removed in this scenario")
 	}
 	sc, _ := store.GetSchedule()
-	if !sc.SavedAt.Equal(clock) {
-		t.Fatalf("the new schedule is in the store in this scenario: %+v", sc)
+	if !sc.SavedAt.Equal(clock) || !sc.NextUpdate.Equal(clock.Add(time.Duration(f.cfg.DefaultUpdateMinutes)*time.Minute)) {
+		t.Fatalf("the resumed schedule is in the store in this scenario: %+v", sc)
 	}
 	if err := stop(); !errors.Is(err, ErrHaltedNotFlushed) {
 		t.Fatalf("stop: %v", err)
