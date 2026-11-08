@@ -189,6 +189,15 @@ class StsControllerDeleteEventTests(unittest.TestCase):
                 self.assertOnlyFails(report, "time")
                 self.assertEqual(report["candidates"][0]["checks"]["time"]["expected"], "not before " + SINCE)
 
+    def test_normalised_calendar_values_do_not_slip_past_the_cutoff(self):
+        """strptime would read 22:05:61 as 22:06:01; such a value must fail the time predicate, not pass a 22:06:00 cutoff."""
+        rc, report, err, _ = run([variant(lastTimestamp="2026-11-08T22:05:61Z")], since="2026-11-08T22:06:00Z")
+        self.assertEqual(rc, 0, err)
+        self.assertOnlyFails(report, "time")
+        rc, report, err, _ = run([variant(lastTimestamp="2026-12-31T23:59:59Z")], since="2026-12-31T23:59:59Z")
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(len(report["matched"]), 1)
+
     def test_same_second_as_the_rollout_start_is_accepted(self):
         rc, report, err, _ = run([variant(lastTimestamp=SINCE)])
         self.assertEqual(rc, 0, err)
@@ -210,7 +219,8 @@ class StsControllerDeleteEventTests(unittest.TestCase):
 
     def test_malformed_since_or_input_fails_closed_with_no_output(self):
         for since in ("garbage", "2026-11-08T22:05:13", "2026-11-08T22:05:13.000Z", "2026-11-08 22:05:13Z", "",
-                      "2026-00-00T00:00:00Z", "2026-11-08T24:00:00Z", "zzzz-zz-zzTzz:zz:zzZ"):
+                      "2026-00-00T00:00:00Z", "2026-11-08T24:00:00Z", "zzzz-zz-zzTzz:zz:zzZ",
+                      "2026-02-30T22:05:13Z", "2026-11-08T22:05:61Z", "2026-13-01T00:00:00Z"):
             with self.subTest(since=since):
                 rc, _, err, out = run([EVENT_1_36], since=since)
                 self.assertNotEqual(rc, 0)
@@ -224,7 +234,8 @@ class StsControllerDeleteEventTests(unittest.TestCase):
                 self.assertIn("EventList", err)
 
     def test_unparseable_event_instant_fails_the_time_predicate(self):
-        for stamp in ("zzzzzzzzzzzzzzzzzzz", "2026-00-00T00:00:00Z", "2026-11-08T25:05:40Z", "2026-11-08T22:05:40+01:00"):
+        for stamp in ("zzzzzzzzzzzzzzzzzzz", "2026-00-00T00:00:00Z", "2026-11-08T25:05:40Z", "2026-11-08T22:05:40+01:00",
+                      "2026-02-30T22:05:40Z", "2026-11-08T22:05:61Z", "2026-11-08T22:05:61.5Z"):
             with self.subTest(stamp=stamp):
                 rc, report, err, _ = run([variant(lastTimestamp=stamp)])
                 self.assertEqual(rc, 0, err)

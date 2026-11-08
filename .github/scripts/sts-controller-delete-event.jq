@@ -13,7 +13,7 @@
 #   since  the instant the rollout began, RFC 3339 UTC at second precision
 #          (YYYY-MM-DDTHH:MM:SSZ, as `date -u +%Y-%m-%dT%H:%M:%SZ` prints it);
 #          anything else, including a value in that shape that is not a
-#          parseable instant, is an error
+#          calendar-valid instant (2026-02-30…, …T22:05:61Z), is an error
 #
 # Output: exactly one object {expected, candidates, matched}. `candidates`
 # carries every input event with the expected and observed value of each
@@ -53,14 +53,20 @@ def nonempty: if . == null or . == "" then empty else . end;
 def component: ((.source.component // "") | nonempty) // ((.reportingComponent // "") | nonempty) // "";
 def instant: ((.lastTimestamp // "") | nonempty) // ((.eventTime // "") | nonempty) // "";
 # Seconds since the epoch of an RFC 3339 UTC instant (YYYY-MM-DDTHH:MM:SS[.fraction]Z) truncated to seconds,
-# or null when the value has another shape or does not parse. Kubernetes serialises every timestamp in UTC.
-def epoch: tostring | if test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$")
-                      then (try (.[0:19] + "Z" | fromdateiso8601) catch null) else null end;
+# or null when the value has another shape, does not parse, or is not a calendar value: strptime normalises
+# "22:05:61" and "02-30", so the parsed value must format back to the same seconds-precision string.
+# Kubernetes serialises every timestamp in UTC.
+def epoch: tostring
+  | if test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$") then
+      (.[0:19] + "Z") as $s
+      | (try ($s | fromdateiso8601) catch null) as $t
+      | if $t != null and ($t | todateiso8601) == $s then $t else null end
+    else null end;
 def check($expected; $observed; $ok): {expected: $expected, observed: $observed, ok: $ok};
 
-($since | try fromdateiso8601 catch null) as $since_epoch
-| if ($since | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$") | not) or $since_epoch == null then
-    error("since must be a parseable RFC 3339 UTC instant at second precision (YYYY-MM-DDTHH:MM:SSZ), got " + ($since | tojson))
+($since | if test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$") then epoch else null end) as $since_epoch
+| if $since_epoch == null then
+    error("since must be a calendar-valid RFC 3339 UTC instant at second precision (YYYY-MM-DDTHH:MM:SSZ), got " + ($since | tojson))
   elif (type != "object") or ((.items | type) != "array") then
     error("input is not an EventList with an items array")
   else
