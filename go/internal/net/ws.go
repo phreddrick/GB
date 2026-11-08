@@ -132,12 +132,17 @@ func (srv *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	go srv.commandWorker(workerCtx, sess, claims.PlayerNum, claims.Governor, cmds, workerDone)
 
 	defer func() {
+		// Order matters (GB1-04 disconnect race): cancel the worker FIRST,
+		// so that by the time the session is observably gone from the
+		// registry its worker has already received cancellation and will
+		// start no further queued command. A command the actor already
+		// started completes (it cannot be interrupted safely); the wait on
+		// workerDone below is therefore bounded by the actor, and it
+		// deliberately happens after unregister so that nothing observing
+		// the registry has to wait for that command.
+		cancelWorker()
 		srv.registry.unregister(sess)
 		sess.Close()
-		// Cancel the worker: a command still queued on the actor is canceled
-		// and never runs; one already running completes (it cannot be
-		// interrupted safely), so the wait below is bounded by the actor.
-		cancelWorker()
 		<-workerDone
 		reason := "closed"
 		if sess.Dropped() {
