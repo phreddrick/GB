@@ -231,3 +231,148 @@ func (s *Store) Counts() (stars, planets, races, ships int, err error) {
 	})
 	return
 }
+
+// Maintenance mode record (CR-43, ADR-0010). Its presence under KeyMaintenance
+// means an operator quiesced the engine and the quiesce is to survive a
+// restart: a server that finds it starts QUIESCED instead of SERVING and runs
+// no scheduled turn until `gbctl resume`, which removes the record in the
+// same transaction that persists the resumed schedule. A store without the
+// record behaves exactly as before this change (SERVING after start). The
+// record is written only by Quiesce, outside turns (the write fence applies),
+// and is never touched by CommitWorld, so the quiesced state and the world
+// commits are independent: a shutdown commit while quiesced keeps the record.
+
+// KeyMaintenance is the meta key of the maintenance record.
+var KeyMaintenance = []byte("maintenance")
+
+// MaintenanceSchemaVersion identifies the layout of the maintenance record.
+const MaintenanceSchemaVersion = 1
+
+// MaintenanceRecord is the durable form of an operator quiesce.
+type MaintenanceRecord struct {
+	SchemaVersion int       `json:"schema_version"`
+	Quiesced      bool      `json:"quiesced"` // always true while the record exists
+	SetAt         time.Time `json:"set_at"`
+	Reason        string    `json:"reason"`
+	EngineVersion string    `json:"engine_version,omitempty"`
+}
+
+// ErrCorruptMaintenanceRecord wraps a maintenance record that is present but
+// undecodable, incomplete, carries unknown fields or invalid values. An
+// absent record is not corrupt: GetMaintenance returns nil, nil for it.
+var ErrCorruptMaintenanceRecord = errors.New("corrupt maintenance record")
+
+var maintenanceRecordFields = requiredFields{
+	required: []string{"schema_version", "quiesced", "set_at", "reason"},
+	optional: []string{"engine_version"},
+}
+
+// Validate checks the record's values: the supported schema version, the
+// quiesced flag set (a record that says "not quiesced" is not a valid way to
+// express the absence of maintenance; the key is deleted instead) and a
+// non-zero time.
+func (r *MaintenanceRecord) Validate() error {
+	var problems []string
+	add := func(f string, a ...any) { problems = append(problems, fmt.Sprintf(f, a...)) }
+	if r.SchemaVersion != MaintenanceSchemaVersion {
+		add("schema_version %d (supported: %d)", r.SchemaVersion, MaintenanceSchemaVersion)
+	}
+	if !r.Quiesced {
+		add("quiesced is false (an absent record means not quiesced)")
+	}
+	if r.SetAt.IsZero() {
+		add("set_at is missing")
+	}
+	if len(problems) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%w: %v", ErrCorruptMaintenanceRecord, problems)
+}
+
+// GetMaintenance returns the maintenance record, or nil, nil when the store
+// has none. A record that is present but malformed is
+// ErrCorruptMaintenanceRecord.
+func (s *Store) GetMaintenance() (*MaintenanceRecord, error) {
+	raw, err := s.GetMeta(KeyMaintenance)
+	if err != nil || raw == nil {
+		return nil, err
+	}
+	var rec MaintenanceRecord
+	if err := strictDecode(raw, maintenanceRecordFields, &rec); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrCorruptMaintenanceRecord, err)
+	}
+	if err := rec.Validate(); err != nil {
+		return nil, err
+	}
+	return &rec, nil
+}
+
+// PutMaintenance writes the maintenance record in one transaction (fsynced
+// by bbolt). It is refused while the write fence is raised and refuses an
+// invalid record before touching the store.
+func (s *Store) PutMaintenance(rec *MaintenanceRecord) error {
+	if err := rec.Validate(); err != nil {
+		return err
+	}
+	if err := s.writeAllowed("PutMaintenance"); err != nil {
+		return err
+	}
+	data, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	if err := s.metaFault("maintenance.put"); err != nil {
+		return err
+	}
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(BucketMeta).Put(KeyMaintenance, data)
+	})
+}
+
+// ClearMaintenanceWithSchedule removes the maintenance record and writes the
+// schedule record in ONE transaction: the resumed schedule and the end of
+// maintenance become durable together, so a crash leaves the store either
+// quiesced with the old schedule or serving with the new one. Deleting an
+// absent record is not an error (an engine quiesced in memory only resumes
+// the same way). Refused while the write fence is raised.
+func (s *Store) ClearMaintenanceWithSchedule(sched *ScheduleRecord) error {
+	if sched == nil {
+		return errors.New("resume: schedule record is nil")
+	}
+	if err := sched.Validate(); err != nil {
+		return err
+	}
+	if err := s.writeAllowed("ClearMaintenanceWithSchedule"); err != nil {
+		return err
+	}
+	data, err := json.Marshal(sched)
+	if err != nil {
+		return err
+	}
+	if err := s.metaFault("maintenance.clear"); err != nil {
+		return err
+	}
+	return s.db.Update(func(tx *bolt.Tx) error {
+		meta := tx.Bucket(BucketMeta)
+		if err := meta.Delete(KeyMaintenance); err != nil {
+			return err
+		}
+		return meta.Put(KeySchedule, data)
+	})
+}
+
+// SetMetaFault installs a test-only fault hook consulted by PutMaintenance
+// ("maintenance.put") and ClearMaintenanceWithSchedule ("maintenance.clear")
+// before their transaction opens; a non-nil error is returned to the caller
+// and nothing is written. Production code never sets it.
+func (s *Store) SetMetaFault(f func(op string) error) {
+	s.metaFaultFn.Store(&f)
+}
+
+func (s *Store) metaFault(op string) error {
+	p := s.metaFaultFn.Load()
+	if p == nil || *p == nil {
+		return nil
+	}
+	return (*p)(op)
+}

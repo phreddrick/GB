@@ -83,9 +83,11 @@ func (s *State) Status() Status {
 	s.statusMu.Lock()
 	d := s.status
 	halt := s.haltReason
+	maint := s.maint.snapshot()
 	s.statusMu.Unlock()
+	mode := s.Mode()
 	st := Status{
-		Mode:           s.Mode().String(),
+		Mode:           mode.String(),
 		Draining:       s.draining.Load(),
 		HaltReason:     halt,
 		NextUpdate:     d.sched.nextUpdate,
@@ -100,6 +102,8 @@ func (s *State) Status() Status {
 		Universe:       d.universe,
 		QueueDepth:     len(s.cmdCh),
 		LastCommitSeq:  d.commitSeq,
+		GameReady:      (mode == ModeServing || mode == ModeTurnInProgress) && !s.draining.Load(),
+		Maintenance:    maint,
 		Persistence:    PersistenceNote,
 	}
 	if ts := s.turnStartNs.Load(); ts != 0 {
@@ -163,12 +167,41 @@ func (s *State) TriggerSegment(ctx context.Context) error {
 
 // Quiesce pauses the engine: scheduled turns and mutating player commands
 // are refused until Resume. It takes effect at the next operation boundary
-// (after a running turn). Quiescing an already quiesced engine is a no-op.
+// (after a running turn: admin requests are serialized on the actor).
+//
+// Durability (CR-43, ADR-0010): the maintenance record is written to the
+// store BEFORE the mode changes, so a crash at any point leaves either no
+// record and a SERVING restart (the caller received no success) or a durable
+// record and a QUIESCED restart. If the write fails the engine still stops
+// turns and mutating commands (quiescing is a safety action and must not be
+// refused), but the request returns ErrMaintenanceNotDurable, status shows
+// maintenance.durable=false with the error, and nothing ever reports that
+// a restart would preserve the quiesce. Quiescing an already durably
+// quiesced engine is a no-op; quiescing one that is quiesced in memory
+// only retries the write.
 func (s *State) Quiesce(ctx context.Context) error {
 	start := s.now()
 	err := s.request(ctx, opQuiesce, func() error {
 		switch s.Mode() {
 		case ModeServing, ModeQuiesced:
+			if s.Mode() == ModeQuiesced && s.maintenanceDurable() {
+				return nil
+			}
+			rec := &db.MaintenanceRecord{
+				SchemaVersion: db.MaintenanceSchemaVersion,
+				Quiesced:      true,
+				SetAt:         s.now().UTC(),
+				Reason:        "operator quiesce (admin API)",
+				EngineVersion: engineVersion(),
+			}
+			if err := s.store.PutMaintenance(rec); err != nil {
+				s.setMaintenance(rec, false, err)
+				s.setMode(ModeQuiesced)
+				s.logger.Error("quiesce: maintenance record not written; QUIESCED in memory only (a restart would start SERVING)",
+					slog.String("op", "admin.quiesce"), slog.String("err", err.Error()))
+				return fmt.Errorf("%w: %w", ErrMaintenanceNotDurable, err)
+			}
+			s.setMaintenance(rec, true, nil)
 			s.setMode(ModeQuiesced)
 			return nil
 		case ModeHalted:
@@ -184,12 +217,17 @@ func (s *State) Quiesce(ctx context.Context) error {
 // resumed: in-memory state may be inconsistent and only a restart (which
 // reloads the store) is safe. Resume is refused while shutdown is draining.
 //
-// Ordering (GB1-03): the rescheduled times are computed on a copy and
-// written to the store first. Only after that write succeeds does the actor
-// adopt the new schedule, publish it and switch to SERVING (which is what
-// makes /readyz report game_ready). If the write fails the store is failing:
-// the engine is HALTED (fail closed, like a failed turn flush), readiness
-// stays false, mutating work is refused, and shutdown will not flush memory.
+// Ordering (GB1-03, CR-43): the rescheduled times are computed on a copy
+// and written to the store first, in the same transaction that deletes the
+// maintenance record (db.Store.ClearMaintenanceWithSchedule), so the end of
+// maintenance and the resumed schedule are durable together. Only after
+// that write succeeds does the actor adopt the new schedule, publish it and
+// switch to SERVING (which is what makes /readyz report game_ready). If the
+// write fails the store is failing: the engine is HALTED (fail closed, like
+// a failed turn flush), game readiness stays false, mutating work is
+// refused, and shutdown will not flush memory; the maintenance record, if
+// it existed, is still in the store, so a restart starts QUIESCED, never
+// silently SERVING.
 func (s *State) Resume(ctx context.Context) error {
 	start := s.now()
 	err := s.request(ctx, opResume, func() error {
@@ -214,12 +252,13 @@ func (s *State) Resume(ctx context.Context) error {
 					next.nextSegment = next.nextUpdate
 				}
 			}
-			if err := s.writeSchedule(next, now); err != nil {
-				s.halt("resume: "+err.Error(), "")
+			if err := s.store.ClearMaintenanceWithSchedule(s.scheduleRecord(next, now)); err != nil {
+				s.halt("resume: persist schedule and clear maintenance: "+err.Error(), "")
 				return fmt.Errorf("resume failed and the engine is now HALTED (restart required): %w", err)
 			}
 			s.sched = next
 			s.publishSchedule()
+			s.clearMaintenance()
 			s.setMode(ModeServing)
 			if overdue {
 				s.logger.Warn("resume: overdue update rescheduled, not run (no-catch-up policy)", slog.String("op", "admin.resume"), slog.Time("next_update", s.sched.nextUpdate))

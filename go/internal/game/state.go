@@ -116,8 +116,9 @@ type State struct {
 	shutdownErr  error         // set by the actor during shutdown, read after <-stopped
 	statusMu     sync.Mutex
 	status       statusData
-	haltReason   string // under statusMu
-	haltStack    string // under statusMu
+	haltReason   string           // under statusMu
+	haltStack    string           // under statusMu
+	maint        maintenanceState // under statusMu (maintenance.go)
 	testHooks    *testHooks
 	loopStarted  bool
 	startupError error
@@ -208,12 +209,39 @@ func New(cfg *config.Config, store *db.Store, opts Options) (*State, error) {
 		if err != nil {
 			return nil, fmt.Errorf("validate store: %w", err)
 		}
-		if corrupt != "" {
+		var maint *db.MaintenanceRecord
+		if corrupt == "" {
+			// A malformed maintenance record is as disqualifying as a
+			// malformed commit record: the operator's intent cannot be read,
+			// so the engine must not guess SERVING (CR-43, fail closed).
+			maint, err = store.GetMaintenance()
+			if err != nil {
+				if !errors.Is(err, db.ErrCorruptMaintenanceRecord) {
+					return nil, fmt.Errorf("validate store: %w", err)
+				}
+				corrupt = "CORRUPT_STORE: " + err.Error()
+			}
+		}
+		switch {
+		case corrupt != "":
 			// Alive but not serving: the operator inspects the store; nothing
 			// is written and no turn fires (plan 8.7 CORRUPT_STORE, carried by
 			// the HALTED mode until a dedicated mode exists).
 			s.halt(corrupt, "")
-		} else {
+		case maint != nil:
+			// Durable maintenance mode (CR-43, ADR-0010): start QUIESCED with
+			// the schedule exactly as persisted. Nothing is written: the
+			// overdue policy is applied, and persisted, by Resume. The actor
+			// arms no turn timer outside SERVING, so no scheduled turn can
+			// run before the operator resumes.
+			if err := s.adoptPersistedSchedule(s.now()); err != nil {
+				return nil, err
+			}
+			s.setMaintenance(maint, true, nil)
+			s.logger.Warn("store holds a maintenance record: starting QUIESCED; scheduled turns will not run until gbctl resume",
+				slog.String("op", "startup"), slog.Time("set_at", maint.SetAt), slog.String("reason", maint.Reason), slog.String("set_by_engine", maint.EngineVersion))
+			s.setMode(ModeQuiesced)
+		default:
 			if err := s.restoreSchedule(s.now()); err != nil {
 				return nil, err
 			}

@@ -224,8 +224,8 @@ func TestQuiesceResume(t *testing.T) {
 		t.Fatalf("mode %s", s.Mode())
 	}
 	h := s.Health(time.Now())
-	if !h.Alive || h.Ready {
-		t.Fatalf("quiesced health %+v", h)
+	if !h.Alive || !h.Ready || h.GameReady || !h.Maintenance || !h.MaintenanceDurable {
+		t.Fatalf("quiesced health %+v (CR-43: Ready for the orchestrator, not for players, durable)", h)
 	}
 	if err := s.TriggerUpdate(ctxT(t, 5*time.Second)); !errors.Is(err, ErrNotServing) {
 		t.Fatalf("update while quiesced: %v", err)

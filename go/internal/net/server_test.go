@@ -30,6 +30,7 @@ type fakeEngine struct {
 	enrolled []string
 	block    chan struct{} // when non-nil, HandleCommand blocks until closed or ctx ends
 	echo     bool
+	durable  bool // maintenance record held (reported while quiesced)
 }
 
 func newFakeEngine() *fakeEngine { return &fakeEngine{mode: engine.ModeServing, alive: true} }
@@ -76,7 +77,8 @@ func (f *fakeEngine) Enroll(ctx context.Context, req *enroll.Request) (enroll.Re
 func (f *fakeEngine) Health(time.Time) engine.Health {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return engine.Health{Mode: f.mode, Alive: f.alive, Ready: f.mode.Ready(), GameReady: f.mode == engine.ModeServing || f.mode == engine.ModeTurnInProgress, HaltReason: f.halt, LastHeartbeat: time.Now()}
+	return engine.Health{Mode: f.mode, Alive: f.alive, Ready: f.mode.Ready(), GameReady: f.mode == engine.ModeServing || f.mode == engine.ModeTurnInProgress, HaltReason: f.halt, LastHeartbeat: time.Now(),
+		Maintenance: f.mode == engine.ModeQuiesced, MaintenanceDurable: f.mode == engine.ModeQuiesced && f.durable}
 }
 func (f *fakeEngine) Status() engine.Status {
 	f.mu.Lock()
@@ -140,7 +142,7 @@ func TestProbesPerMode(t *testing.T) {
 		{engine.ModeUninitialized, 200, false, true},
 		{engine.ModeServing, 200, true, true},
 		{engine.ModeTurnInProgress, 200, true, true},
-		{engine.ModeQuiesced, 503, false, true},
+		{engine.ModeQuiesced, 200, false, true}, // CR-43: process Ready, game not
 		{engine.ModeHalted, 503, false, true},
 		{engine.ModeStopped, 503, false, false},
 	}
@@ -159,6 +161,12 @@ func TestProbesPerMode(t *testing.T) {
 		}
 		if c.mode == engine.ModeHalted && body["halt_reason"] != "panic during command" {
 			t.Errorf("halted readyz must carry the reason: %v", body)
+		}
+		if c.mode == engine.ModeQuiesced && body["maintenance"] != true {
+			t.Errorf("quiesced readyz must say maintenance: %v", body)
+		}
+		if c.mode != engine.ModeQuiesced && body["maintenance"] != nil {
+			t.Errorf("%s: readyz must not claim maintenance: %v", c.mode, body)
 		}
 		code, body = get(t, ts.URL+"/livez")
 		wantLive := 200
@@ -181,6 +189,55 @@ func TestProbesPerMode(t *testing.T) {
 	fe.mu.Unlock()
 	if code, _ := get(t, ts.URL+"/livez"); code != 503 {
 		t.Errorf("stuck actor livez = %d", code)
+	}
+}
+
+// TestQuiescedReadinessSemantics (CR-43): a quiesced server is Ready for
+// the orchestrator (200) but not for players (game_ready false), reports
+// whether the quiesce is durable, and is still not ready while draining or
+// HALTED with a corrupt store.
+func TestQuiescedReadinessSemantics(t *testing.T) {
+	fe := newFakeEngine()
+	srv, ts := newTestServer(t, fe, nil)
+	fe.setMode(engine.ModeQuiesced)
+	fe.mu.Lock()
+	fe.durable = true
+	fe.mu.Unlock()
+	code, body := get(t, ts.URL+"/readyz")
+	if code != 200 || body["ok"] != true || body["game_ready"] != false || body["maintenance"] != true || body["maintenance_durable"] != true {
+		t.Fatalf("durable quiesce readyz code=%d body=%v", code, body)
+	}
+	fe.mu.Lock()
+	fe.durable = false
+	fe.mu.Unlock()
+	code, body = get(t, ts.URL+"/readyz")
+	if code != 200 || body["maintenance"] != true || body["maintenance_durable"] != nil {
+		t.Fatalf("in-memory quiesce readyz code=%d body=%v (maintenance_durable must be absent/false)", code, body)
+	}
+	if code, body := get(t, ts.URL+"/livez"); code != 200 || body["mode"] != "QUIESCED" {
+		t.Fatalf("quiesced livez code=%d body=%v", code, body)
+	}
+	// Draining overrides: a quiesced server that is shutting down is not Ready.
+	srv.draining.Store(true)
+	if code, body := get(t, ts.URL+"/readyz"); code != 503 || body["draining"] != true {
+		t.Fatalf("draining quiesced readyz code=%d body=%v", code, body)
+	}
+	srv.draining.Store(false)
+	// HALTED with a corrupt store (startup validation) is never Ready.
+	fe.setMode(engine.ModeHalted)
+	fe.mu.Lock()
+	fe.halt = "CORRUPT_STORE: corrupt maintenance record: unknown field \"x\""
+	fe.mu.Unlock()
+	code, body = get(t, ts.URL+"/readyz")
+	if code != 503 || body["ok"] != false || body["halt_reason"] != fe.halt || body["maintenance"] != nil {
+		t.Fatalf("corrupt-store readyz code=%d body=%v", code, body)
+	}
+	if code, _ := get(t, ts.URL+"/livez"); code != 200 {
+		t.Fatalf("halted must stay alive (no restart loop): livez %d", code)
+	}
+	fe.setMode(engine.ModeStarting)
+	if code, _ := get(t, ts.URL+"/readyz"); code != 503 {
+		t.Fatalf("starting readyz %d", code)
 	}
 }
 
