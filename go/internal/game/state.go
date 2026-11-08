@@ -128,9 +128,20 @@ type command struct {
 	governor  int
 	text      string
 	sess      net.Responder
-	state     atomic.Int32  // reqQueued -> reqStarted (actor) or reqCanceled (caller); lifecycle.go
-	done      chan struct{} // closed by the actor after running or skipping the command
+	ctx       context.Context // the caller's context; the actor refuses to start a command whose context has ended
+	state     atomic.Int32    // reqQueued -> reqStarted (actor) or reqCanceled (caller or actor); lifecycle.go
+	done      chan struct{}   // closed by the actor after running or skipping the command
 	enqueued  time.Time
+}
+
+// outcome reports what happened to a command whose done channel has closed:
+// nil when the actor ran it, ErrNotExecuted when it was canceled (by its
+// caller or by the actor on a canceled context) and never started.
+func (c *command) outcome() error {
+	if c.state.Load() == reqCanceled {
+		return fmt.Errorf("%w: command canceled while queued: %w", ErrEngineBusy, ErrNotExecuted)
+	}
+	return nil
 }
 
 // Options configure New. Zero values select the defaults.
@@ -375,6 +386,7 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 		governor:  governor,
 		text:      text,
 		sess:      sess,
+		ctx:       ctx,
 		done:      make(chan struct{}),
 		enqueued:  s.now(),
 	}
@@ -390,7 +402,9 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 	}
 	select {
 	case <-cmd.done:
-		return nil
+		// The actor finished with it: either it ran, or the actor itself
+		// skipped it because ctx had ended before it could start (GB1-04).
+		return cmd.outcome()
 	case <-ctx.Done():
 		// Same tie-break as admin requests (lifecycle.go): a command canceled
 		// while queued is skipped by the actor and never runs later; a
@@ -402,7 +416,7 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 		}
 		select {
 		case <-cmd.done:
-			return nil
+			return cmd.outcome()
 		case <-s.stopped:
 			return ErrEngineStopped
 		}
@@ -411,7 +425,7 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 			return ErrEngineStopped
 		}
 		<-cmd.done
-		return nil
+		return cmd.outcome()
 	}
 }
 
@@ -419,6 +433,17 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 // mode checks, panic isolation and metrics.
 func (s *State) handlePlayerCommand(cmd *command) {
 	defer close(cmd.done)
+	if cmd.ctx != nil && cmd.ctx.Err() != nil {
+		// The caller's context has ended (session disconnected, or the
+		// command's wait expired) but the caller has not yet moved the
+		// command out of reqQueued. Never start it (GB1-04): the actor
+		// cancels it itself, so a command still queued when its session was
+		// unregistered cannot run afterwards whichever side notices first.
+		if cmd.state.CompareAndSwap(reqQueued, reqCanceled) {
+			s.metrics.Canceled.Inc("command")
+		}
+		return
+	}
 	if !cmd.state.CompareAndSwap(reqQueued, reqStarted) {
 		// Canceled by the waiting session before it started (GB1-01): the
 		// player was told it did not run, so it must not run now.

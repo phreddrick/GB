@@ -529,3 +529,50 @@ func newLoggedEngine(t *testing.T, logs *syncBuffer, initialized bool) (*State, 
 	})
 	return s, store, cfg
 }
+
+// TestGB104ActorSkipsCommandWhoseContextEnded closes the second half of the
+// GB1-04 disconnect race: a command that is already in the actor's queue
+// when its session's context is canceled must not be started by the actor
+// even if the actor reaches it before the waiting caller has moved it out
+// of reqQueued. The actor checks the command's context first and cancels
+// it itself; the caller then learns "not executed", never "ran".
+func TestGB104ActorSkipsCommandWhoseContextEnded(t *testing.T) {
+	s, _, _ := quietEngine(t, true)
+	sess := &recordingResponder{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // the session is gone before the actor gets to the command
+	cmd := &command{playerNum: 1, governor: 0, text: "who", sess: sess, ctx: ctx, done: make(chan struct{}), enqueued: s.now()}
+	// Run the actor's admission step on the actor goroutine with the command
+	// still in reqQueued (the caller has not raced it to reqCanceled).
+	if err := s.request(ctxT(t, 5*time.Second), opTest, func() error { s.handlePlayerCommand(cmd); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-cmd.done:
+	default:
+		t.Fatal("done not closed")
+	}
+	if got := cmd.state.Load(); got != reqCanceled {
+		t.Fatalf("state %d, want reqCanceled (%d)", got, reqCanceled)
+	}
+	if txt := sess.text(); txt != "" {
+		t.Fatalf("command with an ended context produced output: %q", txt)
+	}
+	if got := s.metrics.Commands.Value("who", "ok"); got != 0 {
+		t.Fatalf("command was dispatched: %v", got)
+	}
+	if got := s.metrics.Canceled.Value("command"); got != 1 {
+		t.Fatalf("canceled counter = %v, want 1 (actor-side cancellation)", got)
+	}
+	if err := cmd.outcome(); !errors.Is(err, ErrNotExecuted) {
+		t.Fatalf("caller outcome %v, want ErrNotExecuted", err)
+	}
+	// A live context is unaffected: the same path still runs commands.
+	live := &command{playerNum: 1, governor: 0, text: "who", sess: sess, ctx: context.Background(), done: make(chan struct{}), enqueued: s.now()}
+	if err := s.request(ctxT(t, 5*time.Second), opTest, func() error { s.handlePlayerCommand(live); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if live.state.Load() != reqStarted || sess.text() == "" || live.outcome() != nil {
+		t.Fatalf("live command not run: state %d output %q", live.state.Load(), sess.text())
+	}
+}
