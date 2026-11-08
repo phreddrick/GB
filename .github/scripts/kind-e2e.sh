@@ -373,10 +373,14 @@ pod_uid_r=$(k get pod gb-engine-0 -o jsonpath='{.metadata.uid}')
 # statefulset-controller, naming gb-engine-0, at or after the instant the rollout began. sts-controller-delete-event.jq
 # evaluates the four predicates separately (the message case-insensitively: Kubernetes title-cases the verb) and reports
 # the expected and observed value of each one, so a failure names the mismatch.
-k get events --field-selector reason=SuccessfulDelete,involvedObject.name=gb-engine -o json > "$WORK/events-rollout.json"
+k get events --field-selector reason=SuccessfulDelete,involvedObject.name=gb-engine -o json > "$WORK/events-rollout.json" || fail "could not list the SuccessfulDelete events on gb-engine"
 jq -f "$EVENT_PROGRAM" --arg uid "$sts_uid" --arg set gb-engine --arg pod gb-engine-0 --arg since "$rollout_started" "$WORK/events-rollout.json" > "$WORK/events-rollout-check.json" 2>&1 \
   || fail "could not evaluate the SuccessfulDelete events (see events-rollout.json in the diagnostics): $(cat "$WORK/events-rollout-check.json" 2>/dev/null)"
-if [ "$(jq -r '.matched | length' "$WORK/events-rollout-check.json")" -lt 1 ]; then
+# Exactly one report object with a `matched` array, or the step fails: no output, several outputs or a non-report never pass.
+matched=$(jq -e -r -s 'if length == 1 and (.[0] | type) == "object" and (.[0].matched | type) == "array" then (.[0].matched | length) else error("expected exactly one report object with a matched array, got \(length) value(s)") end' "$WORK/events-rollout-check.json" 2>&1) \
+  || fail "the event program did not produce a report: $matched"
+[[ "$matched" =~ ^[0-9]+$ ]] || fail "the event program's matched count is not a number: $matched"
+if [ "$matched" -lt 1 ]; then
   candidates=$(jq -r '.candidates | length' "$WORK/events-rollout-check.json")
   {
     echo "SuccessfulDelete events on gb-engine: $candidates candidate(s); expected $(jq -c .expected "$WORK/events-rollout-check.json")"
