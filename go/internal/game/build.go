@@ -528,7 +528,7 @@ func (s *State) initializeNewShip(playerNum, governor int, race *model.Race,
 func (s *State) createShipByPlanet(playerNum, governor int, race *model.Race,
 	newship *model.Ship, planet *model.Planet,
 	starNum, planetNum, x, y int) error {
-	shipno, err := s.store.AllocShipNum()
+	shipno, err := s.allocShipNum()
 	if err != nil {
 		return err
 	}
@@ -594,7 +594,7 @@ func (s *State) createShipByPlanet(playerNum, governor int, race *model.Race,
 func (s *State) createShipByShip(playerNum, governor int, race *model.Race,
 	outside bool, starNum int, planet *model.Planet,
 	newship, builder *model.Ship) error {
-	shipno, err := s.store.AllocShipNum()
+	shipno, err := s.allocShipNum()
 	if err != nil {
 		return err
 	}
@@ -1887,7 +1887,7 @@ func (s *State) cmdSell(p, g int, args []string, sess net.Responder) {
 		return
 	}
 
-	commodno, err := s.store.AllocCommodNum()
+	commodno, err := s.allocCommodNum()
 	if err != nil {
 		sess.Send(fmt.Sprintf("Error allocating lot: %v\n", err))
 		return

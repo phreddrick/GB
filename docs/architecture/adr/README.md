@@ -25,3 +25,4 @@ The migration plan (`../microservices-migration-plan.md`, section 19) lists the 
 | [0006](0006-image-registry-and-digest-pinning.md) | Container images: GHCR, digest pinning, distroless non-root, supply-chain checks | Proposed 2026-10-30 (Phase 2B draft) |
 | [0007](0007-node-placement-and-storage.md) | Node placement, Longhorn persistence and the single-writer volume (RWOP with a declared fallback) | Proposed 2026-10-30 (Phase 2B draft; RWOP unvalidated) |
 | [0008](0008-explicit-universe-bootstrap.md) | Explicit universe bootstrap through the admin API; recovery by volume replacement, no overwrite option | Proposed 2026-10-30 (Phase 2B draft) |
+| [0009](0009-atomic-turn-commit.md) | Atomic turn commit with a commit record, a write fence during turns, and reload-on-failure (CR-18) | Proposed 2026-11-07 (implemented locally, awaiting review; not deployed) |
