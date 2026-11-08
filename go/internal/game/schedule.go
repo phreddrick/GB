@@ -95,8 +95,9 @@ func (s *State) restoreSchedule(now time.Time) error {
 
 // persistSchedule writes the actor's schedule and, only after the write
 // succeeded, refreshes the status snapshot and gauges, so status never
-// advertises a schedule the store does not hold (GB1-03). Called after every
-// turn, after restore and during orderly shutdown.
+// advertises a schedule the store does not hold (GB1-03). Called after
+// restore and resume; turns and the shutdown flush write the schedule
+// inside their world commit instead (commit.go).
 func (s *State) persistSchedule(now time.Time) error {
 	if err := s.writeSchedule(s.sched, now); err != nil {
 		return err
@@ -109,7 +110,16 @@ func (s *State) persistSchedule(now time.Time) error {
 // status snapshot. Callers that must not change state on failure (Resume)
 // write a candidate schedule first and adopt it only on success.
 func (s *State) writeSchedule(sc schedule, now time.Time) error {
-	rec := &db.ScheduleRecord{
+	if err := s.store.PutSchedule(s.scheduleRecord(sc, now)); err != nil {
+		return fmt.Errorf("persist schedule: %w", err)
+	}
+	return nil
+}
+
+// scheduleRecord is the persisted form of sc (also written inside every
+// world commit, commit.go).
+func (s *State) scheduleRecord(sc schedule, now time.Time) *db.ScheduleRecord {
+	return &db.ScheduleRecord{
 		NextUpdate:     sc.nextUpdate,
 		NextSegment:    sc.nextSegment,
 		NumUpdates:     sc.numUpdates,
@@ -118,10 +128,6 @@ func (s *State) writeSchedule(sc schedule, now time.Time) error {
 		MovesPerUpdate: s.cfg.MovesPerUpdate,
 		SavedAt:        now,
 	}
-	if err := s.store.PutSchedule(rec); err != nil {
-		return fmt.Errorf("persist schedule: %w", err)
-	}
-	return nil
 }
 
 // publishSchedule copies the actor-owned schedule into the status snapshot

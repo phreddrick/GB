@@ -14,13 +14,11 @@ go/cmd/racegen/main.go	gosec	G115: integer overflow conversion int -> uint8	func
 go/internal/db/keys.go	gosec	G115: integer overflow conversion int -> uint16	func RaceKey	binary.BigEndian.PutUint16(k, uint16(playerNum))
 go/internal/db/store.go	errcheck	Error return value of `db.Close` is not checked	func Open	db.Close()
 go/internal/db/store.go	gosec	G115: integer overflow conversion int -> uint8	func (*Store).HasTelegrams	prefix := TelegramPrefix(uint8(playerNum), uint8(governor))
-go/internal/db/store.go	gosec	G115: integer overflow conversion int -> uint8	func (*Store).PushTelegram	return b.Put(TelegramKeyPG(uint8(playerNum), uint8(governor), seq), []byte(text))
 go/internal/db/store.go	gosec	G115: integer overflow conversion int -> uint8	func (*Store).ReadAndClearTelegrams	prefix := TelegramPrefix(uint8(playerNum), uint8(governor))
 go/internal/db/store.go	gosec	G115: integer overflow conversion uint32 -> byte	func appendFreeNum	v[1] = byte(num >> 16)
 go/internal/db/store.go	gosec	G115: integer overflow conversion uint32 -> byte	func appendFreeNum	v[2] = byte(num >> 8)
 go/internal/db/store.go	gosec	G115: integer overflow conversion uint32 -> byte	func appendFreeNum	v[3] = byte(num)
 go/internal/db/store.go	gosec	G117: Marshaled struct field "Password" (JSON key "password") matches secret pattern	func (*Store).PutRace	data, err := json.Marshal(race)
-go/internal/db/store.go	staticcheck	S1009: should omit nil check; len() for nil slices is defined as zero	func (*Store).AppendNews	if k != nil && len(k) == 9 && k[0] == newsType {
 go/internal/db/store.go	staticcheck	S1009: should omit nil check; len() for nil slices is defined as zero	func (*Store).HasTelegrams	if k != nil && len(k) >= 2 && k[0] == prefix[0] && k[1] == prefix[1] {
 go/internal/db/store.go	staticcheck	S1009: should omit nil check; len() for nil slices is defined as zero	func (*Store).LatestNewsSeq	if k != nil && len(k) == 9 && k[0] == newsType {
 go/internal/db/store.go	staticcheck	S1009: should omit nil check; len() for nil slices is defined as zero	func (*Store).PurgeNews	for k, _ := cur.Seek(startKey); k != nil && len(k) == 9 && k[0] == newsType; k, _ = cur.Next() {

@@ -5,10 +5,18 @@
 // Phase 1 lifecycle (lifecycle.go, admin.go, schedule.go): the actor also
 // processes typed administrative requests, recovers panics by halting,
 // restores and persists the turn schedule, publishes an operating mode and a
-// heartbeat for health probes, and shuts down in an orderly sequence. The
-// persistence model is unchanged: a turn is still flushed in many bbolt
-// transactions, so a crash or kill during a flush can leave a mixed-turn
-// store (CR-18, Phase 3a).
+// heartbeat for health probes, and shuts down in an orderly sequence.
+//
+// Persistence (commit.go, CR-18 implemented, independent acceptance
+// pending): a turn, a segment and the shutdown flush each commit the whole
+// world, the schedule and the turn's effects in one bbolt transaction with
+// a validated commit record; a turn whose
+// transaction is confirmed not committed is rolled back by reloading the
+// last commit, a confirmed committed turn stands even if notification
+// delivery then fails, and an outcome that cannot be confirmed is reported
+// as uncertain (commit.go). Player commands between turns still write
+// per record (CR-17; the staging set and group commit of plan 8.4 remain
+// Phase 3a work).
 package game
 
 import (
@@ -84,6 +92,13 @@ type State struct {
 	// Turn schedule (actor-owned; schedule.go).
 	sched schedule
 
+	// Effects buffered while a turn body runs, the fence baseline captured
+	// at turn start, and the staged number allocations of the running turn
+	// (commit.go).
+	effects   turnEffects
+	fenceBase uint64
+	turnAlloc turnAllocator
+
 	// Inboxes (other goroutines -> actor goroutine).
 	cmdCh   chan *command      // player commands
 	adminCh chan *adminRequest // typed administrative and lifecycle requests
@@ -113,9 +128,23 @@ type command struct {
 	governor  int
 	text      string
 	sess      net.Responder
-	state     atomic.Int32  // reqQueued -> reqStarted (actor) or reqCanceled (caller); lifecycle.go
-	done      chan struct{} // closed by the actor after running or skipping the command
+	ctx       context.Context // the caller's context; the actor refuses to start a command whose context has ended
+	state     atomic.Int32    // reqQueued -> reqStarted (actor) or reqCanceled (caller or actor); lifecycle.go
+	done      chan struct{}   // closed by the actor after running or skipping the command
 	enqueued  time.Time
+}
+
+// outcome reports what happened to a command whose done channel has closed:
+// nil when the actor ran it, ErrNotExecuted when it was canceled (by its
+// caller or by the actor on an ended context) and never ran.
+func (c *command) outcome() error {
+	if c.state.Load() != reqCanceled {
+		return nil
+	}
+	if c.ctx != nil && c.ctx.Err() != nil {
+		return fmt.Errorf("%w: command canceled while queued: %w (%w)", ErrEngineBusy, ErrNotExecuted, c.ctx.Err())
+	}
+	return fmt.Errorf("%w: command canceled while queued: %w", ErrEngineBusy, ErrNotExecuted)
 }
 
 // Options configure New. Zero values select the defaults.
@@ -175,10 +204,21 @@ func New(cfg *config.Config, store *db.Store, opts Options) (*State, error) {
 		return nil, fmt.Errorf("check universe: %w", err)
 	}
 	if initialized {
-		if err := s.restoreSchedule(s.now()); err != nil {
-			return nil, err
+		corrupt, err := s.validateStoreCommit()
+		if err != nil {
+			return nil, fmt.Errorf("validate store: %w", err)
 		}
-		s.setMode(ModeServing)
+		if corrupt != "" {
+			// Alive but not serving: the operator inspects the store; nothing
+			// is written and no turn fires (plan 8.7 CORRUPT_STORE, carried by
+			// the HALTED mode until a dedicated mode exists).
+			s.halt(corrupt, "")
+		} else {
+			if err := s.restoreSchedule(s.now()); err != nil {
+				return nil, err
+			}
+			s.setMode(ModeServing)
+		}
 	} else {
 		s.logger.Warn("store holds no universe; waiting for administrative initialisation", slog.String("mode", ModeUninitialized.String()))
 		s.setMode(ModeUninitialized)
@@ -349,6 +389,7 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 		governor:  governor,
 		text:      text,
 		sess:      sess,
+		ctx:       ctx,
 		done:      make(chan struct{}),
 		enqueued:  s.now(),
 	}
@@ -364,7 +405,9 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 	}
 	select {
 	case <-cmd.done:
-		return nil
+		// The actor finished with it: either it ran, or the actor itself
+		// skipped it because ctx had ended before it could start (GB1-04).
+		return cmd.outcome()
 	case <-ctx.Done():
 		// Same tie-break as admin requests (lifecycle.go): a command canceled
 		// while queued is skipped by the actor and never runs later; a
@@ -374,18 +417,23 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 			s.metrics.Canceled.Inc("command")
 			return fmt.Errorf("%w: command canceled while queued: %w (%w)", ErrEngineBusy, ErrNotExecuted, ctx.Err())
 		}
-		select {
-		case <-cmd.done:
-			return nil
-		case <-s.stopped:
-			return ErrEngineStopped
+		// The actor claimed the command first. It closes done before it can
+		// exit (handlePlayerCommand and drainQueues both defer it), so
+		// waiting for done alone is safe, and it is the only wait that
+		// reports the real outcome: a select on done and stopped could pick
+		// stopped after the command had completed and tell the player it
+		// was not run.
+		if s.testHooks != nil && s.testHooks.afterLostCancelRace != nil {
+			s.testHooks.afterLostCancelRace(cmd)
 		}
+		<-cmd.done
+		return cmd.outcome()
 	case <-s.stopped:
 		if cmd.state.CompareAndSwap(reqQueued, reqCanceled) {
 			return ErrEngineStopped
 		}
 		<-cmd.done
-		return nil
+		return cmd.outcome()
 	}
 }
 
@@ -397,6 +445,27 @@ func (s *State) handlePlayerCommand(cmd *command) {
 		// Canceled by the waiting session before it started (GB1-01): the
 		// player was told it did not run, so it must not run now.
 		return
+	}
+	if s.testHooks != nil && s.testHooks.afterCommandAdmit != nil {
+		s.testHooks.afterCommandAdmit(cmd)
+	}
+	if cmd.ctx != nil && cmd.ctx.Err() != nil {
+		// Admission is the ordering point (GB1-04): the actor claims the
+		// command first and only then consults the caller's context. Once
+		// claimed, the caller can no longer move it to reqCanceled, so the
+		// decision below is the only one: if the context has ended (the
+		// session disconnected, or the command's wait expired) the actor
+		// marks it canceled itself and never runs it; if the context is
+		// still live here, the command started before its session's
+		// cancellation, hence before the session left the registry, and it
+		// runs to completion. Cancellation after this check is a started
+		// command finishing, never a queued one starting.
+		cmd.state.Store(reqCanceled)
+		s.metrics.Canceled.Inc("command")
+		return
+	}
+	if s.testHooks != nil && s.testHooks.beforeCommandDispatch != nil {
+		s.testHooks.beforeCommandDispatch(cmd)
 	}
 	verb := canonicalVerb(cmd.text)
 	mode := s.Mode()
@@ -712,23 +781,50 @@ func (s *State) raceByNum(playerNum int) *model.Race {
 	return s.races[playerNum-1]
 }
 
-// notify sends text to a specific governor.
+// notify sends text to a specific governor. During a turn body the notice
+// is held until the turn has committed (commit.go).
 func (s *State) notify(playerNum, governor int, text string) {
+	if s.effects.active {
+		s.effects.notices = append(s.effects.notices, pendingNotice{kind: noticeGovernor, player: playerNum, governor: governor, text: text})
+		return
+	}
 	if s.registry != nil {
 		s.registry.Notify(playerNum, governor, text)
 	}
 }
 
-// notifyRace sends text to all governors of a race.
+// notifyRace sends text to all governors of a race (held during a turn).
 func (s *State) notifyRace(playerNum int, text string) {
+	if s.effects.active {
+		s.effects.notices = append(s.effects.notices, pendingNotice{kind: noticeRace, player: playerNum, text: text})
+		return
+	}
 	if s.registry != nil {
 		s.registry.NotifyRace(playerNum, text)
 	}
 }
 
-// shout sends text to all connected players.
+// shout sends text to all connected players (held during a turn).
 func (s *State) shout(text string) {
+	if s.effects.active {
+		s.effects.notices = append(s.effects.notices, pendingNotice{kind: noticeShout, text: text})
+		return
+	}
 	if s.registry != nil {
 		s.registry.Shout(text)
 	}
+}
+
+// governorOnline reports whether a session for (playerNum, governor) is
+// attached, without sending anything.
+func (s *State) governorOnline(playerNum, governor int) bool {
+	if s.registry == nil {
+		return false
+	}
+	for _, si := range s.registry.ConnectedPlayers() {
+		if si.PlayerNum == playerNum && si.Governor == governor {
+			return true
+		}
+	}
+	return false
 }

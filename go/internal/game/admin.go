@@ -68,12 +68,13 @@ func (s *State) handleAdmin(req *adminRequest) {
 
 // statusData is the snapshot HTTP handlers read under statusMu.
 type statusData struct {
-	sched    schedule
-	universe *db.UniverseRecord
-	stars    int
-	races    int
-	ships    int
-	lastTurn time.Time
+	sched     schedule
+	universe  *db.UniverseRecord
+	stars     int
+	races     int
+	ships     int
+	lastTurn  time.Time
+	commitSeq uint64 // last committed sequence (0 when the store has no commit record yet)
 }
 
 // Status returns the current status without going through the actor queue,
@@ -98,6 +99,7 @@ func (s *State) Status() Status {
 		Ships:          d.ships,
 		Universe:       d.universe,
 		QueueDepth:     len(s.cmdCh),
+		LastCommitSeq:  d.commitSeq,
 		Persistence:    PersistenceNote,
 	}
 	if ts := s.turnStartNs.Load(); ts != 0 {

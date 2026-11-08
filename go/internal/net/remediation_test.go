@@ -289,12 +289,22 @@ func TestGB104QueuedCommandCanceledByDisconnect(t *testing.T) {
 	}
 	r := readAll(c)
 	_ = r.next(t, 5*time.Second)
-	for _, cmd := range []string{"gate", "later1", "later2"} {
-		if err := c.WriteMessage(websocket.TextMessage, []byte(cmd)); err != nil {
+	if err := c.WriteMessage(websocket.TextMessage, []byte("gate")); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, 2*time.Second, "gate command to start", func() bool { return se.inflight.Load() == 1 })
+	// Fill the session's command queue (fastTiming.commandQueue = 4) and send
+	// one more: the rejection line for the extra command proves, on the
+	// server side, that later1..later4 were admitted to the queue before the
+	// connection is closed. (A successful client write alone would not.)
+	for i := 1; i <= fastTiming.commandQueue+1; i++ {
+		if err := c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("later%d", i))); err != nil {
 			t.Fatal(err)
 		}
 	}
-	waitFor(t, 2*time.Second, "gate command to start", func() bool { return se.inflight.Load() == 1 })
+	if msg := r.next(t, 5*time.Second); !strings.Contains(msg, "Too many commands waiting") {
+		t.Fatalf("expected the queue-full rejection as proof of admission, got %q", msg)
+	}
 	_ = c.Close()
 	waitFor(t, 2*time.Second, "session to unregister", func() bool { return srv.registry.Count() == 0 })
 	close(se.gate) // the started command completes

@@ -61,6 +61,6 @@
 - id: persistence/non-atomic-turn-flush
   untested: true
   finding: CR-18
-  reason: a turn is flushed in one bbolt transaction per ship batch, star, planet and race (turn.go flushAll) plus separate power, block and star-data writes; a crash or kill during the flush leaves a mixed-turn store; Phase 1 closes only the orderly path (SIGTERM waits for the running turn and reports a timeout honestly) and no test asserts crash consistency; the crash-injection tests T1-T8 of plan section 8.11 arrive with the single-transaction commit in Phase 3a
+  reason: IMPLEMENTED - INDEPENDENT ACCEPTANCE PENDING (2026-11-07, branch feature/cr18-atomic-turn-persistence, ADR-0009); turns, segments and the shutdown flush now commit the world, the schedule, the turn's effects and staged number allocations in one bbolt transaction with a validated commit record, a write fence aborts any turn that writes outside the commit, and a failed or uncertain commit reloads the last commit and halts with an explicit reason; the golden CheckCase mechanism does not apply, coverage is go/internal/game/commit_test.go, commit_remediation_test.go, go/internal/db/commit_test.go and go/test/e2e/crash_test.go; the entry stays until the independent reviewer accepts the corrected implementation; CR-11 and CR-17 (per-command persistence) remain separate open findings
   phase_to_fix: 3a
   since: 2026-10-29

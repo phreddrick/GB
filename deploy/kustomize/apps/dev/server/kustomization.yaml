@@ -24,7 +24,7 @@ images:
   # --require-published-image). Merging deploys nothing: synchronisation is a
   # separately approved manual step (docs/operations/deploy.md).
   - name: ghcr.io/phreddrick/gb-server
-    digest: sha256:a2e433228760d9556e1824aad3fc4b09321a50d7dd8e225bf69e489a9432535a
+    digest: sha256:1d8fac1a9b7efaaf4f632c3501144193bb1442551be572c2d52334a0c852f8a2
 
 configMapGenerator:
   - name: gb-engine-config

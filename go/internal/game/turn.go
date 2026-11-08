@@ -1,7 +1,6 @@
 package game
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -13,10 +12,10 @@ import (
 // doUpdate performs a full game update (production, combat, etc.).
 // Corresponds to do_update() + do_turn(update=1) in doturn.c / GB_server.c.
 // Called exclusively by the actor goroutine, through runTurn (lifecycle.go),
-// which handles mode transitions, panic isolation and schedule persistence.
+// which handles mode transitions, panic isolation and the atomic commit of
+// the world and the schedule (commit.go). Nothing here writes to the store.
 func (s *State) doUpdate() {
 	s.sched.numUpdates++
-	s.shout(fmt.Sprintf("\n*** DOING UPDATE %d ***\n", s.sched.numUpdates))
 
 	s.sched.nextUpdate = s.sched.nextUpdate.Add(s.updateInterval())
 	s.sched.numSegments = 0
@@ -24,7 +23,7 @@ func (s *State) doUpdate() {
 
 	if err := s.doTurn(true); err != nil {
 		// A turn that cannot read its inputs must not be skipped silently:
-		// fail closed (Phase 1 policy; Phase 3a adds reload-on-failure).
+		// fail closed; runTurn reloads the last commit and halts.
 		panic(fmt.Sprintf("update %d aborted: %v", s.sched.numUpdates, err))
 	}
 
@@ -44,8 +43,6 @@ func (s *State) doSegment() {
 		return
 	}
 	s.sched.numSegments++
-	s.shout(fmt.Sprintf("\n*** DOING MOVEMENT SEGMENT %d/%d ***\n",
-		s.sched.numSegments, s.cfg.MovesPerUpdate-1))
 
 	s.sched.nextSegment = s.sched.nextSegment.Add(s.segmentInterval())
 
@@ -56,11 +53,12 @@ func (s *State) doSegment() {
 	s.shout(fmt.Sprintf("\n*** MOVEMENT %d DONE ***\n", s.sched.numSegments))
 }
 
-// doTurn executes one game turn.
+// doTurn executes one game turn on the in-memory world.
 // If update is true, performs full production + movement; otherwise movement only.
 // Corresponds to do_turn() in doturn.c. It returns an error only when the
-// turn's inputs could not be read; flush errors are logged and reported
-// through flushAll's return value.
+// turn's inputs could not be read. It performs no store write: the whole
+// world is committed by runTurn in one transaction after it returns, and the
+// store's write fence refuses anything else while it runs (CR-18).
 func (s *State) doTurn(update bool) error {
 	// Reload ships from DB to pick up any changes made by player commands
 	// since the last turn. Stars and races are kept in memory.
@@ -184,6 +182,12 @@ func (s *State) doTurn(update bool) error {
 		if ship != nil && ship.Alive && ship.Type == model.StypeMissile && s.shipAttacksPlanet(ship) {
 			s.doMissile(ship)
 		}
+	}
+
+	// Test-only fault point: planets and ships have been processed and the
+	// in-memory world is half advanced (commit_test.go).
+	if s.testHooks != nil && s.testHooks.midTurn != nil {
+		s.testHooks.midTurn(update)
 	}
 
 	if update {
@@ -462,37 +466,10 @@ func (s *State) doTurn(update bool) error {
 		}
 
 		s.computePowerBlocks()
-		var flushErrs []error
-		if err := s.flushAll(); err != nil {
-			flushErrs = append(flushErrs, err)
-		}
-
-		// Persist power and blocks.
-		if err := s.store.PutPower(s.power); err != nil {
-			flushErrs = append(flushErrs, fmt.Errorf("PutPower: %w", err))
-		}
-		if err := s.store.PutBlocks(s.blocks); err != nil {
-			flushErrs = append(flushErrs, fmt.Errorf("PutBlocks: %w", err))
-		}
-		if err := s.store.PutPowerBlocks(&s.powerBlocks); err != nil {
-			flushErrs = append(flushErrs, fmt.Errorf("PutPowerBlocks: %w", err))
-		}
-		if err := s.store.PutStarData(s.sdata); err != nil {
-			flushErrs = append(flushErrs, fmt.Errorf("PutStarData: %w", err))
-		}
-		if len(flushErrs) > 0 {
-			// Part of the turn may be on disk (CR-18). Fail closed rather
-			// than continue with a store that disagrees with memory.
-			panic(fmt.Sprintf("update flush failed: %v", errors.Join(flushErrs...)))
-		}
-	} else {
-		// Segment-only flush.
-		if err := s.flushAll(); err != nil {
-			panic(fmt.Sprintf("segment flush failed: %v", err))
-		}
 	}
 
-	// Notify all races.
+	// Notify all races. These notices are buffered and delivered only after
+	// the turn has committed (commit.go), so "finished" means durable.
 	for _, r := range s.races {
 		if r == nil {
 			continue
@@ -504,50 +481,6 @@ func (s *State) doTurn(update bool) error {
 		}
 	}
 	return nil
-}
-
-// flushAll writes all in-memory state back to the DB, one transaction per
-// record (not atomic across records: CR-18, Phase 3a). Called at the end of
-// a full update or segment and by the orderly shutdown path. Every error is
-// logged and all of them are returned joined; the caller decides whether to
-// halt.
-func (s *State) flushAll() error {
-	var errs []error
-	fail := func(err error) {
-		s.logger.Error("flush error", slog.String("op", "flush"), slog.String("err", err.Error()))
-		errs = append(errs, err)
-	}
-	if err := s.store.PutShipsBatch(s.ships); err != nil {
-		fail(fmt.Errorf("PutShipsBatch: %w", err))
-	}
-	s.Progress()
-	for _, star := range s.stars {
-		if star == nil {
-			continue
-		}
-		if err := s.store.PutStar(star); err != nil {
-			fail(fmt.Errorf("PutStar %d: %w", star.Number, err))
-		}
-		s.Progress()
-	}
-	for _, byPlanet := range s.planets {
-		for _, planet := range byPlanet {
-			if err := s.store.PutPlanet(planet); err != nil {
-				fail(fmt.Errorf("PutPlanet %d/%d: %w", planet.StarNum, planet.PlanetNum, err))
-			}
-			s.Progress()
-		}
-	}
-	for _, race := range s.races {
-		if race == nil {
-			continue
-		}
-		if err := s.store.PutRace(race); err != nil {
-			fail(fmt.Errorf("PutRace %d: %w", race.PlayerNum, err))
-		}
-		s.Progress()
-	}
-	return errors.Join(errs...)
 }
 
 // rebuildOrbitChains clears all nextship/ships linked-list pointers and
