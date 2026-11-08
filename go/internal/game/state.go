@@ -128,9 +128,23 @@ type command struct {
 	governor  int
 	text      string
 	sess      net.Responder
-	state     atomic.Int32  // reqQueued -> reqStarted (actor) or reqCanceled (caller); lifecycle.go
-	done      chan struct{} // closed by the actor after running or skipping the command
+	ctx       context.Context // the caller's context; the actor refuses to start a command whose context has ended
+	state     atomic.Int32    // reqQueued -> reqStarted (actor) or reqCanceled (caller or actor); lifecycle.go
+	done      chan struct{}   // closed by the actor after running or skipping the command
 	enqueued  time.Time
+}
+
+// outcome reports what happened to a command whose done channel has closed:
+// nil when the actor ran it, ErrNotExecuted when it was canceled (by its
+// caller or by the actor on an ended context) and never ran.
+func (c *command) outcome() error {
+	if c.state.Load() != reqCanceled {
+		return nil
+	}
+	if c.ctx != nil && c.ctx.Err() != nil {
+		return fmt.Errorf("%w: command canceled while queued: %w (%w)", ErrEngineBusy, ErrNotExecuted, c.ctx.Err())
+	}
+	return fmt.Errorf("%w: command canceled while queued: %w", ErrEngineBusy, ErrNotExecuted)
 }
 
 // Options configure New. Zero values select the defaults.
@@ -375,6 +389,7 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 		governor:  governor,
 		text:      text,
 		sess:      sess,
+		ctx:       ctx,
 		done:      make(chan struct{}),
 		enqueued:  s.now(),
 	}
@@ -390,7 +405,9 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 	}
 	select {
 	case <-cmd.done:
-		return nil
+		// The actor finished with it: either it ran, or the actor itself
+		// skipped it because ctx had ended before it could start (GB1-04).
+		return cmd.outcome()
 	case <-ctx.Done():
 		// Same tie-break as admin requests (lifecycle.go): a command canceled
 		// while queued is skipped by the actor and never runs later; a
@@ -400,18 +417,23 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 			s.metrics.Canceled.Inc("command")
 			return fmt.Errorf("%w: command canceled while queued: %w (%w)", ErrEngineBusy, ErrNotExecuted, ctx.Err())
 		}
-		select {
-		case <-cmd.done:
-			return nil
-		case <-s.stopped:
-			return ErrEngineStopped
+		// The actor claimed the command first. It closes done before it can
+		// exit (handlePlayerCommand and drainQueues both defer it), so
+		// waiting for done alone is safe, and it is the only wait that
+		// reports the real outcome: a select on done and stopped could pick
+		// stopped after the command had completed and tell the player it
+		// was not run.
+		if s.testHooks != nil && s.testHooks.afterLostCancelRace != nil {
+			s.testHooks.afterLostCancelRace(cmd)
 		}
+		<-cmd.done
+		return cmd.outcome()
 	case <-s.stopped:
 		if cmd.state.CompareAndSwap(reqQueued, reqCanceled) {
 			return ErrEngineStopped
 		}
 		<-cmd.done
-		return nil
+		return cmd.outcome()
 	}
 }
 
@@ -423,6 +445,27 @@ func (s *State) handlePlayerCommand(cmd *command) {
 		// Canceled by the waiting session before it started (GB1-01): the
 		// player was told it did not run, so it must not run now.
 		return
+	}
+	if s.testHooks != nil && s.testHooks.afterCommandAdmit != nil {
+		s.testHooks.afterCommandAdmit(cmd)
+	}
+	if cmd.ctx != nil && cmd.ctx.Err() != nil {
+		// Admission is the ordering point (GB1-04): the actor claims the
+		// command first and only then consults the caller's context. Once
+		// claimed, the caller can no longer move it to reqCanceled, so the
+		// decision below is the only one: if the context has ended (the
+		// session disconnected, or the command's wait expired) the actor
+		// marks it canceled itself and never runs it; if the context is
+		// still live here, the command started before its session's
+		// cancellation, hence before the session left the registry, and it
+		// runs to completion. Cancellation after this check is a started
+		// command finishing, never a queued one starting.
+		cmd.state.Store(reqCanceled)
+		s.metrics.Canceled.Inc("command")
+		return
+	}
+	if s.testHooks != nil && s.testHooks.beforeCommandDispatch != nil {
+		s.testHooks.beforeCommandDispatch(cmd)
 	}
 	verb := canonicalVerb(cmd.text)
 	mode := s.Mode()

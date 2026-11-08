@@ -316,10 +316,14 @@ func (s *State) drainQueues() {
 	for {
 		select {
 		case cmd := <-s.cmdCh:
-			if cmd.state.CompareAndSwap(reqQueued, reqStarted) {
-				_ = cmd.sess.Send(refusalMessage(ModeQuiesced))
-			}
-			close(cmd.done)
+			func() {
+				// done must close even if the responder panics: callers
+				// that lost the cancellation race wait on it alone.
+				defer close(cmd.done)
+				if cmd.state.CompareAndSwap(reqQueued, reqStarted) {
+					_ = cmd.sess.Send(refusalMessage(ModeQuiesced))
+				}
+			}()
 		case req := <-s.adminCh:
 			if req.state.CompareAndSwap(reqQueued, reqStarted) {
 				req.reply <- adminResult{err: ErrEngineStopped}
@@ -369,6 +373,13 @@ func (s *State) flushForShutdown() (*db.CommitRecord, error) {
 // as canceled (the caller learns it is still running and is not rolled
 // back). There is no mid-operation cancellation: a started turn, flush or
 // store write always runs to completion.
+//
+// Player commands have one more, actor-owned transition (GB1-04): after
+// claiming a command (reqStarted) the actor consults the caller's context
+// and, if it has already ended, moves the command to reqCanceled itself
+// and never dispatches it. The caller reads the final state from
+// command.outcome once done is closed, so a command the actor canceled is
+// reported as not executed, and a command the actor ran as executed.
 const (
 	reqQueued int32 = iota
 	reqStarted
@@ -452,5 +463,16 @@ type testHooks struct {
 	beforeTurn  func(kind turnKind)
 	midTurn     func(update bool) // inside doTurn, after planets and ships were processed
 	afterCommit func(kind string) // inside persistTurn, right after the transaction committed
-	panicVerb   string            // a command verb that panics inside dispatch
+	// afterCommandAdmit runs on the actor after a player command has been
+	// claimed (reqStarted) and before its context is consulted: the window
+	// the GB1-04 cancellation test needs to force.
+	afterCommandAdmit func(cmd *command)
+	// beforeCommandDispatch runs on the actor after the context check
+	// passed and before dispatch (the command is going to run).
+	beforeCommandDispatch func(cmd *command)
+	// afterLostCancelRace runs on the caller's goroutine inside
+	// HandleCommand after its context ended and its queued->canceled CAS
+	// failed, before it waits for done (the branch of the shutdown test).
+	afterLostCancelRace func(cmd *command)
+	panicVerb           string // a command verb that panics inside dispatch
 }
