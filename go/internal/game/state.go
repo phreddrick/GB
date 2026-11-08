@@ -417,12 +417,14 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 			s.metrics.Canceled.Inc("command")
 			return fmt.Errorf("%w: command canceled while queued: %w (%w)", ErrEngineBusy, ErrNotExecuted, ctx.Err())
 		}
-		select {
-		case <-cmd.done:
-			return cmd.outcome()
-		case <-s.stopped:
-			return ErrEngineStopped
-		}
+		// The actor claimed the command first. It closes done before it can
+		// exit (handlePlayerCommand defers it; drainQueues closes it too),
+		// so waiting for done alone is safe, and it is the only wait that
+		// reports the real outcome: a select on done and stopped could pick
+		// stopped after the command had completed and tell the player it
+		// was not run.
+		<-cmd.done
+		return cmd.outcome()
 	case <-s.stopped:
 		if cmd.state.CompareAndSwap(reqQueued, reqCanceled) {
 			return ErrEngineStopped

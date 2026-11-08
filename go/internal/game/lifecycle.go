@@ -369,6 +369,13 @@ func (s *State) flushForShutdown() (*db.CommitRecord, error) {
 // as canceled (the caller learns it is still running and is not rolled
 // back). There is no mid-operation cancellation: a started turn, flush or
 // store write always runs to completion.
+//
+// Player commands have one more, actor-owned transition (GB1-04): after
+// claiming a command (reqStarted) the actor consults the caller's context
+// and, if it has already ended, moves the command to reqCanceled itself
+// and never dispatches it. The caller reads the final state from
+// command.outcome once done is closed, so a command the actor canceled is
+// reported as not executed, and a command the actor ran as executed.
 const (
 	reqQueued int32 = iota
 	reqStarted
