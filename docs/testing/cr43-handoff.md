@@ -66,6 +66,19 @@ Startup and liveness probes are unchanged in the manifests; the startup probe is
 
 `internal/db/maintenance_test.go` (4 tests, 14 malformed forms), `internal/game/maintenance_test.go` (8 tests), `internal/net/server_test.go` (`TestProbesPerMode` updated, `TestQuiescedReadinessSemantics`), `internal/game/lifecycle_test.go` (`TestQuiesceResume` updated), `go/test/e2e/maintenance_test.go` (`TestQuiesceSurvivesCrashAndRestart`: SIGKILL and SIGTERM after a quiesce, resume then SIGKILL), `go/test/e2e/basic_test.go` (quiesced readiness expectation updated), `.github/scripts/kind-e2e.sh` (hosted). Local results on igor, 2026-11-08: `go test ./...` ok, `go test -race` ok on `db`, `game`, `net`, `admin`, `gbctl`; lint gate 1057/1057 baseline, 0 new; `test_release_safety.py` 64 ok; `workflow_policy_check.py` 17 ok.
 
+### 6.1 Independent review (Codex, read-only sandbox, 2026-11-08)
+
+| Round | Commit reviewed | Verdict | Blocking points and remediation |
+|---|---|---|---|
+| 1 | `0ba08d5` | CHANGES REQUIRED | P2: a failed resume transaction may in fact be visible (bbolt can report an error after writing its meta page) while status kept `maintenance.durable=true`; P3: fault hook only before the transaction, tests weaker than claimed. Remediated in `f48cf49` (read-back classification, post-commit and in-transaction fault stages, direct-restart and fixed-clock tests, controller-identity event check in kind e2e) |
+| 2 | `f48cf49` | CHANGES REQUIRED | never-confirmed records promised as QUIESCED; visible resume promised as SERVING; `saved_at` not a transaction identity under a fixed clock; coverage gaps. Remediated in `bab9794` (before-snapshot and byte-for-byte comparison with the intended bytes, prior-confirmation state carried through, chained and read-back tests) |
+| 3 | `bab9794` | CHANGES REQUIRED | visible-resume fallback still unconditional; unexpected bytes classified as likely valid; coverage; handoff summary. Remediated in `8dbb4d2` |
+| 4 | `8dbb4d2` | CHANGES REQUIRED | a second store read could misreport a read failure as corruption; actor-path assertions incomplete. Remediated in `941c0d2` (`db.DecodeMaintenanceRecord`, keyed read faults, stored-pair assertions) |
+| 5 | `941c0d2` | CHANGES REQUIRED | visible-resume tests accepted missing or malformed values; two scenarios lacked stored-pair and metric checks. Remediated in `d2ebb8b` (test-only) |
+| 6 | `d2ebb8b` | **APPROVE** | no remaining findings |
+
+The reviewer could not execute Go tests in its sandbox (read-only build cache); every round's test claims were verified locally on igor (`go test ./...`, `-race` on the touched packages, lint gate 1057/1057 with 0 new). Transcripts: owner-held `cr43-review-2026-11-08/`.
+
 ## 7. Acceptance criteria and evidence (development server, separately authorised)
 
 1. Deploy the ADR-0010 image by the normal path (publish, digest pull request, one sync). Because the running server is quiesced on a pre-ADR-0010 image, this first rollout still needs the exceptional path of `deploy.md` section 5.2 (or a resume first); record it.
