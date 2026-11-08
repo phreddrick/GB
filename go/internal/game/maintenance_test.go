@@ -425,15 +425,23 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 	// failReadsAfter returns a hook that fails the named write stage and,
 	// from that moment on, every GetMeta read, so the before-snapshot is
 	// taken normally and only the read-back fails.
-	failReadsAfter := func(stage string) func(string) error {
+	// keys selects which meta reads fail ("maintenance", "schedule"); empty = all.
+	failReadsAfter := func(stage string, keys ...string) func(string) error {
 		failing := false
 		return func(op string) error {
 			switch {
 			case op == stage:
 				failing = true
 				return boom
-			case op == "meta.get" && failing:
-				return boom
+			case failing && strings.HasPrefix(op, "meta.get:"):
+				if len(keys) == 0 {
+					return boom
+				}
+				for _, k := range keys {
+					if op == "meta.get:"+k {
+						return boom
+					}
+				}
 			}
 			return nil
 		}
@@ -503,6 +511,7 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 		if err := s.Quiesce(ctxT(t, 5*time.Second)); !errors.Is(err, ErrMaintenanceNotDurable) {
 			t.Fatalf("quiesce: %v", err)
 		}
+		schedBefore, _ := store.GetMeta(db.KeySchedule)
 		faultOn(store, "maintenance.clear")
 		err := s.Resume(ctxT(t, 5*time.Second))
 		if err == nil || !strings.Contains(err.Error(), "holds no maintenance record") || !strings.Contains(err.Error(), "SERVING") {
@@ -511,34 +520,45 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "SERVING") {
 			t.Fatalf("status: %+v", st.Maintenance)
 		}
-	})
-
-	t.Run("resume read-back failure is reported as unknown", func(t *testing.T) {
-		f := newMaintFixture(t)
-		s, store, _ := f.open()
-		if err := s.Quiesce(ctxT(t, 5*time.Second)); err != nil {
-			t.Fatal(err)
-		}
-		recBefore, _ := store.GetMeta(db.KeyMaintenance)
-		schedBefore, _ := store.GetMeta(db.KeySchedule)
-		store.SetMetaFault(failReadsAfter("maintenance.clear"))
-		err := s.Resume(ctxT(t, 5*time.Second))
-		if err == nil || !strings.Contains(err.Error(), "could not be read back") {
-			t.Fatalf("resume: %v", err)
-		}
-		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "unknown") {
-			t.Fatalf("status: %+v", st.Maintenance)
-		}
 		if s.Metrics().MaintenanceDurable.Value() != 0 {
-			t.Fatal("metric must be 0 when the outcome is unknown")
+			t.Fatal("metric must be 0")
 		}
 		store.SetMetaFault(nil)
 		recAfter, _ := store.GetMeta(db.KeyMaintenance)
 		schedAfter, _ := store.GetMeta(db.KeySchedule)
-		if !bytes.Equal(recAfter, recBefore) || !bytes.Equal(schedAfter, schedBefore) {
-			t.Fatal("the store is unchanged in this scenario (the failure preceded the transaction)")
+		if recAfter != nil || !bytes.Equal(schedAfter, schedBefore) {
+			t.Fatal("the store is unchanged: no record, previous schedule bytes")
 		}
 	})
+
+	for _, failKey := range []string{"maintenance", "schedule"} {
+		t.Run("resume read-back failure of the "+failKey+" record is reported as unknown", func(t *testing.T) {
+			f := newMaintFixture(t)
+			s, store, _ := f.open()
+			if err := s.Quiesce(ctxT(t, 5*time.Second)); err != nil {
+				t.Fatal(err)
+			}
+			recBefore, _ := store.GetMeta(db.KeyMaintenance)
+			schedBefore, _ := store.GetMeta(db.KeySchedule)
+			store.SetMetaFault(failReadsAfter("maintenance.clear", failKey))
+			err := s.Resume(ctxT(t, 5*time.Second))
+			if err == nil || !strings.Contains(err.Error(), "could not be read back") {
+				t.Fatalf("resume: %v", err)
+			}
+			if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "unknown") {
+				t.Fatalf("status: %+v", st.Maintenance)
+			}
+			if s.Metrics().MaintenanceDurable.Value() != 0 {
+				t.Fatal("metric must be 0 when the outcome is unknown")
+			}
+			store.SetMetaFault(nil)
+			recAfter, _ := store.GetMeta(db.KeyMaintenance)
+			schedAfter, _ := store.GetMeta(db.KeySchedule)
+			if !bytes.Equal(recAfter, recBefore) || !bytes.Equal(schedAfter, schedBefore) {
+				t.Fatal("the store is unchanged in this scenario (the failure preceded the transaction)")
+			}
+		})
+	}
 
 	t.Run("unexpected store state after a failed resume is reported as unpredictable", func(t *testing.T) {
 		f := newMaintFixture(t)
@@ -581,6 +601,7 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 		if err := s.Quiesce(ctxT(t, 5*time.Second)); !errors.Is(err, ErrMaintenanceNotDurable) {
 			t.Fatalf("quiesce: %v", err)
 		}
+		schedBeforeRaw, _ := store.GetMeta(db.KeySchedule)
 		faultOn(store, "maintenance.clear.committed")
 		err := s.Resume(ctxT(t, 5*time.Second))
 		if err == nil || !strings.Contains(err.Error(), "never been confirmed") || !strings.Contains(err.Error(), "possibly QUIESCED, not guaranteed") || strings.Contains(err.Error(), "previously confirmed record") {
@@ -589,9 +610,15 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "not guaranteed") {
 			t.Fatalf("status: %+v", st.Maintenance)
 		}
+		if s.Metrics().MaintenanceDurable.Value() != 0 {
+			t.Fatal("metric must be 0")
+		}
 		store.SetMetaFault(nil)
 		if m, _ := store.GetMaintenance(); m != nil {
 			t.Fatal("the record is removed in this scenario")
+		}
+		if schedAfter, _ := store.GetMeta(db.KeySchedule); bytes.Equal(schedAfter, schedBeforeRaw) {
+			t.Fatal("the resumed schedule must have been written in this scenario")
 		}
 	})
 
@@ -602,14 +629,24 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 		if err := s.Quiesce(ctxT(t, 5*time.Second)); !errors.Is(err, ErrMaintenanceNotDurable) {
 			t.Fatalf("quiesce: %v", err)
 		}
+		schedBeforeRaw, _ := store.GetMeta(db.KeySchedule)
 		faultOn(store, "maintenance.clear.committed")
 		err := s.Resume(ctxT(t, 5*time.Second))
 		if err == nil || !strings.Contains(err.Error(), "holds no maintenance record") || !strings.Contains(err.Error(), "resumed schedule is visible") || !strings.Contains(err.Error(), "SERVING") {
 			t.Fatalf("resume: %v", err)
 		}
+		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "SERVING") {
+			t.Fatalf("status: %+v", st.Maintenance)
+		}
+		if s.Metrics().MaintenanceDurable.Value() != 0 {
+			t.Fatal("metric must be 0")
+		}
 		store.SetMetaFault(nil)
 		if m, _ := store.GetMaintenance(); m != nil {
 			t.Fatal("no record in this scenario")
+		}
+		if schedAfter, _ := store.GetMeta(db.KeySchedule); bytes.Equal(schedAfter, schedBeforeRaw) {
+			t.Fatal("the resumed schedule must have been written in this scenario")
 		}
 	})
 

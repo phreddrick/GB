@@ -148,9 +148,10 @@ func (s *State) classifyMaintenanceWriteFailure(intended []byte, prior storeSnap
 	case bytes.Equal(raw, prior.maintenance):
 		// The store still holds exactly the record it held before this
 		// attempt (reachable in practice only when that record was never
-		// confirmed: a confirmed record makes Quiesce a no-op). Its bytes
-		// are known valid only if they decode.
-		if _, derr := s.store.GetMaintenance(); derr != nil {
+		// confirmed: a confirmed record makes Quiesce a no-op). The bytes
+		// already read are decoded here, never read again, so a decode
+		// verdict cannot be confused with a read failure.
+		if _, derr := db.DecodeMaintenanceRecord(raw); derr != nil {
 			return "write failed and the store holds a malformed maintenance record (" + derr.Error() + "): the next start would HALT with CORRUPT_STORE"
 		}
 		if prior.priorConfirmed {
@@ -158,7 +159,7 @@ func (s *State) classifyMaintenanceWriteFailure(intended []byte, prior storeSnap
 		}
 		return "write failed; the store still holds a maintenance record that was never confirmed durable by this process: a restart would likely start QUIESCED, but it is not guaranteed; re-run quiesce to confirm"
 	default:
-		if _, derr := s.store.GetMaintenance(); derr != nil {
+		if _, derr := db.DecodeMaintenanceRecord(raw); derr != nil {
 			return "write failed and the store holds a malformed maintenance record (" + derr.Error() + "): the next start would HALT with CORRUPT_STORE"
 		}
 		return "write failed and the store holds a maintenance record that matches neither the previous nor the intended one: the next start cannot be predicted from here; inspect meta/maintenance before relying on it"

@@ -306,6 +306,14 @@ func (s *Store) GetMaintenance() (*MaintenanceRecord, error) {
 	if err != nil || raw == nil {
 		return nil, err
 	}
+	return DecodeMaintenanceRecord(raw)
+}
+
+// DecodeMaintenanceRecord decodes and validates raw record bytes exactly as
+// GetMaintenance does, without touching the store; a malformed value is
+// ErrCorruptMaintenanceRecord. Callers that already hold the bytes use it
+// so that a decode verdict is never confused with a read failure.
+func DecodeMaintenanceRecord(raw []byte) (*MaintenanceRecord, error) {
 	var rec MaintenanceRecord
 	if err := strictDecode(raw, maintenanceRecordFields, &rec); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrCorruptMaintenanceRecord, err)
@@ -390,8 +398,8 @@ func (s *Store) ClearMaintenanceWithSchedule(sched *ScheduleRecord) error {
 // rolls back), and "maintenance.put.committed" / "maintenance.clear.committed"
 // after the transaction committed (the caller is told of an error although
 // the change is visible: the ambiguous outcome a failed final fsync can
-// produce), and "meta.get" before every GetMeta read (a failing read-back).
-// Production code never sets it.
+// produce), and "meta.get:<key>" before every GetMeta read of that key (a
+// failing read-back). Production code never sets it.
 func (s *Store) SetMetaFault(f func(op string) error) {
 	s.metaFaultFn.Store(&f)
 }

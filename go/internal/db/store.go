@@ -538,7 +538,7 @@ func (s *Store) DeleteCommod(num uint32) error {
 
 // GetMeta reads a single metadata value.
 func (s *Store) GetMeta(key []byte) ([]byte, error) {
-	if err := s.metaFault("meta.get"); err != nil {
+	if err := s.metaFault("meta.get:" + string(key)); err != nil {
 		return nil, err
 	}
 	var val []byte
