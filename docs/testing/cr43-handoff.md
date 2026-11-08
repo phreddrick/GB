@@ -27,7 +27,8 @@ Not changed: game rules, turn processing, the commit path (`CommitWorld` never t
 - `meta/maintenance` = `{"schema_version":1,"quiesced":true,"set_at":"<RFC3339>","reason":"operator quiesce (admin API)","engine_version":"<module@rev>"}`; strictly decoded like the commit and schedule records (presence of every required key, no unknown key, no JSON null, no trailing data) and validated (`schema_version 1`, `quiesced true`, non-zero `set_at`).
 - Absent record: pre-CR-43 behaviour exactly (`TestStoreWithoutMaintenanceRecordKeepsStartupBehaviour`, with and without a CR-18 commit record).
 - Forward: an engine without ADR-0010 ignores the extra key (bbolt bucket entries are independent) and starts `SERVING` as it always did; the record remains and a later ADR-0010 engine honours it. Rolling back the image therefore loses the durable quiesce but never the data.
-- The record is outside `WorldDigest`; a quiesce or resume does not change the logical world state.
+- The record is outside `WorldDigest`, so a quiesce does not change the logical world state; a resume changes only the schedule fields that the digest already includes (the no-catch-up reschedule), exactly as before this change.
+- A bbolt transaction that reports an error has not necessarily been rolled back (the meta page may be written before a failing final fsync). Both maintenance writes therefore classify their failure by **reading the store back** (`classifyMaintenanceWriteFailure`, `classifyResumeFailure` in `internal/game/maintenance.go`) and report the predicted next start; the test-only fault stages `maintenance.*.committed` reproduce the "visible but reported failed" shape, `maintenance.clear.in-tx` the rollback.
 
 ## 4. Crash consistency and ordering
 
@@ -35,11 +36,13 @@ Not changed: game rules, turn processing, the commit path (`CommitWorld` never t
 |---|---|---|
 | crash before the quiesce's record transaction commits | no record | `SERVING` (the caller got no success; status after the start says so) |
 | crash after the record committed, before the mode changed or the reply was sent | record | `QUIESCED` |
-| record write fails | no record; engine `QUIESCED` in memory, `maintenance.durable false`, exit 5 to `gbctl` | `SERVING` (documented and reported, never silent); re-issue `quiesce` to make it durable |
+| record write reports an error | the engine reads the store back and reports what it found: **no record** → next start `SERVING`; **record visible** → next start `QUIESCED`, but durability on disk is not confirmed; **read-back failed** → unknown. In every case the engine is `QUIESCED` in memory, `maintenance.durable false` with the explanation, `gb_maintenance_durable 0`, exit 5 to `gbctl` | as reported; re-issue `quiesce` to confirm durability |
 | orderly shutdown while quiesced (shutdown commit) | record kept, new commit record of kind `shutdown` | `QUIESCED` |
 | crash before the resume transaction commits | record and old schedule | `QUIESCED` |
 | crash after the resume transaction committed | no record, rescheduled schedule | `SERVING` (the resume was durable; `next_update` is the rescheduled one) |
-| resume transaction fails | record and old schedule; engine `HALTED` | `QUIESCED` |
+| resume transaction fails, **confirmed not applied** (read-back: record present, schedule unchanged) | record and old schedule; engine `HALTED`, `maintenance.durable true` kept | `QUIESCED` |
+| resume transaction reports an error but **is visible** (read-back: record gone, schedule `saved_at` = this resume's) | the resumed pair; engine `HALTED`, durability claim withdrawn (`maintenance.durable false`, error says the next start will be `SERVING`), `gb_maintenance_durable 0` | `SERVING` with the rescheduled times |
+| resume transaction fails and the read-back fails | unknown; engine `HALTED`, `maintenance.durable false`, error says unknown | unknown until the next start; `gbctl status` then says |
 | malformed record | untouched | `HALTED` `CORRUPT_STORE`, not Ready, nothing written |
 
 The maintenance writes are ordinary fenced writes: a turn body cannot perform them (`TestMaintenanceWritesAreFencedAndIndependentOfCommits`), and a quiesce requested during a turn runs after the turn's commit on the actor (`TestQuiesceDuringTurnIsAppliedAfterTheCommit`).
@@ -75,4 +78,5 @@ Startup and liveness probes are unchanged in the manifests; the startup probe is
 - A quiesced Pod is now routable: players can connect and log in (CR-20) and receive the paused refusal. Acceptable for development with `GB_ENROLL_PREVIEW=false`; revisit with the player-access decision.
 - Monitors keyed on `/readyz` for gameplay must switch to `game_ready` or `gb_engine_mode`.
 - `gbctl` from an older revision cannot decode the new status (strict envelope); build it from the deployed revision as the runbook already requires.
-- A `CORRUPT_STORE` start caused by a malformed maintenance record requires operator inspection of `meta/maintenance`; no repair tool exists (consistent with the commit-record policy).
+- A `CORRUPT_STORE` start caused by a malformed maintenance record requires operator inspection of `meta/maintenance`; no repair tool exists (consistent with the commit-record policy). Such a start never answers `/readyz` 200, so in Kubernetes the **startup probe** (120 × 5 s) restarts the container after about ten minutes even though `/livez` stays 200; the restart changes nothing (nothing is written) and the inspection happens through `kubectl logs --previous` and the admin API during the ten-minute window, or by scaling to zero and inspecting the volume elsewhere (owner decision; this is the pre-existing behaviour of every `HALTED` start, not new to CR-43).
+- The in-process test fault hook cannot exercise a crash *between* the transaction's commit and the reply (the subprocess tests crash before or after whole operations); the ordering argument for that boundary is by inspection: the record write precedes the mode change and the reply, and the resume transaction precedes the mode change and the reply.

@@ -208,4 +208,47 @@ func TestMetaFaultHook(t *testing.T) {
 	if rec == nil || sched == nil || !sched.SavedAt.Equal(now.Add(-time.Hour)) {
 		t.Fatalf("a failed clear must leave the record and the old schedule: rec=%v sched=%+v", rec, sched)
 	}
+	// In-transaction abort: bbolt rolls back, same durable state.
+	s.SetMetaFault(func(op string) error {
+		if op == "maintenance.clear.in-tx" {
+			return boom
+		}
+		return nil
+	})
+	if err := s.ClearMaintenanceWithSchedule(testSchedule(now)); !errors.Is(err, boom) {
+		t.Fatalf("clear with an in-tx fault: %v", err)
+	}
+	rec, _ = s.GetMaintenance()
+	sched, _ = s.GetSchedule()
+	if rec == nil || !sched.SavedAt.Equal(now.Add(-time.Hour)) {
+		t.Fatalf("an aborted transaction must leave the record and the old schedule: rec=%v sched=%+v", rec, sched)
+	}
+	// Reported failure after the commit: the change is visible although the
+	// caller got an error (the shape callers must classify by reading back).
+	s.SetMetaFault(func(op string) error {
+		if op == "maintenance.clear.committed" {
+			return boom
+		}
+		return nil
+	})
+	if err := s.ClearMaintenanceWithSchedule(testSchedule(now)); !errors.Is(err, boom) {
+		t.Fatalf("clear with a post-commit fault: %v", err)
+	}
+	rec, _ = s.GetMaintenance()
+	sched, _ = s.GetSchedule()
+	if rec != nil || !sched.SavedAt.Equal(now) {
+		t.Fatalf("a post-commit fault leaves the change visible: rec=%v sched=%+v", rec, sched)
+	}
+	s.SetMetaFault(func(op string) error {
+		if op == "maintenance.put.committed" {
+			return boom
+		}
+		return nil
+	})
+	if err := s.PutMaintenance(&MaintenanceRecord{SchemaVersion: 1, Quiesced: true, SetAt: now, Reason: "x"}); !errors.Is(err, boom) {
+		t.Fatalf("put with a post-commit fault: %v", err)
+	}
+	if rec, _ := s.GetMaintenance(); rec == nil {
+		t.Fatal("a post-commit fault leaves the record visible")
+	}
 }

@@ -195,11 +195,15 @@ func (s *State) Quiesce(ctx context.Context) error {
 				EngineVersion: engineVersion(),
 			}
 			if err := s.store.PutMaintenance(rec); err != nil {
-				s.setMaintenance(rec, false, err)
+				// Classify by reading back (a bbolt error after the meta page
+				// was written leaves the record visible): never report
+				// "not written" from the error path alone.
+				detail := s.classifyMaintenanceWriteFailure(rec, err)
+				s.setMaintenance(rec, false, errors.New(detail))
 				s.setMode(ModeQuiesced)
-				s.logger.Error("quiesce: maintenance record not written; QUIESCED in memory only (a restart would start SERVING)",
-					slog.String("op", "admin.quiesce"), slog.String("err", err.Error()))
-				return fmt.Errorf("%w: %w", ErrMaintenanceNotDurable, err)
+				s.logger.Error("quiesce: maintenance record write failed; QUIESCED in memory, durability not confirmed",
+					slog.String("op", "admin.quiesce"), slog.String("err", err.Error()), slog.String("store", detail))
+				return fmt.Errorf("%w: %s: %w", ErrMaintenanceNotDurable, detail, err)
 			}
 			s.setMaintenance(rec, true, nil)
 			s.setMode(ModeQuiesced)
@@ -252,9 +256,14 @@ func (s *State) Resume(ctx context.Context) error {
 					next.nextSegment = next.nextUpdate
 				}
 			}
-			if err := s.store.ClearMaintenanceWithSchedule(s.scheduleRecord(next, now)); err != nil {
-				s.halt("resume: persist schedule and clear maintenance: "+err.Error(), "")
-				return fmt.Errorf("resume failed and the engine is now HALTED (restart required): %w", err)
+			resumeRec := s.scheduleRecord(next, now)
+			if err := s.store.ClearMaintenanceWithSchedule(resumeRec); err != nil {
+				// The transaction reported an error, which does not establish
+				// a rollback: read the store back and say what the next
+				// start will do (CR-43 review P2).
+				detail := s.classifyResumeFailure(resumeRec)
+				s.halt("resume: persist schedule and clear maintenance: "+err.Error()+"; "+detail, "")
+				return fmt.Errorf("resume failed and the engine is now HALTED (restart required): %w; %s", err, detail)
 			}
 			s.sched = next
 			s.publishSchedule()

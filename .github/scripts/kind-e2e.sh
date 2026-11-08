@@ -329,12 +329,12 @@ gbctl -json quiesce > "$WORK/quiesce-1.json" || { cat "$WORK/quiesce-1.json"; fa
 [ "$(jq -r .status.mode "$WORK/quiesce-1.json")" = "QUIESCED" ] && [ "$(jq -r .status.maintenance.durable "$WORK/quiesce-1.json")" = "true" ] && [ "$(jq -r .status.game_ready "$WORK/quiesce-1.json")" = "false" ] || fail "quiesce reply: $(cat "$WORK/quiesce-1.json")"
 curl -fsS "http://127.0.0.1:$PLAYER_PORT/readyz" > "$WORK/readyz-quiesced.json" || fail "/readyz while quiesced must answer 200: $(cat "$WORK/readyz-quiesced.json" 2>/dev/null)"
 [ "$(jq -r .mode "$WORK/readyz-quiesced.json")" = "QUIESCED" ] && [ "$(jq -r .game_ready "$WORK/readyz-quiesced.json")" = "false" ] && [ "$(jq -r .maintenance "$WORK/readyz-quiesced.json")" = "true" ] && [ "$(jq -r .maintenance_durable "$WORK/readyz-quiesced.json")" = "true" ] || fail "readyz while quiesced: $(cat "$WORK/readyz-quiesced.json")"
-# Two readiness periods later the kubelet still reports Ready.
-sleep 12
+# Longer than the readiness failure window (3 probes x 5 s) later, the kubelet still reports Ready.
+sleep 20
 [ "$(k get pod gb-engine-0 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')" = "True" ] || fail "the quiesced Pod lost its Ready condition"
 pvc_uid_1=$(k get pvc world-gb-engine-0 -o jsonpath='{.metadata.uid}')
 counters_q=$(jq -c '[.status.num_updates, .status.num_segments, .status.next_update]' "$WORK/quiesce-1.json")
-ok "QUIESCED (durable), /readyz 200 game_ready=false maintenance=true, Pod Ready after 12 s; PVC $pvc_uid_1; counters $counters_q"
+ok "QUIESCED (durable), /readyz 200 game_ready=false maintenance=true, Pod Ready after 20 s; PVC $pvc_uid_1; counters $counters_q"
 
 step "image update while quiesced: the StatefulSet controller replaces the Pod (no manual deletion), the new Pod starts QUIESCED and Ready, no turn runs, same PVC"
 docker exec "$node" ctr -n k8s.io images tag docker.io/library/gb-server:ci docker.io/library/gb-server:ci-rollout >/dev/null || fail "could not tag the node image for the rollout"
@@ -342,6 +342,8 @@ rm -rf "$WORK/kustomize-rollout"
 cp -R "$REPO/deploy/kustomize" "$WORK/kustomize-rollout"
 sed -i 's/^    newTag: ci$/    newTag: ci-rollout/' "$WORK/kustomize-rollout/apps/ci/server/kustomization.yaml"
 grep -q 'newTag: ci-rollout' "$WORK/kustomize-rollout/apps/ci/server/kustomization.yaml" || fail "rollout overlay did not change the tag"
+sts_uid=$(k get statefulset gb-engine -o jsonpath='{.metadata.uid}')
+rollout_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 k logs -f pod/gb-engine-0 > "$WORK/gb-engine-0.before-rollout.log" 2>&1 &
 LOG_PID=$!
 sleep 1
@@ -358,7 +360,10 @@ pod_uid_r=$(k get pod gb-engine-0 -o jsonpath='{.metadata.uid}')
 [ "$(k get statefulset gb-engine -o jsonpath='{.status.updatedReplicas}')" = "1" ] && [ "$(k get statefulset gb-engine -o jsonpath='{.status.currentRevision}')" = "$(k get statefulset gb-engine -o jsonpath='{.status.updateRevision}')" ] || fail "StatefulSet did not converge on the update revision"
 [ "$(k get pvc world-gb-engine-0 -o jsonpath='{.metadata.uid}')" = "$pvc_uid_1" ] || fail "PVC identity changed across the rolling update"
 [ "$(k get pod gb-engine-0 -o jsonpath='{.status.containerStatuses[0].restartCount}')" = "0" ] || fail "new Pod has restarts"
-k get events --field-selector reason=SuccessfulDelete,involvedObject.name=gb-engine -o json | jq -e '.items[] | select(.message | test("delete Pod gb-engine-0"))' >/dev/null || fail "no SuccessfulDelete event from the StatefulSet controller: the Pod was not replaced by the controller"
+# The deletion must be the StatefulSet controller's own: an event on this StatefulSet's UID, from the statefulset-controller, after the rollout began.
+k get events --field-selector reason=SuccessfulDelete,involvedObject.name=gb-engine -o json > "$WORK/events-rollout.json"
+jq -e --arg uid "$sts_uid" --arg since "$rollout_started" '.items[] | select(.involvedObject.uid == $uid and (.message | test("delete Pod gb-engine-0 in StatefulSet gb-engine successful")) and ((.source.component // .reportingComponent // "") | test("statefulset-controller")) and (((.lastTimestamp // .eventTime // "") | tostring) >= $since))' "$WORK/events-rollout.json" >/dev/null \
+  || { jq -c '.items[] | {uid: .involvedObject.uid, comp: (.source.component // .reportingComponent), at: (.lastTimestamp // .eventTime), msg: .message}' "$WORK/events-rollout.json"; fail "no SuccessfulDelete event by the statefulset-controller for this StatefulSet after $rollout_started: the Pod was not replaced by the controller"; }
 grep -q '"msg":"shutdown: actor draining".*"mode":"QUIESCED"' "$WORK/gb-engine-0.before-rollout.log" || { tail -20 "$WORK/gb-engine-0.before-rollout.log"; fail "the replaced Pod did not shut down from QUIESCED"; }
 grep -q 'shutdown complete' "$WORK/gb-engine-0.before-rollout.log" || { tail -20 "$WORK/gb-engine-0.before-rollout.log"; fail "the replaced Pod did not log an orderly shutdown"; }
 k logs pod/gb-engine-0 > "$WORK/gb-engine-0.after-rollout.log"

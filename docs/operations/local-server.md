@@ -250,10 +250,12 @@ What `gbctl status` tells you:
 | `mode` | `maintenance` | Meaning |
 |---|---|---|
 | `QUIESCED` | `durable: true`, `set_at`, `reason` | the record is in the store; a restart starts `QUIESCED` |
-| `QUIESCED` | `durable: false`, `error` | the quiesce is **in memory only**: the record write failed (`error` says why); turns are still stopped, but a restart would start `SERVING`. Re-run `gbctl quiesce` (it retries the write) or treat the store as failing. `gbctl quiesce` itself returned exit 5 with `engine is QUIESCED in memory only …` |
+| `QUIESCED` | `durable: false`, `error` | the record write reported an error and the engine read the store back: `error` says whether the store **holds no record** (a restart would start `SERVING`), holds the record **visible but not confirmed** on disk (a restart would likely start `QUIESCED`), or **could not be read back**. Turns are stopped either way. Re-run `gbctl quiesce` (it retries the write and confirms) or treat the store as failing. `gbctl quiesce` itself returned exit 5 with `engine is QUIESCED in memory, but the maintenance record write did not succeed …` |
 | `SERVING` | absent | normal |
 | `HALTED` with `halt_reason` `CORRUPT_STORE: corrupt maintenance record …` | absent | the record exists but is malformed (unknown field, `quiesced: false`, JSON null, wrong schema, trailing data). Nothing was written or repaired; the operator inspects `meta/maintenance` and decides. The same fail-closed start as a malformed commit record (section 9) |
-| `HALTED` with `halt_reason` `resume: …` | absent (record still in the store) | the resume transaction failed; the next start is `QUIESCED` |
+| `HALTED` with `halt_reason` `resume: … the next start will be QUIESCED` | `durable: true` still shown | the resume transaction failed and the read-back confirms the record and the old schedule are still in the store |
+| `HALTED` with `halt_reason` `resume: … the next start will be SERVING` | `durable: false`, `error` says the store shows the resume applied | the transaction reported an error but is visible (record removed, schedule written): a restart serves with the rescheduled times |
+| `HALTED` with `halt_reason` `resume: … next start unknown` | `durable: false`, `error` | the store could not be read back after the failure; `gbctl status` after the next start says what happened |
 
 Ambiguous outcomes: if `gbctl quiesce` timed out or the process died
 before replying, the record may or may not be in the store; `gbctl status`

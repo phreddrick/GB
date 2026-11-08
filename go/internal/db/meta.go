@@ -324,9 +324,15 @@ func (s *Store) PutMaintenance(rec *MaintenanceRecord) error {
 	if err := s.metaFault("maintenance.put"); err != nil {
 		return err
 	}
-	return s.db.Update(func(tx *bolt.Tx) error {
+	if err := s.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(BucketMeta).Put(KeyMaintenance, data)
-	})
+	}); err != nil {
+		return err
+	}
+	// Test-only: report an error although the transaction committed (the
+	// shape of a final-fsync failure, whose rollback cannot undo the
+	// already-written meta page). Callers must classify by reading back.
+	return s.metaFault("maintenance.put.committed")
 }
 
 // ClearMaintenanceWithSchedule removes the maintenance record and writes the
@@ -352,19 +358,30 @@ func (s *Store) ClearMaintenanceWithSchedule(sched *ScheduleRecord) error {
 	if err := s.metaFault("maintenance.clear"); err != nil {
 		return err
 	}
-	return s.db.Update(func(tx *bolt.Tx) error {
+	if err := s.db.Update(func(tx *bolt.Tx) error {
 		meta := tx.Bucket(BucketMeta)
 		if err := meta.Delete(KeyMaintenance); err != nil {
 			return err
 		}
-		return meta.Put(KeySchedule, data)
-	})
+		if err := meta.Put(KeySchedule, data); err != nil {
+			return err
+		}
+		// Test-only: abort inside the transaction (bbolt rolls it back).
+		return s.metaFault("maintenance.clear.in-tx")
+	}); err != nil {
+		return err
+	}
+	return s.metaFault("maintenance.clear.committed")
 }
 
 // SetMetaFault installs a test-only fault hook consulted by PutMaintenance
-// ("maintenance.put") and ClearMaintenanceWithSchedule ("maintenance.clear")
-// before their transaction opens; a non-nil error is returned to the caller
-// and nothing is written. Production code never sets it.
+// and ClearMaintenanceWithSchedule at named stages: "maintenance.put" and
+// "maintenance.clear" before the transaction opens (nothing is written),
+// "maintenance.clear.in-tx" inside the transaction after the writes (bbolt
+// rolls back), and "maintenance.put.committed" / "maintenance.clear.committed"
+// after the transaction committed (the caller is told of an error although
+// the change is visible: the ambiguous outcome a failed final fsync can
+// produce). Production code never sets it.
 func (s *Store) SetMetaFault(f func(op string) error) {
 	s.metaFaultFn.Store(&f)
 }

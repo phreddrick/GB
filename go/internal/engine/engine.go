@@ -175,12 +175,14 @@ var (
 	ErrStillRunning = errors.New("request had already started; it continues to completion and is not rolled back")
 	// ErrEngineStopped: the actor has shut down.
 	ErrEngineStopped = errors.New("engine stopped")
-	// ErrMaintenanceNotDurable: Quiesce paused the engine in memory but could
-	// not write the maintenance record; scheduled turns and mutating
-	// commands are refused as usual, but a restart would start SERVING. The
+	// ErrMaintenanceNotDurable: Quiesce paused the engine in memory but the
+	// maintenance record write reported an error; scheduled turns and
+	// mutating commands are refused as usual, but the quiesce is not
+	// confirmed durable (the record may be absent, or visible but with its
+	// durability on disk unconfirmed; the status error text says which). The
 	// operator re-runs `gbctl quiesce` (which retries the write) or treats
 	// the store as failing. Never reported as success (CR-43).
-	ErrMaintenanceNotDurable = errors.New("engine is QUIESCED in memory only: the maintenance record was not written, so a restart would start SERVING; re-run quiesce to retry")
+	ErrMaintenanceNotDurable = errors.New("engine is QUIESCED in memory, but the maintenance record write did not succeed: a restart is not guaranteed to start QUIESCED (gbctl status says what the store shows); re-run quiesce to retry")
 	// ErrShutdownTimeout: the actor did not finish within the shutdown
 	// budget; a turn may still be running and may still commit after the
 	// process is told to exit. The commit is atomic, so the store will hold

@@ -232,8 +232,12 @@ func TestQuiescedReadinessSemantics(t *testing.T) {
 	if code != 503 || body["ok"] != false || body["halt_reason"] != fe.halt || body["maintenance"] != nil {
 		t.Fatalf("corrupt-store readyz code=%d body=%v", code, body)
 	}
+	// Liveness stays 200 while HALTED so the liveness probe does not
+	// restart-loop a halted process (the startup probe, which is /readyz,
+	// will still restart a container that never becomes Ready: that is the
+	// documented behaviour of a CORRUPT_STORE start, see cr43-handoff.md).
 	if code, _ := get(t, ts.URL+"/livez"); code != 200 {
-		t.Fatalf("halted must stay alive (no restart loop): livez %d", code)
+		t.Fatalf("halted must stay alive for the liveness probe: livez %d", code)
 	}
 	fe.setMode(engine.ModeStarting)
 	if code, _ := get(t, ts.URL+"/readyz"); code != 503 {
