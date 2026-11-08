@@ -76,6 +76,9 @@ Startup and liveness probes are unchanged in the manifests; the startup probe is
 | 4 | `8dbb4d2` | CHANGES REQUIRED | a second store read could misreport a read failure as corruption; actor-path assertions incomplete. Remediated in `941c0d2` (`db.DecodeMaintenanceRecord`, keyed read faults, stored-pair assertions) |
 | 5 | `941c0d2` | CHANGES REQUIRED | visible-resume tests accepted missing or malformed values; two scenarios lacked stored-pair and metric checks. Remediated in `d2ebb8b` (test-only) |
 | 6 | `d2ebb8b` | **APPROVE** | no remaining findings |
+| 7 (CI fix) | `f9ed90e` | CHANGES REQUIRED | P2: the shell block decided on `jq -r '.matched \| length'` without `-e`, so a program printing nothing would have erred inside the `if` condition (not stopped by `set -e`) and skipped the failure branch; P3: format-only instant validation, tautological fail-closed assertions, overstated ownership claim. Remediated in `f668b9f` (`jq -e -s` requiring exactly one report object, numeric check, kubectl failure handled, parsed instants, raw-stdout assertions, shell-block tests, qualification) |
+| 8 (CI fix) | `f668b9f` | CHANGES REQUIRED | P3: `fromdateiso8601` normalises `22:05:61` and `02-30`; P3: section 6.2 claimed more than the log excerpt showed. Remediated in `720144d` (round-trip calendar validation with tests, claims narrowed) |
+| 9 (CI fix) | `720144d` | **APPROVE** | no new findings; hosted rollout verification remains outstanding (the rerun of pull request #18) |
 
 The reviewer could not execute Go tests in its sandbox (read-only build cache); every round's test claims were verified locally on igor (`go test ./...`, `-race` on the touched packages, lint gate 1057/1057 with 0 new). Transcripts: owner-held `cr43-review-2026-11-08/`.
 
