@@ -273,31 +273,49 @@ inspectable (`gbctl status` shows `halt_reason`). Recovery is a **process
 restart**, which reloads the store. The same fail-closed path is taken when
 `gbctl resume` cannot persist the rescheduled times (GB1-03).
 
-**A failed turn is rolled back, not half applied (CR-18, ADR-0009).** While
-a turn body runs, the store refuses every write except the turn's own
-commit (the write fence; number allocation is staged in memory and
-persisted by the commit), and the news, telegrams and messages the turn
-produces are held back. The engine then reports one of four outcomes, each
-decided by reading the durable commit record back, never by assumption:
+**A turn is never half applied; what a failed turn left behind is
+established, not assumed (CR-18, ADR-0009).** While a turn body runs, the
+store refuses every write except the turn's own commit (the write fence;
+number allocation is staged in memory and persisted by the commit), and
+the news, telegrams and messages the turn produces are held back. When a
+turn does not complete normally the engine halts and reports one of the
+following outcomes, each decided by reading the durable commit record back
+and comparing its **complete identity** (schema version, sequence, turn,
+segment, kind, wall time, engine version) with the record that existed
+before the turn and with the record the commit would have written:
 
-- **Nothing written.** The body panicked, turn code hit the write fence, or
-  the commit transaction failed or panicked and the record still shows the
-  previous sequence. The held effects and staged allocations are dropped,
-  the in-memory world and schedule are **reloaded from the last commit**,
-  players are told the turn was rolled back, and the halt reason ends in
-  `nothing of the turn was written; in-memory state reloaded from the last
-  commit` (a fence violation names the refused store method).
-- **Uncertain.** The commit record could not be read back, changed in an
-  unexpected way, or advanced although an error was reported (for example
-  a failure after the transaction became visible). The halt reason says
-  `outcome uncertain` and never claims a rollback; memory is reloaded from
-  the store as it is now visible, players are told the outcome is
-  uncertain, and `commit_seq` in `gbctl status` shows what the store holds.
-- **Committed, delivery failed.** The transaction committed but delivering
-  the held notifications panicked. The halt reason says `committed
+- **Confirmed aborted transaction.** The body panicked, turn code hit the
+  write fence, or the commit transaction failed or panicked and the record
+  read back is identical to the record before the turn (or still absent on
+  a store that had none). No new turn commit exists. The held effects and
+  staged allocations are dropped, the in-memory world and schedule are
+  reloaded from that last commit, players are told the turn was rolled
+  back, and the halt reason ends in `nothing of the turn was written;
+  in-memory state reloaded from the last commit` (a fence violation names
+  the refused store method).
+- **Confirmed committed transaction, delivery failed.** The transaction
+  committed and only the delivery of the held notifications panicked. The
+  committed state is durable and stands; the halt reason says `committed
   (commit_seq N) ... nothing was rolled back`; store and memory agree.
-- **Reload failed.** In the first two cases, if reloading the store fails,
-  the reason says `in-memory state is untrusted`.
+- **Uncertain outcome.** The commit record could not be read back or is
+  malformed, has disappeared, is identical to the record this commit would
+  have written although a failure was reported (the transaction became
+  visible; durability on disk is not asserted), or differs from both known
+  identities (including an altered record carrying the previous sequence).
+  Persistence cannot be asserted either way. The halt reason says `outcome
+  uncertain` and never claims a rollback; no held notification is
+  delivered; memory is reloaded from the store as it is now visible;
+  `commit_seq` in `gbctl status` shows what the store holds and the
+  operator compares it with the expected turn.
+- **Reload failed.** In the aborted and uncertain cases, if reloading the
+  world, the schedule or the commit record fails, the reason says
+  `in-memory state is untrusted` instead of `reloaded`.
+
+The engine stays `HALTED` in all of these; the operator reads the halt
+reason and `commit_seq` before restarting, because the right follow-up
+differs (an aborted or uncertain turn is overdue after the restart and is
+run by hand with `gbctl update` once the store's state is confirmed; a
+committed turn must not be run again).
 
 In every case the halted shutdown writes nothing. After a restart a turn
 that was not committed is simply overdue: the no-catch-up policy
