@@ -418,11 +418,14 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 			return fmt.Errorf("%w: command canceled while queued: %w (%w)", ErrEngineBusy, ErrNotExecuted, ctx.Err())
 		}
 		// The actor claimed the command first. It closes done before it can
-		// exit (handlePlayerCommand defers it; drainQueues closes it too),
-		// so waiting for done alone is safe, and it is the only wait that
+		// exit (handlePlayerCommand and drainQueues both defer it), so
+		// waiting for done alone is safe, and it is the only wait that
 		// reports the real outcome: a select on done and stopped could pick
 		// stopped after the command had completed and tell the player it
 		// was not run.
+		if s.testHooks != nil && s.testHooks.afterLostCancelRace != nil {
+			s.testHooks.afterLostCancelRace(cmd)
+		}
 		<-cmd.done
 		return cmd.outcome()
 	case <-s.stopped:
@@ -460,6 +463,9 @@ func (s *State) handlePlayerCommand(cmd *command) {
 		cmd.state.Store(reqCanceled)
 		s.metrics.Canceled.Inc("command")
 		return
+	}
+	if s.testHooks != nil && s.testHooks.beforeCommandDispatch != nil {
+		s.testHooks.beforeCommandDispatch(cmd)
 	}
 	verb := canonicalVerb(cmd.text)
 	mode := s.Mode()

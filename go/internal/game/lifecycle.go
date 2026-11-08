@@ -316,10 +316,14 @@ func (s *State) drainQueues() {
 	for {
 		select {
 		case cmd := <-s.cmdCh:
-			if cmd.state.CompareAndSwap(reqQueued, reqStarted) {
-				_ = cmd.sess.Send(refusalMessage(ModeQuiesced))
-			}
-			close(cmd.done)
+			func() {
+				// done must close even if the responder panics: callers
+				// that lost the cancellation race wait on it alone.
+				defer close(cmd.done)
+				if cmd.state.CompareAndSwap(reqQueued, reqStarted) {
+					_ = cmd.sess.Send(refusalMessage(ModeQuiesced))
+				}
+			}()
 		case req := <-s.adminCh:
 			if req.state.CompareAndSwap(reqQueued, reqStarted) {
 				req.reply <- adminResult{err: ErrEngineStopped}
@@ -463,5 +467,12 @@ type testHooks struct {
 	// claimed (reqStarted) and before its context is consulted: the window
 	// the GB1-04 cancellation test needs to force.
 	afterCommandAdmit func(cmd *command)
-	panicVerb         string // a command verb that panics inside dispatch
+	// beforeCommandDispatch runs on the actor after the context check
+	// passed and before dispatch (the command is going to run).
+	beforeCommandDispatch func(cmd *command)
+	// afterLostCancelRace runs on the caller's goroutine inside
+	// HandleCommand after its context ended and its queued->canceled CAS
+	// failed, before it waits for done (the branch of the shutdown test).
+	afterLostCancelRace func(cmd *command)
+	panicVerb           string // a command verb that panics inside dispatch
 }

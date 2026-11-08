@@ -631,79 +631,98 @@ func TestGB104CancellationBetweenAdmissionAndContextCheck(t *testing.T) {
 
 // TestGB104OutcomeSurvivesShutdownAfterLostCancellationRace covers the
 // caller branch where it lost the queued->canceled race (the actor had
-// claimed the command) and the engine stops right after the command is
-// finished with. The caller must report the command's real outcome, never
-// ErrEngineStopped ("your command was NOT run") for a command that ran,
-// nor lose the actor-side cancellation outcome. Shutdown is initiated from
-// inside the actor's admission window, so completion and stop are both
-// observable by the time the caller resumes, deterministically.
+// claimed the command) and the engine stops before the caller resumes. The
+// caller is held inside that branch (afterLostCancelRace hook) until both
+// the command's done channel and the engine's stopped channel are closed,
+// so the previously racy choice between them is forced to its worst case
+// deterministically; the caller must still report the command's real
+// outcome: ErrNotExecuted when the actor canceled it, nil when it ran,
+// never ErrEngineStopped.
 func TestGB104OutcomeSurvivesShutdownAfterLostCancellationRace(t *testing.T) {
-	t.Run("actor canceled, then stop", func(t *testing.T) {
+	run := func(t *testing.T, cancelAt string, wantRan bool) {
 		s, _, _ := quietEngine(t, true)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		sess := &recordingResponder{}
-		stopDone := make(chan error, 1)
-		s.testHooks = &testHooks{afterCommandAdmit: func(cmd *command) {
-			if cmd.text != "who" {
-				return
-			}
-			cancel() // caller wakes, loses the CAS (actor holds the claim)
-			go func() { stopDone <- s.Stop(ctxT(t, 10*time.Second)) }()
-			waitUntil(t, 5*time.Second, func() bool { return s.draining.Load() })
+		entered := make(chan *command, 1) // the caller reached the failed-CAS branch
+		release := make(chan struct{})
+		hooks := &testHooks{afterLostCancelRace: func(cmd *command) {
+			entered <- cmd
+			<-release
 		}}
-		err := s.HandleCommand(ctx, 1, 0, "who", sess)
+		switch cancelAt {
+		case "admit": // canceled after the claim, before the context check: the actor cancels it
+			hooks.afterCommandAdmit = func(cmd *command) {
+				if cmd.text == "who" {
+					cancel()
+				}
+			}
+		case "dispatch": // canceled after the context check: the command runs
+			hooks.beforeCommandDispatch = func(cmd *command) {
+				if cmd.text == "who" {
+					cancel()
+				}
+			}
+		}
+		s.testHooks = hooks
+		result := make(chan error, 1)
+		go func() { result <- s.HandleCommand(ctx, 1, 0, "who", sess) }()
+		var cmd *command
+		select {
+		case cmd = <-entered:
+		case err := <-result:
+			t.Fatalf("caller returned %v without entering the failed-CAS branch", err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("caller did not reach the failed-CAS branch")
+		}
+		if cmd.state.Load() == reqQueued {
+			t.Fatal("hook ran while the command was still queued (CAS could not have failed)")
+		}
+		// Make the command's completion and the engine's stop both observable
+		// while the caller is still held in the branch.
+		select {
+		case <-cmd.done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("actor did not finish with the command")
+		}
+		if err := s.Stop(ctxT(t, 10*time.Second)); err != nil {
+			t.Fatalf("Stop: %v", err)
+		}
+		select {
+		case <-s.Stopped():
+		default:
+			t.Fatal("engine not stopped after Stop returned")
+		}
+		close(release)
+		var err error
+		select {
+		case err = <-result:
+		case <-time.After(5 * time.Second):
+			t.Fatal("caller did not return after release")
+		}
 		if errors.Is(err, ErrEngineStopped) {
 			t.Fatalf("caller told the engine stopped instead of the command's outcome: %v", err)
+		}
+		if wantRan {
+			if err != nil {
+				t.Fatalf("command that ran reported %v", err)
+			}
+			if sess.text() == "" || s.metrics.Commands.Value("who", "ok") != 1 {
+				t.Fatal("command did not run")
+			}
+			if got := s.metrics.Canceled.Value("command"); got != 0 {
+				t.Fatalf("canceled counter = %v for a command that ran", got)
+			}
+			return
 		}
 		expectNotExecuted(t, "command", err)
 		if sess.text() != "" || s.metrics.Commands.Value("who", "ok") != 0 {
 			t.Fatalf("canceled command ran: %q", sess.text())
 		}
 		if got := s.metrics.Canceled.Value("command"); got != 1 {
-			t.Fatalf("canceled counter = %v", got)
+			t.Fatalf("canceled counter = %v, want exactly 1", got)
 		}
-		if err := <-stopDone; err != nil {
-			t.Fatalf("Stop: %v", err)
-		}
-	})
-	t.Run("actor ran it, then stop", func(t *testing.T) {
-		s, _, _ := quietEngine(t, true)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		sess := &recordingResponder{}
-		stopDone := make(chan error, 1)
-		s.testHooks = &testHooks{afterCommandAdmit: func(cmd *command) {
-			if cmd.text != "who" {
-				return
-			}
-			// Context stays live here, so the command runs; the caller then
-			// sees ctx.Done only after done closed (cancel below runs after
-			// dispatch), and stop follows immediately.
-			go func() { stopDone <- s.Stop(ctxT(t, 10*time.Second)) }()
-			waitUntil(t, 5*time.Second, func() bool { return s.draining.Load() })
-		}}
-		err := s.HandleCommand(ctx, 1, 0, "who", sess)
-		if err != nil {
-			t.Fatalf("command that ran reported %v", err)
-		}
-		if sess.text() == "" || s.metrics.Commands.Value("who", "ok") != 1 {
-			t.Fatal("command did not run")
-		}
-		if err := <-stopDone; err != nil {
-			t.Fatalf("Stop: %v", err)
-		}
-	})
-}
-
-func waitUntil(t *testing.T, d time.Duration, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(d)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("condition not met in time")
+	t.Run("actor canceled, then stop", func(t *testing.T) { run(t, "admit", false) })
+	t.Run("command ran, then stop", func(t *testing.T) { run(t, "dispatch", true) })
 }
