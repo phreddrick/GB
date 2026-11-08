@@ -641,4 +641,5 @@ type fenceState struct {
 	fenceMu      sync.Mutex
 	lastFenced   string
 	commitFault  atomic.Pointer[func(stage string) error]
+	metaFaultFn  atomic.Pointer[func(op string) error]
 }

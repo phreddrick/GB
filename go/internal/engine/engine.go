@@ -29,7 +29,11 @@ const (
 	ModeTurnInProgress
 	// ModeQuiesced: an operator paused the engine (or shutdown has begun):
 	// mutating player commands and scheduled turns are refused; status works;
-	// Resume returns to ModeServing.
+	// Resume returns to ModeServing. The process is healthy and Ready for
+	// the orchestrator (CR-43: a quiesced Pod must stay Ready so a
+	// StatefulSet rolling update can replace it) while the game is not
+	// (Health.GameReady is false). An operator quiesce is recorded durably
+	// (db.MaintenanceRecord) so that a restart starts QUIESCED again.
 	ModeQuiesced
 	// ModeHalted: a panic, a failed commit or a failed startup validation
 	// stopped mutating work. All mutating operations are refused, nothing
@@ -62,12 +66,16 @@ func (m Mode) String() string {
 	return "UNKNOWN"
 }
 
-// Ready reports whether the engine should advertise readiness (plan 11.5):
-// SERVING and TURN_IN_PROGRESS serve players; UNINITIALIZED is ready for
-// administrative initialisation only (Health.GameReady is false there).
+// Ready reports whether the engine should advertise process readiness to
+// the orchestrator (plan 11.5, CR-43): SERVING and TURN_IN_PROGRESS serve
+// players; UNINITIALIZED is ready for administrative initialisation only;
+// QUIESCED is a healthy, initialised server deliberately paused by an
+// operator (Health.GameReady is false in both). STARTING (store not yet
+// loaded or validated), HALTED (including CORRUPT_STORE) and STOPPED are
+// not ready: the process cannot operate safely.
 func (m Mode) Ready() bool {
 	switch m {
-	case ModeServing, ModeTurnInProgress, ModeUninitialized:
+	case ModeServing, ModeTurnInProgress, ModeUninitialized, ModeQuiesced:
 		return true
 	}
 	return false
@@ -81,9 +89,15 @@ func (m Mode) AcceptsCommands() bool { return m == ModeServing }
 type Health struct {
 	Mode       Mode
 	Alive      bool   // actor heartbeated recently, or a turn is making progress
-	Ready      bool   // Mode.Ready() and not draining
+	Ready      bool   // Mode.Ready() and not draining (process readiness for the orchestrator)
 	GameReady  bool   // players can be served (SERVING or TURN_IN_PROGRESS)
 	HaltReason string // non-empty in ModeHalted
+	// Maintenance is true while an operator quiesce is in effect (ModeQuiesced
+	// entered through Quiesce or restored from the store); MaintenanceDurable
+	// says whether the store holds the maintenance record, i.e. whether a
+	// restart would start QUIESCED again.
+	Maintenance        bool
+	MaintenanceDurable bool
 	// Diagnostics.
 	LastHeartbeat time.Time
 	TurnRunning   bool
@@ -112,7 +126,25 @@ type Status struct {
 	TurnStarted    *time.Time         `json:"turn_started,omitempty"`
 	QueueDepth     int                `json:"queue_depth"`
 	LastCommitSeq  uint64             `json:"commit_seq,omitempty"`
-	Persistence    string             `json:"persistence"`
+	// GameReady is true only while players are served (SERVING or
+	// TURN_IN_PROGRESS, not draining); it is false while QUIESCED even
+	// though /readyz then answers 200 (CR-43).
+	GameReady bool `json:"game_ready"`
+	// Maintenance is present while an operator quiesce is in effect.
+	Maintenance *MaintenanceStatus `json:"maintenance,omitempty"`
+	Persistence string             `json:"persistence"`
+}
+
+// MaintenanceStatus describes an operator quiesce (CR-43, ADR-0010).
+type MaintenanceStatus struct {
+	// Durable is true when the store holds the maintenance record, so a
+	// restart starts QUIESCED. False means the engine is quiesced in memory
+	// only (the record could not be written; Error says why) and a restart
+	// would start SERVING; re-running `gbctl quiesce` retries the write.
+	Durable bool       `json:"durable"`
+	SetAt   *time.Time `json:"set_at,omitempty"`
+	Reason  string     `json:"reason,omitempty"`
+	Error   string     `json:"error,omitempty"`
 }
 
 // PersistenceNote is repeated in every status so operators are never
@@ -143,6 +175,14 @@ var (
 	ErrStillRunning = errors.New("request had already started; it continues to completion and is not rolled back")
 	// ErrEngineStopped: the actor has shut down.
 	ErrEngineStopped = errors.New("engine stopped")
+	// ErrMaintenanceNotDurable: Quiesce paused the engine in memory but the
+	// maintenance record write reported an error; scheduled turns and
+	// mutating commands are refused as usual, but the quiesce is not
+	// confirmed durable (the record may be absent, or visible but with its
+	// durability on disk unconfirmed; the status error text says which). The
+	// operator re-runs `gbctl quiesce` (which retries the write) or treats
+	// the store as failing. Never reported as success (CR-43).
+	ErrMaintenanceNotDurable = errors.New("engine is QUIESCED in memory, but the maintenance record write did not succeed: a restart is not guaranteed to start QUIESCED (gbctl status says what the store shows); re-run quiesce to retry")
 	// ErrShutdownTimeout: the actor did not finish within the shutdown
 	// budget; a turn may still be running and may still commit after the
 	// process is told to exit. The commit is atomic, so the store will hold

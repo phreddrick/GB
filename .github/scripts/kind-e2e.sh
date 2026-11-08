@@ -35,8 +35,11 @@
 #
 # What it proves: the image starts under Pod Security `restricted` as UID
 # 65532 with a read-only root and a writable mounted volume; probes behave;
-# `gbctl universe init` succeeds once and is refused (exit 4) afterwards; an
-# orderly restart keeps universe and schedule; the cluster is deleted. What
+# `gbctl universe init` succeeds once and is refused (exit 4) afterwards; a
+# quiesced server stays Ready and durably quiesced, a StatefulSet rolling
+# update replaces it without manual deletion and the replacement starts
+# QUIESCED without running a turn (CR-43); an orderly restart keeps universe
+# and schedule; the cluster is deleted. What
 # it does not prove: Longhorn RWOP, NetworkPolicy enforcement (kind's default
 # CNI does not enforce the policies that are applied here), Traefik routing,
 # PodMonitor discovery, node fencing, or a player login (no race exists on a
@@ -73,6 +76,14 @@ fi
 for tool in kind kubectl docker curl jq openssl python3 timeout; do
   command -v "$tool" >/dev/null || { echo "kind-e2e: $tool is required" >&2; exit 2; }
 done
+# The rollout-evidence program (CR-43: was the quiesced Pod deleted by the
+# StatefulSet controller itself?) is compiled against an empty EventList
+# before anything is created, so a syntax error in it can never surface only
+# after a cluster exists.
+EVENT_PROGRAM="$HERE/sts-controller-delete-event.jq"
+[ -f "$EVENT_PROGRAM" ] || { echo "kind-e2e: $EVENT_PROGRAM is missing next to this script" >&2; exit 2; }
+jq -e -f "$EVENT_PROGRAM" --arg uid compile-check --arg set gb-engine --arg pod gb-engine-0 --arg since 2000-01-01T00:00:00Z <<<'{"items":[]}' >/dev/null \
+  || { echo "kind-e2e: $EVENT_PROGRAM does not compile or does not evaluate an empty EventList" >&2; exit 2; }
 mkdir -p "$WORK" "$DIAG"
 chmod 700 "$WORK"
 : "${KUBECONFIG:=$WORK/kubeconfig}"
@@ -107,6 +118,7 @@ collect_diagnostics() {
   k logs pod/gb-engine-0 --all-containers=true > "$DIAG/gb-engine-0.log" 2>&1 || true
   k logs pod/gb-engine-0 --all-containers=true --previous > "$DIAG/gb-engine-0.previous.log" 2>&1 || true
   cp -f "$WORK"/*.log "$DIAG"/ 2>/dev/null || true
+  cp -f "$WORK"/events-rollout*.json "$DIAG"/ 2>/dev/null || true
   cp -f "$WORK"/*.json "$DIAG"/ 2>/dev/null || true
 }
 
@@ -315,6 +327,90 @@ ws=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PLAYER_PORT/ws")
 grep -qE '^4[0-9][0-9]$' <<<"$ws" || fail "WebSocket endpoint without a token returned $ws"
 ok "login of an unknown race -> $code, WebSocket without token -> $ws (both refused, no server error)"
 
+# ------------------------------------------------- quiesced rolling update --
+# CR-43 (ADR-0010): a quiesced server stays Kubernetes-Ready, its quiesce is
+# durable, and a normal StatefulSet rolling update replaces the Pod without
+# any manual deletion while no turn runs. The "new image" is a second tag of
+# the same bytes (kind has no registry): the controller only compares the
+# Pod template, so the rollout mechanics are the same as for a new digest.
+step "quiesce: durable maintenance record, /readyz 200 with game_ready=false, Pod stays Ready"
+gbctl -json quiesce > "$WORK/quiesce-1.json" || { cat "$WORK/quiesce-1.json"; fail "quiesce failed"; }
+[ "$(jq -r .status.mode "$WORK/quiesce-1.json")" = "QUIESCED" ] && [ "$(jq -r .status.maintenance.durable "$WORK/quiesce-1.json")" = "true" ] && [ "$(jq -r .status.game_ready "$WORK/quiesce-1.json")" = "false" ] || fail "quiesce reply: $(cat "$WORK/quiesce-1.json")"
+curl -fsS "http://127.0.0.1:$PLAYER_PORT/readyz" > "$WORK/readyz-quiesced.json" || fail "/readyz while quiesced must answer 200: $(cat "$WORK/readyz-quiesced.json" 2>/dev/null)"
+[ "$(jq -r .mode "$WORK/readyz-quiesced.json")" = "QUIESCED" ] && [ "$(jq -r .game_ready "$WORK/readyz-quiesced.json")" = "false" ] && [ "$(jq -r .maintenance "$WORK/readyz-quiesced.json")" = "true" ] && [ "$(jq -r .maintenance_durable "$WORK/readyz-quiesced.json")" = "true" ] || fail "readyz while quiesced: $(cat "$WORK/readyz-quiesced.json")"
+# Longer than the readiness failure window (3 probes x 5 s) later, the kubelet still reports Ready.
+sleep 20
+[ "$(k get pod gb-engine-0 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')" = "True" ] || fail "the quiesced Pod lost its Ready condition"
+pvc_uid_1=$(k get pvc world-gb-engine-0 -o jsonpath='{.metadata.uid}')
+counters_q=$(jq -c '[.status.num_updates, .status.num_segments, .status.next_update]' "$WORK/quiesce-1.json")
+ok "QUIESCED (durable), /readyz 200 game_ready=false maintenance=true, Pod Ready after 20 s; PVC $pvc_uid_1; counters $counters_q"
+
+step "image update while quiesced: the StatefulSet controller replaces the Pod (no manual deletion), the new Pod starts QUIESCED and Ready, no turn runs, same PVC"
+docker exec "$node" ctr -n k8s.io images tag docker.io/library/gb-server:ci docker.io/library/gb-server:ci-rollout >/dev/null || fail "could not tag the node image for the rollout"
+rm -rf "$WORK/kustomize-rollout"
+cp -R "$REPO/deploy/kustomize" "$WORK/kustomize-rollout"
+sed -i 's/^    newTag: ci$/    newTag: ci-rollout/' "$WORK/kustomize-rollout/apps/ci/server/kustomization.yaml"
+grep -q 'newTag: ci-rollout' "$WORK/kustomize-rollout/apps/ci/server/kustomization.yaml" || fail "rollout overlay did not change the tag"
+sts_uid=$(k get statefulset gb-engine -o jsonpath='{.metadata.uid}')
+rollout_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+k logs -f pod/gb-engine-0 > "$WORK/gb-engine-0.before-rollout.log" 2>&1 &
+LOG_PID=$!
+sleep 1
+k apply -k "$WORK/kustomize-rollout/apps/ci/server"
+# Completes only when the controller has replaced the Pod and the new one is Ready.
+k rollout status statefulset/gb-engine --timeout=300s
+k wait pod/gb-engine-0 --for=condition=Ready --timeout=120s
+sleep 1
+kill "$LOG_PID" 2>/dev/null || true
+LOG_PID=""
+pod_uid_r=$(k get pod gb-engine-0 -o jsonpath='{.metadata.uid}')
+[ "$pod_uid_r" != "$pod_uid_1" ] || fail "the Pod was not replaced by the rolling update"
+[ "$(k get pod gb-engine-0 -o jsonpath='{.spec.containers[0].image}')" = "gb-server:ci-rollout" ] || fail "new Pod image: $(k get pod gb-engine-0 -o jsonpath='{.spec.containers[0].image}')"
+[ "$(k get statefulset gb-engine -o jsonpath='{.status.updatedReplicas}')" = "1" ] && [ "$(k get statefulset gb-engine -o jsonpath='{.status.currentRevision}')" = "$(k get statefulset gb-engine -o jsonpath='{.status.updateRevision}')" ] || fail "StatefulSet did not converge on the update revision"
+[ "$(k get pvc world-gb-engine-0 -o jsonpath='{.metadata.uid}')" = "$pvc_uid_1" ] || fail "PVC identity changed across the rolling update"
+[ "$(k get pod gb-engine-0 -o jsonpath='{.status.containerStatuses[0].restartCount}')" = "0" ] || fail "new Pod has restarts"
+# The deletion must be the StatefulSet controller's own: a SuccessfulDelete event on this StatefulSet's UID, from the
+# statefulset-controller, naming gb-engine-0, at or after the instant the rollout began. sts-controller-delete-event.jq
+# evaluates the four predicates separately (the message case-insensitively: Kubernetes title-cases the verb) and reports
+# the expected and observed value of each one, so a failure names the mismatch.
+k get events --field-selector reason=SuccessfulDelete,involvedObject.name=gb-engine -o json > "$WORK/events-rollout.json" || fail "could not list the SuccessfulDelete events on gb-engine"
+jq -f "$EVENT_PROGRAM" --arg uid "$sts_uid" --arg set gb-engine --arg pod gb-engine-0 --arg since "$rollout_started" "$WORK/events-rollout.json" > "$WORK/events-rollout-check.json" 2>&1 \
+  || fail "could not evaluate the SuccessfulDelete events (see events-rollout.json in the diagnostics): $(cat "$WORK/events-rollout-check.json" 2>/dev/null)"
+# Exactly one report object with a `matched` array, or the step fails: no output, several outputs or a non-report never pass.
+matched=$(jq -e -r -s 'if length == 1 and (.[0] | type) == "object" and (.[0].matched | type) == "array" then (.[0].matched | length) else error("expected exactly one report object with a matched array, got \(length) value(s)") end' "$WORK/events-rollout-check.json" 2>&1) \
+  || fail "the event program did not produce a report: $matched"
+[[ "$matched" =~ ^[0-9]+$ ]] || fail "the event program's matched count is not a number: $matched"
+if [ "$matched" -lt 1 ]; then
+  candidates=$(jq -r '.candidates | length' "$WORK/events-rollout-check.json")
+  {
+    echo "SuccessfulDelete events on gb-engine: $candidates candidate(s); expected $(jq -c .expected "$WORK/events-rollout-check.json")"
+    jq -r '.candidates[] | "  event \(.name):", (.checks | to_entries[] | "    \(.key): \(if .value.ok then "ok" else "MISMATCH" end)  expected \(.value.expected | tojson)  observed \(.value.observed | tojson)")' "$WORK/events-rollout-check.json"
+  } >&2
+  if [ "$candidates" -eq 0 ]; then why="no SuccessfulDelete event exists on gb-engine at all"; else why="each of the $candidates candidate event(s) listed above fails at least one predicate"; fi
+  fail "no SuccessfulDelete event by the statefulset-controller for StatefulSet uid $sts_uid naming gb-engine-0 at or after $rollout_started ($why): the Pod was not shown to be replaced by the controller"
+fi
+grep -q '"msg":"shutdown: actor draining".*"mode":"QUIESCED"' "$WORK/gb-engine-0.before-rollout.log" || { tail -20 "$WORK/gb-engine-0.before-rollout.log"; fail "the replaced Pod did not shut down from QUIESCED"; }
+grep -q 'shutdown complete' "$WORK/gb-engine-0.before-rollout.log" || { tail -20 "$WORK/gb-engine-0.before-rollout.log"; fail "the replaced Pod did not log an orderly shutdown"; }
+k logs pod/gb-engine-0 > "$WORK/gb-engine-0.after-rollout.log"
+grep -q 'starting QUIESCED' "$WORK/gb-engine-0.after-rollout.log" || { cat "$WORK/gb-engine-0.after-rollout.log"; fail "the new Pod did not start QUIESCED from the maintenance record"; }
+if grep -q '"msg":"turn starting"' "$WORK/gb-engine-0.after-rollout.log"; then fail "a turn ran on the quiesced replacement"; fi
+if grep -Eq 'CORRUPT_STORE|engine halted' "$WORK/gb-engine-0.after-rollout.log"; then cat "$WORK/gb-engine-0.after-rollout.log"; fail "the new Pod reported a store problem"; fi
+start_port_forward
+gbctl -json status > "$WORK/status-rollout.json"
+[ "$(jq -r .status.mode "$WORK/status-rollout.json")" = "QUIESCED" ] && [ "$(jq -r .status.maintenance.durable "$WORK/status-rollout.json")" = "true" ] || fail "status after the rolling update: $(cat "$WORK/status-rollout.json")"
+[ "$(jq -c '[.status.num_updates, .status.num_segments, .status.next_update]' "$WORK/status-rollout.json")" = "$counters_q" ] || fail "counters or schedule changed across the quiesced rolling update: $counters_q -> $(jq -c '[.status.num_updates, .status.num_segments, .status.next_update]' "$WORK/status-rollout.json")"
+[ "$(jq -c .status.universe "$WORK/status-rollout.json")" = "$universe_1" ] || fail "universe record changed across the rolling update"
+curl -fsS "http://127.0.0.1:$PLAYER_PORT/readyz" | jq -e '.mode == "QUIESCED" and .game_ready == false and .maintenance == true' >/dev/null || fail "readyz of the replacement"
+ok "controller replaced $pod_uid_1 with $pod_uid_r on gb-server:ci-rollout (SuccessfulDelete event, orderly QUIESCED shutdown); new Pod QUIESCED, Ready, no turn, counters $counters_q, PVC $pvc_uid_1 unchanged"
+
+step "resume after the rolling update"
+gbctl -json resume > "$WORK/resume-1.json" || { cat "$WORK/resume-1.json"; fail "resume failed"; }
+[ "$(jq -r .status.mode "$WORK/resume-1.json")" = "SERVING" ] && [ "$(jq -r .status.game_ready "$WORK/resume-1.json")" = "true" ] && [ "$(jq -r .status.maintenance "$WORK/resume-1.json")" = "null" ] || fail "resume reply: $(cat "$WORK/resume-1.json")"
+curl -fsS "http://127.0.0.1:$PLAYER_PORT/readyz" | jq -e '.mode == "SERVING" and .game_ready == true and (.maintenance // false) == false' >/dev/null || fail "readyz after resume"
+next_update_1=$(jq -r .status.next_update "$WORK/resume-1.json")
+pod_uid_1=$pod_uid_r
+ok "SERVING again; next_update $next_update_1"
+
 # ----------------------------------------------------------------- restart --
 step "orderly restart (kubectl rollout restart), universe and schedule persist"
 k logs -f pod/gb-engine-0 > "$WORK/gb-engine-0.before-restart.log" 2>&1 &
@@ -341,7 +437,7 @@ ok "new pod $pod_uid_2 (old $pod_uid_1 shut down orderly); same universe record 
 
 jq -n --arg cluster "kind-$CLUSTER" --arg server "$server_version" --arg image "$expected_config" --arg nu "$next_update_1" --argjson universe "$universe_1" \
   '{kind: "gb-kind-e2e-record", cluster: $cluster, server_version: $server, image_config_digest: $image, universe: $universe, next_update: $nu,
-    proves: ["restricted PSS admission", "uid 65532", "read-only root", "writable volume", "probes", "gbctl init once then exit 4", "orderly restart keeps universe and schedule"],
+    proves: ["restricted PSS admission", "uid 65532", "read-only root", "writable volume", "probes", "gbctl init once then exit 4", "quiesced Pod stays Ready and quiesce is durable", "StatefulSet rolling update replaces a quiesced Pod without manual deletion, replacement starts QUIESCED, no turn, same PVC", "orderly restart keeps universe and schedule"],
     does_not_prove: ["Longhorn RWOP", "NetworkPolicy enforcement", "Traefik", "PodMonitor", "node fencing", "player session"]}' > "$WORK/kind-e2e-record.json"
 cat "$WORK/kind-e2e-record.json"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then

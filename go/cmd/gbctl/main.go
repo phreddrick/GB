@@ -230,6 +230,21 @@ func printHuman(w io.Writer, cmd string, resp *admin.Response) {
 		if st.Draining {
 			_, _ = fmt.Fprintf(w, "draining:      true\n")
 		}
+		_, _ = fmt.Fprintf(w, "game ready:    %t\n", st.GameReady)
+		if m := st.Maintenance; m != nil {
+			if m.Durable {
+				_, _ = fmt.Fprintf(w, "maintenance:   quiesced, durable (a restart starts QUIESCED)")
+			} else {
+				_, _ = fmt.Fprintf(w, "maintenance:   quiesced IN MEMORY ONLY (a restart would start SERVING): %s", m.Error)
+			}
+			if m.SetAt != nil {
+				_, _ = fmt.Fprintf(w, "; since %s", m.SetAt.Format(time.RFC3339))
+			}
+			if m.Reason != "" {
+				_, _ = fmt.Fprintf(w, "; %s", m.Reason)
+			}
+			_, _ = fmt.Fprintln(w)
+		}
 		_, _ = fmt.Fprintf(w, "updates:       %d (next %s)\n", st.NumUpdates, st.NextUpdate.Local().Format(time.RFC3339))
 		_, _ = fmt.Fprintf(w, "segments:      %d/%d (next %s)\n", st.NumSegments, st.MovesPerUpdate-1, st.NextSegment.Local().Format(time.RFC3339))
 		_, _ = fmt.Fprintf(w, "world:         %d stars, %d races, %d ships\n", st.Stars, st.Races, st.Ships)

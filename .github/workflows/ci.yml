@@ -600,7 +600,7 @@ jobs:
           kubectl version --client
           docker version --format '{{.Server.Version}}'
 
-      - name: kind end-to-end (create, load, apply ci entry points, verify, init once, restart, delete)
+      - name: kind end-to-end (create, load, apply ci entry points, verify, init once, quiesced rolling update, restart, delete)
         env:
           IMAGES_DIR: ${{ runner.temp }}/images
           WORK_DIR: ${{ runner.temp }}/kind-e2e

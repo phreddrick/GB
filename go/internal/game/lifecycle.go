@@ -73,11 +73,13 @@ func (s *State) Health(now time.Time) Health {
 	}
 	h.Ready = mode.Ready() && !s.draining.Load()
 	h.GameReady = (mode == ModeServing || mode == ModeTurnInProgress) && !s.draining.Load()
+	s.statusMu.Lock()
 	if mode == ModeHalted {
-		s.statusMu.Lock()
 		h.HaltReason = s.haltReason
-		s.statusMu.Unlock()
 	}
+	h.Maintenance = s.maint.active
+	h.MaintenanceDurable = s.maint.active && s.maint.durable
+	s.statusMu.Unlock()
 	return h
 }
 

@@ -314,6 +314,10 @@ These are the findings that stop the server from being usable or deployable at a
 - Backups: nothing. bbolt supports an online consistent snapshot (`db.View` + `tx.WriteTo`), which is the correct hook for a backup endpoint or sidecar; none exists.
 - Persistence consistency: no schema version in the database, no turn number stamped on records, no checksum. `AllRaces` silently drops a race whose `PlayerNum` is out of range (`store.go:303`).
 
+Addendum 2026-11-08 (found in operation, not in this review's reading):
+
+- **CR-43, High, VERIFIED (operated).** Maintenance mode did not survive a restart and blocked the restart it was meant to protect. `/readyz` answered 503 in `QUIESCED` (`internal/net/health.go`, `Mode.Ready`), so a quiesced StatefulSet Pod was `NotReady` and the `OrderedReady` controller never replaced it for an image update (the first image-update sync of 2026-11-08 succeeded in Argo CD and stalled in Kubernetes until an owner-authorised manual Pod deletion). `QUIESCED` was an in-memory atomic only: every restart entered `SERVING` and armed the turn timer, leaving a ten-minute no-catch-up window to quiesce again by hand. Fixed by ADR-0010 (durable `meta/maintenance` record written before the mode change and cleared in the resume transaction; process readiness separated from game readiness: `QUIESCED` is Ready with `game_ready=false`). Independent acceptance on the development server pending.
+
 ---
 
 ## 8. Package and dependency recommendations

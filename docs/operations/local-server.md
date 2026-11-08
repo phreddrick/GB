@@ -104,8 +104,8 @@ export GBCTL_TOKEN=...                      # or GBCTL_TOKEN_FILE=...
 gbctl status                                # mode, schedule, counters, world size, universe record
 gbctl update                                # run a full update now and wait for it
 gbctl segment                               # run a movement segment now
-gbctl quiesce                               # pause turns and mutating player commands
-gbctl resume                                # resume a quiesced engine
+gbctl quiesce                               # pause turns and mutating player commands; durable across restarts (section 7a)
+gbctl resume                                # resume a quiesced engine (clears the maintenance record, reschedules overdue turns)
 gbctl universe init -seed N [...]           # section 3
 gbctl -json status                          # raw JSON reply
 ```
@@ -169,7 +169,7 @@ HTTP 410 and never reach the engine.
 | Endpoint | Listener | Meaning |
 |---|---|---|
 | `GET /livez` | both | 200 while the actor goroutine heartbeats (every 10 s, stale after 60 s) **or** a running turn advanced its progress counter within `GB_TURN_STALL_TIMEOUT`. A long valid turn is never reported dead. `HALTED` and `QUIESCED` are alive. 503 only for a stuck or stopped actor. |
-| `GET /readyz` | both | 200 in `SERVING`, `TURN_IN_PROGRESS` and `UNINITIALIZED` (admin only, `game_ready: false`); 503 in `STARTING`, `QUIESCED`, `HALTED`, `STOPPED` and while shutting down. The body carries `mode`, `game_ready`, `draining`, `halt_reason`, `turn_running`. |
+| `GET /readyz` | both | **Process** readiness for the orchestrator (CR-43, ADR-0010): 200 in `SERVING`, `TURN_IN_PROGRESS`, `UNINITIALIZED` (admin only, `game_ready: false`) and `QUIESCED` (operator maintenance, `game_ready: false`, `maintenance: true`, `maintenance_durable` when the store holds the record); 503 in `STARTING`, `HALTED` (including a `CORRUPT_STORE` start), `STOPPED` and while shutting down. **Gameplay** readiness is the body's `game_ready` (and `game_ready` in `gbctl status`), never the HTTP code. The body carries `mode`, `game_ready`, `draining`, `halt_reason`, `turn_running`, `maintenance`, `maintenance_durable`. |
 | `GET /status` | player | mode, connected session count, schedule, counters, star and race counts. No player list, no secrets. |
 | `GET /metrics` | admin | Prometheus text format. |
 
@@ -177,7 +177,9 @@ Both probes are served by the HTTP goroutines from atomics; they never wait
 for the actor, so they answer during long turns and while halted.
 
 Engine modes (`gbctl status`, `/readyz`): `STARTING`, `UNINITIALIZED`,
-`SERVING`, `TURN_IN_PROGRESS`, `QUIESCED`, `HALTED`, `STOPPED`.
+`SERVING`, `TURN_IN_PROGRESS`, `QUIESCED`, `HALTED`, `STOPPED`. `gbctl
+status` also reports `game_ready` and, while quiesced, a `maintenance`
+object (`durable`, `set_at`, `reason`, `error`); see section 7a.
 
 Metrics (bounded labels; never per player or per session):
 `gb_engine_mode{mode}`, `gb_commands_total{type,result}` (type is the
@@ -185,6 +187,7 @@ canonical command name or `unknown`), `gb_command_panics_total`,
 `gb_turn_panics_total`, `gb_turn_duration_seconds{kind}`,
 `gb_turns_total{kind,result}`, `gb_turn_progress`, `gb_actor_queue_depth`,
 `gb_admin_operations_total{op,result}`, `gb_schedule_*`, `gb_world_*`,
+`gb_maintenance_durable` (1 while the store holds the maintenance record),
 `gb_enrollments_total{result}`, `gb_sessions_connected`,
 `gb_logins_total{result}`, `gb_ws_dropped_sessions_total{reason}`,
 `gb_ws_rejected_total{reason}`, `gb_http_requests_total{route,code}`.
@@ -210,7 +213,9 @@ The schedule (next update, next segment, update and segment counters,
 intervals) is persisted in `meta/schedule` after initialisation, after every
 turn, after resume and during orderly shutdown, and restored at startup. An
 orderly restart therefore continues the same schedule and the "DOING UPDATE
-n" numbering does not restart.
+n" numbering does not restart. A restart of a **quiesced** server adopts the
+schedule without applying the overdue policy (section 7a); the policy is
+applied at `gbctl resume`.
 
 Overdue policy (Phase 1, conservative; the final policy is a Phase 3
 decision): turns that fell due while the server was down or quiesced are
@@ -219,6 +224,54 @@ update interval (segments restart with it), the counters are kept, the
 number of missed updates is logged and counted
 (`gb_schedule_missed_turns_total`). Run `gbctl update` if the missed turn
 should happen.
+
+## 7a. Maintenance mode: a durable quiesce (CR-43, ADR-0010)
+
+`gbctl quiesce` does two things, in this order: it writes the maintenance
+record `meta/maintenance` (`{schema_version: 1, quiesced: true, set_at,
+reason, engine_version}`) in its own bbolt transaction, then switches the
+engine to `QUIESCED`. From then on scheduled turns do not fire (the actor
+arms no timer outside `SERVING`), mutating player commands are refused
+with the "paused" message, `update`/`segment` are refused (exit 4), and
+**a restart starts `QUIESCED` again**: startup reads the record after the
+CR-18 validation, adopts the schedule exactly as persisted (overdue times
+stay in the past, nothing is written, no missed turn is counted) and
+answers `/readyz` 200 with `game_ready: false`. This is what lets a
+Kubernetes rolling update replace a quiesced Pod (`deploy.md` section 5).
+
+`gbctl resume` deletes the record and writes the resumed schedule (the
+no-catch-up policy of section 7 applied at that moment) in **one**
+transaction, then switches to `SERVING`. The store is therefore always in
+one of two states: quiesced with the old schedule, or serving with the new
+one.
+
+What `gbctl status` tells you:
+
+| `mode` | `maintenance` | Meaning |
+|---|---|---|
+| `QUIESCED` | `durable: true`, `set_at`, `reason` | the record is in the store; a restart starts `QUIESCED` |
+| `QUIESCED` | `durable: false`, `error` | the record write reported an error and the engine read the store back: `error` says whether the store **holds no record** (a restart would start `SERVING`), holds this record **visible but not confirmed** on disk (a restart would *likely* start `QUIESCED`), holds the **previous record** unchanged (confirmed or never confirmed), holds **malformed** bytes (a restart would halt `CORRUPT_STORE`), holds bytes matching **neither** state (inspect `meta/maintenance`), or **could not be read back**. Turns are stopped either way. Re-run `gbctl quiesce` (it writes again and confirms) or treat the store as failing. `gbctl quiesce` itself returned exit 5 with `engine is QUIESCED in memory, but the maintenance record write did not succeed …` |
+| `SERVING` | absent | normal |
+| `HALTED` with `halt_reason` `CORRUPT_STORE: corrupt maintenance record …` | absent | the record exists but is malformed (unknown field, `quiesced: false`, JSON null, wrong schema, trailing data). Nothing was written or repaired; the operator inspects `meta/maintenance` and decides. The same fail-closed start as a malformed commit record (section 9) |
+| `HALTED` with `halt_reason` `resume: … the next start will be QUIESCED` | `durable: true` still shown | the resume transaction failed, the store is byte-for-byte unchanged, and the record in it had been confirmed durable by a successful write (or read at startup) |
+| `HALTED` with `halt_reason` `resume: … likely QUIESCED, not guaranteed` | `durable: false`, `error` | the store is unchanged but its record only ever became visible through a failed write; nothing has confirmed it |
+| `HALTED` with `halt_reason` `resume: … the store shows it applied … SERVING if the change persisted, otherwise …` | `durable: false`, `error` | the transaction reported an error but is visible (record removed, the resumed schedule written); a restart serves with the rescheduled times if the change reached disk, otherwise starts from the previous record if that one had been confirmed, and otherwise possibly quiesced, not guaranteed |
+| `HALTED` with `halt_reason` `resume: … the next start would be SERVING` (no record) | `durable: false`, `error` | the quiesce had been in memory only; nothing in the store keeps the next start quiesced |
+| `HALTED` with `halt_reason` `resume: … unknown` or `… cannot be predicted` | `durable: false`, `error` | the store could not be read back, or matches neither the previous nor the intended state; `gbctl status` after the next start says what happened |
+
+Ambiguous outcomes: if `gbctl quiesce` timed out or the process died
+before replying, the record may or may not be in the store; `gbctl status`
+after the next start says which (`QUIESCED`/`durable: true` or `SERVING`),
+and re-issuing the quiesce is always safe (a durable double quiesce is a
+no-op). If `gbctl resume` timed out, the store is either still quiesced or
+serving with the new schedule, never half way; `gbctl status` says which,
+and re-issuing `resume` on a `SERVING` engine is a no-op.
+
+Stores written before this change carry no record and start as before
+(`SERVING`, overdue policy). The record is written only by `quiesce`,
+outside turns and through the write fence; commits never touch it, so the
+shutdown flush performed while quiesced keeps it, and it is not part of
+the world digest.
 
 ## 8. Shutdown
 

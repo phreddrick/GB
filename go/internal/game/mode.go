@@ -38,7 +38,11 @@ var (
 	ErrShutdownCommitFailed    = engine.ErrShutdownCommitFailed
 	ErrShutdownCommitUncertain = engine.ErrShutdownCommitUncertain
 	ErrEnrollmentDisabled      = engine.ErrEnrollmentDisabled
+	ErrMaintenanceNotDurable   = engine.ErrMaintenanceNotDurable
 )
+
+// MaintenanceStatus is the status view of an operator quiesce (CR-43).
+type MaintenanceStatus = engine.MaintenanceStatus
 
 // PersistenceNote is repeated in every status.
 const PersistenceNote = engine.PersistenceNote

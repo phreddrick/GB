@@ -83,9 +83,11 @@ func (s *State) Status() Status {
 	s.statusMu.Lock()
 	d := s.status
 	halt := s.haltReason
+	maint := s.maint.snapshot()
 	s.statusMu.Unlock()
+	mode := s.Mode()
 	st := Status{
-		Mode:           s.Mode().String(),
+		Mode:           mode.String(),
 		Draining:       s.draining.Load(),
 		HaltReason:     halt,
 		NextUpdate:     d.sched.nextUpdate,
@@ -100,6 +102,8 @@ func (s *State) Status() Status {
 		Universe:       d.universe,
 		QueueDepth:     len(s.cmdCh),
 		LastCommitSeq:  d.commitSeq,
+		GameReady:      (mode == ModeServing || mode == ModeTurnInProgress) && !s.draining.Load(),
+		Maintenance:    maint,
 		Persistence:    PersistenceNote,
 	}
 	if ts := s.turnStartNs.Load(); ts != 0 {
@@ -163,12 +167,52 @@ func (s *State) TriggerSegment(ctx context.Context) error {
 
 // Quiesce pauses the engine: scheduled turns and mutating player commands
 // are refused until Resume. It takes effect at the next operation boundary
-// (after a running turn). Quiescing an already quiesced engine is a no-op.
+// (after a running turn: admin requests are serialized on the actor).
+//
+// Durability (CR-43, ADR-0010): the maintenance record is written to the
+// store BEFORE the mode changes, so a crash at any point leaves either no
+// record and a SERVING restart (the caller received no success) or a durable
+// record and a QUIESCED restart. If the write fails the engine still stops
+// turns and mutating commands (quiescing is a safety action and must not be
+// refused), but the request returns ErrMaintenanceNotDurable, status shows
+// maintenance.durable=false with the error, and nothing ever reports that
+// a restart would preserve the quiesce. Quiescing an already durably
+// quiesced engine is a no-op; quiescing one that is quiesced in memory
+// only retries the write.
 func (s *State) Quiesce(ctx context.Context) error {
 	start := s.now()
 	err := s.request(ctx, opQuiesce, func() error {
 		switch s.Mode() {
 		case ModeServing, ModeQuiesced:
+			if s.Mode() == ModeQuiesced && s.maintenanceDurable() {
+				return nil
+			}
+			rec := &db.MaintenanceRecord{
+				SchemaVersion: db.MaintenanceSchemaVersion,
+				Quiesced:      true,
+				SetAt:         s.now().UTC(),
+				Reason:        "operator quiesce (admin API)",
+				EngineVersion: engineVersion(),
+			}
+			intended, encErr := db.EncodeMaintenanceRecord(rec)
+			if encErr != nil {
+				return encErr
+			}
+			before := s.snapshotMetaForWrite()
+			if err := s.store.PutMaintenance(rec); err != nil {
+				// Classify by reading back (a bbolt error after the meta page
+				// was written leaves the record visible): never report
+				// "not written" from the error path alone, and never promise
+				// QUIESCED on the strength of a record this process has not
+				// confirmed.
+				detail := s.classifyMaintenanceWriteFailure(intended, before)
+				s.setMaintenance(rec, false, errors.New(detail))
+				s.setMode(ModeQuiesced)
+				s.logger.Error("quiesce: maintenance record write failed; QUIESCED in memory, durability not confirmed",
+					slog.String("op", "admin.quiesce"), slog.String("err", err.Error()), slog.String("store", detail))
+				return fmt.Errorf("%w: %s: %w", ErrMaintenanceNotDurable, detail, err)
+			}
+			s.setMaintenance(rec, true, nil)
 			s.setMode(ModeQuiesced)
 			return nil
 		case ModeHalted:
@@ -184,12 +228,19 @@ func (s *State) Quiesce(ctx context.Context) error {
 // resumed: in-memory state may be inconsistent and only a restart (which
 // reloads the store) is safe. Resume is refused while shutdown is draining.
 //
-// Ordering (GB1-03): the rescheduled times are computed on a copy and
-// written to the store first. Only after that write succeeds does the actor
-// adopt the new schedule, publish it and switch to SERVING (which is what
-// makes /readyz report game_ready). If the write fails the store is failing:
-// the engine is HALTED (fail closed, like a failed turn flush), readiness
-// stays false, mutating work is refused, and shutdown will not flush memory.
+// Ordering (GB1-03, CR-43): the rescheduled times are computed on a copy
+// and written to the store first, in the same transaction that deletes the
+// maintenance record (db.Store.ClearMaintenanceWithSchedule), so the end of
+// maintenance and the resumed schedule are durable together. Only after
+// that write succeeds does the actor adopt the new schedule, publish it and
+// switch to SERVING (which is what makes /readyz report game_ready). If the
+// write reports an error the store is failing: the engine is HALTED (fail
+// closed, like a failed turn flush), game readiness stays false, mutating
+// work is refused, and shutdown will not flush memory. What the next start
+// will do is then established by reading the store back, never assumed
+// (classifyResumeFailure): a confirmed record still present means QUIESCED;
+// a visible resume means SERVING if it persisted; anything else is reported
+// as not guaranteed.
 func (s *State) Resume(ctx context.Context) error {
 	start := s.now()
 	err := s.request(ctx, opResume, func() error {
@@ -214,12 +265,23 @@ func (s *State) Resume(ctx context.Context) error {
 					next.nextSegment = next.nextUpdate
 				}
 			}
-			if err := s.writeSchedule(next, now); err != nil {
-				s.halt("resume: "+err.Error(), "")
-				return fmt.Errorf("resume failed and the engine is now HALTED (restart required): %w", err)
+			resumeRec := s.scheduleRecord(next, now)
+			intended, encErr := db.EncodeScheduleRecord(resumeRec)
+			if encErr != nil {
+				return encErr
+			}
+			before := s.snapshotMetaForWrite()
+			if err := s.store.ClearMaintenanceWithSchedule(resumeRec); err != nil {
+				// The transaction reported an error, which does not establish
+				// a rollback: read the store back and say what the next
+				// start will do (CR-43 review P2).
+				detail := s.classifyResumeFailure(intended, before)
+				s.halt("resume: persist schedule and clear maintenance: "+err.Error()+"; "+detail, "")
+				return fmt.Errorf("resume failed and the engine is now HALTED (restart required): %w; %s", err, detail)
 			}
 			s.sched = next
 			s.publishSchedule()
+			s.clearMaintenance()
 			s.setMode(ModeServing)
 			if overdue {
 				s.logger.Warn("resume: overdue update rescheduled, not run (no-catch-up policy)", slog.String("op", "admin.resume"), slog.Time("next_update", s.sched.nextUpdate))

@@ -433,7 +433,9 @@ func TestAcceptanceScenario(t *testing.T) {
 	if code, out := s.gbctl("quiesce"); code != 0 {
 		t.Fatalf("quiesce: %d %s", code, out)
 	}
-	if code, body, _ := s.get("/readyz"); code != 503 || body["mode"] != "QUIESCED" {
+	// CR-43: a quiesced server stays Ready for the orchestrator (200) while
+	// the game is not ready and the quiesce is reported as durable.
+	if code, body, _ := s.get("/readyz"); code != 200 || body["mode"] != "QUIESCED" || body["game_ready"] != false || body["maintenance"] != true || body["maintenance_durable"] != true {
 		t.Fatalf("readyz while quiesced: %d %v", code, body)
 	}
 	if code, _, _ := s.get("/livez"); code != 200 {
