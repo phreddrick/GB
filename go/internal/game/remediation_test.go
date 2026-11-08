@@ -631,45 +631,63 @@ func TestGB104CancellationBetweenAdmissionAndContextCheck(t *testing.T) {
 
 // TestGB104OutcomeSurvivesShutdownAfterLostCancellationRace covers the
 // caller branch where it lost the queued->canceled race (the actor had
-// claimed the command) and the engine stops before the caller resumes. The
-// caller is held inside that branch (afterLostCancelRace hook) until both
-// the command's done channel and the engine's stopped channel are closed,
-// so the previously racy choice between them is forced to its worst case
-// deterministically; the caller must still report the command's real
-// outcome: ErrNotExecuted when the actor canceled it, nil when it ran,
-// never ErrEngineStopped.
+// claimed the command) and the engine stops before the caller resumes.
+// Entry into that branch is forced, not hoped for: the actor's cancel hook
+// cancels the context and then waits until the caller has reached the
+// failed-CAS branch (afterLostCancelRace), so done cannot close before the
+// caller's outer select runs. The caller is then held there until both the
+// command's done channel and the engine's stopped channel are closed, and
+// released: it must report the command's real outcome, ErrNotExecuted when
+// the actor canceled it, nil when it ran, never ErrEngineStopped.
 func TestGB104OutcomeSurvivesShutdownAfterLostCancellationRace(t *testing.T) {
 	run := func(t *testing.T, cancelAt string, wantRan bool) {
 		s, _, _ := quietEngine(t, true)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		sess := &recordingResponder{}
-		entered := make(chan *command, 1) // the caller reached the failed-CAS branch
-		release := make(chan struct{})
+		callerIn := make(chan struct{})  // closed by the caller's hook on entry to the failed-CAS branch
+		cmdOut := make(chan *command, 1) // the command, delivered by the caller's hook
+		release := make(chan struct{})   // lets the held caller continue
+		abort := make(chan struct{})     // closed by cleanup so no hook can strand a goroutine
+		var releaseOnce, callerOnce sync.Once
+		t.Cleanup(func() {
+			close(abort)
+			releaseOnce.Do(func() { close(release) })
+		})
 		hooks := &testHooks{afterLostCancelRace: func(cmd *command) {
-			entered <- cmd
-			<-release
+			callerOnce.Do(func() {
+				cmdOut <- cmd
+				close(callerIn)
+			})
+			select {
+			case <-release:
+			case <-abort:
+			}
 		}}
+		// The actor side: cancel, then wait for the caller to be inside the
+		// failed-CAS branch before the actor may close done.
+		actorHook := func(cmd *command) {
+			if cmd.text != "who" {
+				return
+			}
+			cancel()
+			select {
+			case <-callerIn:
+			case <-abort:
+			}
+		}
 		switch cancelAt {
-		case "admit": // canceled after the claim, before the context check: the actor cancels it
-			hooks.afterCommandAdmit = func(cmd *command) {
-				if cmd.text == "who" {
-					cancel()
-				}
-			}
-		case "dispatch": // canceled after the context check: the command runs
-			hooks.beforeCommandDispatch = func(cmd *command) {
-				if cmd.text == "who" {
-					cancel()
-				}
-			}
+		case "admit": // after the claim, before the context check: the actor cancels it
+			hooks.afterCommandAdmit = actorHook
+		case "dispatch": // after the context check: the command runs
+			hooks.beforeCommandDispatch = actorHook
 		}
 		s.testHooks = hooks
 		result := make(chan error, 1)
 		go func() { result <- s.HandleCommand(ctx, 1, 0, "who", sess) }()
 		var cmd *command
 		select {
-		case cmd = <-entered:
+		case cmd = <-cmdOut:
 		case err := <-result:
 			t.Fatalf("caller returned %v without entering the failed-CAS branch", err)
 		case <-time.After(5 * time.Second):
@@ -678,8 +696,7 @@ func TestGB104OutcomeSurvivesShutdownAfterLostCancellationRace(t *testing.T) {
 		if cmd.state.Load() == reqQueued {
 			t.Fatal("hook ran while the command was still queued (CAS could not have failed)")
 		}
-		// Make the command's completion and the engine's stop both observable
-		// while the caller is still held in the branch.
+		// Completion and stop both become observable while the caller is held.
 		select {
 		case <-cmd.done:
 		case <-time.After(5 * time.Second):
@@ -693,7 +710,7 @@ func TestGB104OutcomeSurvivesShutdownAfterLostCancellationRace(t *testing.T) {
 		default:
 			t.Fatal("engine not stopped after Stop returned")
 		}
-		close(release)
+		releaseOnce.Do(func() { close(release) })
 		var err error
 		select {
 		case err = <-result:
