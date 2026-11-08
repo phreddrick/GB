@@ -136,12 +136,15 @@ type command struct {
 
 // outcome reports what happened to a command whose done channel has closed:
 // nil when the actor ran it, ErrNotExecuted when it was canceled (by its
-// caller or by the actor on a canceled context) and never started.
+// caller or by the actor on an ended context) and never ran.
 func (c *command) outcome() error {
-	if c.state.Load() == reqCanceled {
-		return fmt.Errorf("%w: command canceled while queued: %w", ErrEngineBusy, ErrNotExecuted)
+	if c.state.Load() != reqCanceled {
+		return nil
 	}
-	return nil
+	if c.ctx != nil && c.ctx.Err() != nil {
+		return fmt.Errorf("%w: command canceled while queued: %w (%w)", ErrEngineBusy, ErrNotExecuted, c.ctx.Err())
+	}
+	return fmt.Errorf("%w: command canceled while queued: %w", ErrEngineBusy, ErrNotExecuted)
 }
 
 // Options configure New. Zero values select the defaults.
@@ -433,20 +436,27 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 // mode checks, panic isolation and metrics.
 func (s *State) handlePlayerCommand(cmd *command) {
 	defer close(cmd.done)
-	if cmd.ctx != nil && cmd.ctx.Err() != nil {
-		// The caller's context has ended (session disconnected, or the
-		// command's wait expired) but the caller has not yet moved the
-		// command out of reqQueued. Never start it (GB1-04): the actor
-		// cancels it itself, so a command still queued when its session was
-		// unregistered cannot run afterwards whichever side notices first.
-		if cmd.state.CompareAndSwap(reqQueued, reqCanceled) {
-			s.metrics.Canceled.Inc("command")
-		}
-		return
-	}
 	if !cmd.state.CompareAndSwap(reqQueued, reqStarted) {
 		// Canceled by the waiting session before it started (GB1-01): the
 		// player was told it did not run, so it must not run now.
+		return
+	}
+	if s.testHooks != nil && s.testHooks.afterCommandAdmit != nil {
+		s.testHooks.afterCommandAdmit(cmd)
+	}
+	if cmd.ctx != nil && cmd.ctx.Err() != nil {
+		// Admission is the ordering point (GB1-04): the actor claims the
+		// command first and only then consults the caller's context. Once
+		// claimed, the caller can no longer move it to reqCanceled, so the
+		// decision below is the only one: if the context has ended (the
+		// session disconnected, or the command's wait expired) the actor
+		// marks it canceled itself and never runs it; if the context is
+		// still live here, the command started before its session's
+		// cancellation, hence before the session left the registry, and it
+		// runs to completion. Cancellation after this check is a started
+		// command finishing, never a queued one starting.
+		cmd.state.Store(reqCanceled)
+		s.metrics.Canceled.Inc("command")
 		return
 	}
 	verb := canonicalVerb(cmd.text)

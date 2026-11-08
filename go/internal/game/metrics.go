@@ -16,7 +16,7 @@ type Metrics struct {
 	TurnProgress   *metrics.Counter   // gb_turn_progress
 	EngineMode     *metrics.Gauge     // gb_engine_mode{mode}
 	AdminOps       *metrics.Counter   // gb_admin_operations_total{op,result}
-	Canceled       *metrics.Counter   // gb_requests_canceled_total{op}: canceled while queued, never run
+	Canceled       *metrics.Counter   // gb_requests_canceled_total{op}: canceled while queued (by caller or actor), never run
 	QueueDepth     *metrics.Gauge     // gb_actor_queue_depth
 	NextUpdate     *metrics.Gauge     // gb_schedule_next_update_timestamp_seconds
 	NextSegment    *metrics.Gauge     // gb_schedule_next_segment_timestamp_seconds
@@ -45,7 +45,7 @@ func NewMetrics(r *metrics.Registry) *Metrics {
 		TurnProgress:   metrics.NewCounter(r, "gb_turn_progress", "Progress counter advanced per entity during turns (liveness watchdog)."),
 		EngineMode:     metrics.NewGauge(r, "gb_engine_mode", "1 for the current engine mode, 0 otherwise.", "mode"),
 		AdminOps:       metrics.NewCounter(r, "gb_admin_operations_total", "Administrative operations by name and result.", "op", "result"),
-		Canceled:       metrics.NewCounter(r, "gb_requests_canceled_total", "Actor requests canceled by their caller while queued (never executed), by operation.", "op"),
+		Canceled:       metrics.NewCounter(r, "gb_requests_canceled_total", "Actor requests canceled while queued and never executed, by operation: by their caller, or (player commands) by the actor because the caller's context had ended at admission.", "op"),
 		QueueDepth:     metrics.NewGauge(r, "gb_actor_queue_depth", "Player commands waiting for the actor."),
 		NextUpdate:     metrics.NewGauge(r, "gb_schedule_next_update_timestamp_seconds", "Unix time of the next scheduled update."),
 		NextSegment:    metrics.NewGauge(r, "gb_schedule_next_segment_timestamp_seconds", "Unix time of the next scheduled movement segment."),

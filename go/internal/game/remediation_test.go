@@ -543,7 +543,8 @@ func TestGB104ActorSkipsCommandWhoseContextEnded(t *testing.T) {
 	cancel() // the session is gone before the actor gets to the command
 	cmd := &command{playerNum: 1, governor: 0, text: "who", sess: sess, ctx: ctx, done: make(chan struct{}), enqueued: s.now()}
 	// Run the actor's admission step on the actor goroutine with the command
-	// still in reqQueued (the caller has not raced it to reqCanceled).
+	// still in reqQueued (the caller has not raced it to reqCanceled): the
+	// actor claims it, finds the context ended, and marks it canceled.
 	if err := s.request(ctxT(t, 5*time.Second), opTest, func() error { s.handlePlayerCommand(cmd); return nil }); err != nil {
 		t.Fatal(err)
 	}
@@ -574,5 +575,56 @@ func TestGB104ActorSkipsCommandWhoseContextEnded(t *testing.T) {
 	}
 	if live.state.Load() != reqStarted || sess.text() == "" || live.outcome() != nil {
 		t.Fatalf("live command not run: state %d output %q", live.state.Load(), sess.text())
+	}
+}
+
+// TestGB104CancellationBetweenAdmissionAndContextCheck forces the exact
+// interleaving the independent review named: the actor has already claimed
+// the command (reqQueued -> reqStarted) when the session's context is
+// canceled, before the actor consults that context. The command must not
+// run, the caller (HandleCommand) must report "not executed", and the
+// cancellation must be counted exactly once.
+func TestGB104CancellationBetweenAdmissionAndContextCheck(t *testing.T) {
+	s, _, _ := quietEngine(t, true)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sess := &recordingResponder{}
+	hookRan := make(chan struct{}, 1)
+	s.testHooks = &testHooks{afterCommandAdmit: func(cmd *command) {
+		if cmd.text != "who" {
+			return
+		}
+		if cmd.state.Load() != reqStarted {
+			t.Errorf("hook ran with state %d, want reqStarted", cmd.state.Load())
+		}
+		cancel() // the session goes away between admission and the context check
+		hookRan <- struct{}{}
+	}}
+	err := s.HandleCommand(ctx, 1, 0, "who", sess)
+	select {
+	case <-hookRan:
+	default:
+		t.Fatal("admission hook did not run")
+	}
+	expectNotExecuted(t, "command", err)
+	barrier(t, s)
+	if txt := sess.text(); txt != "" {
+		t.Fatalf("command whose session was canceled after admission produced output: %q", txt)
+	}
+	if got := s.metrics.Commands.Value("who", "ok"); got != 0 {
+		t.Fatalf("command was dispatched: %v", got)
+	}
+	if got := s.metrics.Canceled.Value("command"); got != 1 {
+		t.Fatalf("canceled counter = %v, want exactly 1", got)
+	}
+	// Control: with the context left alone, the same path runs the command.
+	s.testHooks = &testHooks{afterCommandAdmit: func(cmd *command) { hookRan <- struct{}{} }}
+	sess2 := &recordingResponder{}
+	if err := s.HandleCommand(ctxT(t, 5*time.Second), 1, 0, "who", sess2); err != nil {
+		t.Fatalf("control command: %v", err)
+	}
+	<-hookRan
+	if sess2.text() == "" || s.metrics.Commands.Value("who", "ok") != 1 {
+		t.Fatal("control command did not run")
 	}
 }
