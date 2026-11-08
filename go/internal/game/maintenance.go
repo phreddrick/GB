@@ -139,16 +139,29 @@ func (s *State) snapshotMetaForWrite() storeSnapshot {
 func (s *State) classifyMaintenanceWriteFailure(intended []byte, prior storeSnapshot) string {
 	raw, rerr := s.store.GetMeta(db.KeyMaintenance)
 	switch {
-	case rerr != nil:
-		return "write failed and the store could not be read back (" + rerr.Error() + "): whether the next start is QUIESCED or SERVING is unknown"
+	case prior.readErr != nil || rerr != nil:
+		return "write failed and the store could not be read back: whether the next start is QUIESCED or SERVING is unknown"
 	case raw == nil:
 		return "write failed and the store holds no maintenance record: the next start would be SERVING"
 	case bytes.Equal(raw, intended):
 		return "write reported an error but this record is visible in the store: a restart would likely start QUIESCED, but durability on disk is not confirmed; re-run quiesce to confirm"
-	case prior.priorConfirmed && bytes.Equal(raw, prior.maintenance):
-		return "write failed; the store still holds the previously confirmed maintenance record: the next start would be QUIESCED from it"
+	case bytes.Equal(raw, prior.maintenance):
+		// The store still holds exactly the record it held before this
+		// attempt (reachable in practice only when that record was never
+		// confirmed: a confirmed record makes Quiesce a no-op). Its bytes
+		// are known valid only if they decode.
+		if _, derr := s.store.GetMaintenance(); derr != nil {
+			return "write failed and the store holds a malformed maintenance record (" + derr.Error() + "): the next start would HALT with CORRUPT_STORE"
+		}
+		if prior.priorConfirmed {
+			return "write failed; the store still holds the previously confirmed maintenance record: the next start would be QUIESCED from it"
+		}
+		return "write failed; the store still holds a maintenance record that was never confirmed durable by this process: a restart would likely start QUIESCED, but it is not guaranteed; re-run quiesce to confirm"
 	default:
-		return "write failed; the store holds a maintenance record that was never confirmed durable by this process: a restart would likely start QUIESCED, but it is not guaranteed; re-run quiesce to confirm"
+		if _, derr := s.store.GetMaintenance(); derr != nil {
+			return "write failed and the store holds a malformed maintenance record (" + derr.Error() + "): the next start would HALT with CORRUPT_STORE"
+		}
+		return "write failed and the store holds a maintenance record that matches neither the previous nor the intended one: the next start cannot be predicted from here; inspect meta/maintenance before relying on it"
 	}
 }
 
@@ -179,9 +192,14 @@ func (s *State) classifyResumeFailure(intendedSched []byte, before storeSnapshot
 		withdraw(msg)
 		return msg
 	case recRaw == nil && bytes.Equal(schedRaw, intendedSched):
-		msg := "resume transaction reported an error but the store shows it applied (maintenance record removed, resumed schedule written); durability on disk is not confirmed: the next start is SERVING if the change persisted, otherwise QUIESCED from the previous record"
-		if before.maintenance == nil {
+		var msg string
+		switch {
+		case before.maintenance == nil:
 			msg = "resume transaction reported an error; the store holds no maintenance record (the quiesce was in memory only) and the resumed schedule is visible: the next start would be SERVING"
+		case before.priorConfirmed:
+			msg = "resume transaction reported an error but the store shows it applied (maintenance record removed, resumed schedule written); durability on disk is not confirmed: the next start is SERVING if the change persisted, otherwise QUIESCED from the previously confirmed record"
+		default:
+			msg = "resume transaction reported an error but the store shows it applied (maintenance record removed, resumed schedule written); durability on disk is not confirmed, and the previous record had never been confirmed either: the next start is SERVING if the change persisted, otherwise possibly QUIESCED, not guaranteed"
 		}
 		withdraw(msg)
 		return msg

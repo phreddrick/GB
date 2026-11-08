@@ -1,6 +1,7 @@
 package game
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"path/filepath"
@@ -404,8 +405,10 @@ func TestQuiesceRetryInSameProcessConfirmsDurability(t *testing.T) {
 	}
 }
 
-// TestMaintenanceClassifierBranches (review round 2): every read-back
-// branch of both classifiers is exercised and asserted against the store.
+// TestMaintenanceClassifierBranches (review rounds 2 and 3): every read-back
+// branch of both classifiers is exercised, asserting the message, the
+// durability flag and the stored record pair; branches unreachable through
+// the actor are exercised on the classifier directly.
 func TestMaintenanceClassifierBranches(t *testing.T) {
 	boom := errors.New("injected failure")
 	faultOn := func(store *db.Store, ops ...string) {
@@ -419,16 +422,37 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 		})
 	}
 
+	// failReadsAfter returns a hook that fails the named write stage and,
+	// from that moment on, every GetMeta read, so the before-snapshot is
+	// taken normally and only the read-back fails.
+	failReadsAfter := func(stage string) func(string) error {
+		failing := false
+		return func(op string) error {
+			switch {
+			case op == stage:
+				failing = true
+				return boom
+			case op == "meta.get" && failing:
+				return boom
+			}
+			return nil
+		}
+	}
+
 	t.Run("quiesce read-back failure is reported as unknown", func(t *testing.T) {
 		f := newMaintFixture(t)
 		s, store, _ := f.open()
-		faultOn(store, "maintenance.put", "meta.get")
+		store.SetMetaFault(failReadsAfter("maintenance.put"))
 		err := s.Quiesce(ctxT(t, 5*time.Second))
 		if !errors.Is(err, ErrMaintenanceNotDurable) || !strings.Contains(err.Error(), "could not be read back") || !strings.Contains(err.Error(), "unknown") {
 			t.Fatalf("quiesce: %v", err)
 		}
 		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "unknown") {
 			t.Fatalf("status: %+v", st.Maintenance)
+		}
+		store.SetMetaFault(nil)
+		if m, err := store.GetMaintenance(); err != nil || m != nil {
+			t.Fatalf("nothing was written in this scenario: %v %v", m, err)
 		}
 	})
 
@@ -495,7 +519,9 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 		if err := s.Quiesce(ctxT(t, 5*time.Second)); err != nil {
 			t.Fatal(err)
 		}
-		faultOn(store, "maintenance.clear", "meta.get")
+		recBefore, _ := store.GetMeta(db.KeyMaintenance)
+		schedBefore, _ := store.GetMeta(db.KeySchedule)
+		store.SetMetaFault(failReadsAfter("maintenance.clear"))
 		err := s.Resume(ctxT(t, 5*time.Second))
 		if err == nil || !strings.Contains(err.Error(), "could not be read back") {
 			t.Fatalf("resume: %v", err)
@@ -505,6 +531,12 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 		}
 		if s.Metrics().MaintenanceDurable.Value() != 0 {
 			t.Fatal("metric must be 0 when the outcome is unknown")
+		}
+		store.SetMetaFault(nil)
+		recAfter, _ := store.GetMeta(db.KeyMaintenance)
+		schedAfter, _ := store.GetMeta(db.KeySchedule)
+		if !bytes.Equal(recAfter, recBefore) || !bytes.Equal(schedAfter, schedBefore) {
+			t.Fatal("the store is unchanged in this scenario (the failure preceded the transaction)")
 		}
 	})
 
@@ -527,12 +559,96 @@ func TestMaintenanceClassifierBranches(t *testing.T) {
 			}
 			return nil
 		})
+		schedBefore, _ := store.GetMeta(db.KeySchedule)
 		err := s.Resume(ctxT(t, 5*time.Second))
 		if err == nil || !strings.Contains(err.Error(), "unexpected state") || !strings.Contains(err.Error(), "cannot be predicted") {
 			t.Fatalf("resume: %v", err)
 		}
 		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "unexpected") {
 			t.Fatalf("status: %+v", st.Maintenance)
+		}
+		recAfter, _ := store.GetMeta(db.KeyMaintenance)
+		schedAfter, _ := store.GetMeta(db.KeySchedule)
+		if recAfter != nil || !bytes.Equal(schedAfter, schedBefore) {
+			t.Fatal("expected: record removed by the interfering writer, schedule unchanged")
+		}
+	})
+
+	t.Run("visible resume after a visible-but-unconfirmed quiesce promises nothing", func(t *testing.T) {
+		f := newMaintFixture(t)
+		s, store, _ := f.open()
+		faultOn(store, "maintenance.put.committed")
+		if err := s.Quiesce(ctxT(t, 5*time.Second)); !errors.Is(err, ErrMaintenanceNotDurable) {
+			t.Fatalf("quiesce: %v", err)
+		}
+		faultOn(store, "maintenance.clear.committed")
+		err := s.Resume(ctxT(t, 5*time.Second))
+		if err == nil || !strings.Contains(err.Error(), "never been confirmed") || !strings.Contains(err.Error(), "possibly QUIESCED, not guaranteed") || strings.Contains(err.Error(), "previously confirmed record") {
+			t.Fatalf("resume: %v", err)
+		}
+		if st := s.Status(); st.Maintenance == nil || st.Maintenance.Durable || !strings.Contains(st.Maintenance.Error, "not guaranteed") {
+			t.Fatalf("status: %+v", st.Maintenance)
+		}
+		store.SetMetaFault(nil)
+		if m, _ := store.GetMaintenance(); m != nil {
+			t.Fatal("the record is removed in this scenario")
+		}
+	})
+
+	t.Run("visible resume of an in-memory-only quiesce says SERVING", func(t *testing.T) {
+		f := newMaintFixture(t)
+		s, store, _ := f.open()
+		faultOn(store, "maintenance.put")
+		if err := s.Quiesce(ctxT(t, 5*time.Second)); !errors.Is(err, ErrMaintenanceNotDurable) {
+			t.Fatalf("quiesce: %v", err)
+		}
+		faultOn(store, "maintenance.clear.committed")
+		err := s.Resume(ctxT(t, 5*time.Second))
+		if err == nil || !strings.Contains(err.Error(), "holds no maintenance record") || !strings.Contains(err.Error(), "resumed schedule is visible") || !strings.Contains(err.Error(), "SERVING") {
+			t.Fatalf("resume: %v", err)
+		}
+		store.SetMetaFault(nil)
+		if m, _ := store.GetMaintenance(); m != nil {
+			t.Fatal("no record in this scenario")
+		}
+	})
+
+	t.Run("quiesce classifier: previous confirmed record, malformed record, foreign record", func(t *testing.T) {
+		// These read-back states cannot be reached through Quiesce on the
+		// actor (a confirmed record makes Quiesce a no-op; the store is never
+		// written by anyone else), so the classifier is exercised directly.
+		f := newMaintFixture(t)
+		s, store, _ := f.open()
+		now := time.Now().UTC()
+		prev := &db.MaintenanceRecord{SchemaVersion: 1, Quiesced: true, SetAt: now.Add(-time.Hour), Reason: "earlier"}
+		if err := store.PutMaintenance(prev); err != nil {
+			t.Fatal(err)
+		}
+		prevRaw, _ := store.GetMeta(db.KeyMaintenance)
+		intended, _ := db.EncodeMaintenanceRecord(&db.MaintenanceRecord{SchemaVersion: 1, Quiesced: true, SetAt: now, Reason: "now"})
+		got := s.classifyMaintenanceWriteFailure(intended, storeSnapshot{maintenance: prevRaw, priorConfirmed: true})
+		if !strings.Contains(got, "previously confirmed") || !strings.Contains(got, "would be QUIESCED") {
+			t.Fatalf("confirmed previous record: %q", got)
+		}
+		got = s.classifyMaintenanceWriteFailure(intended, storeSnapshot{maintenance: prevRaw, priorConfirmed: false})
+		if !strings.Contains(got, "never confirmed") || !strings.Contains(got, "not guaranteed") {
+			t.Fatalf("unconfirmed previous record: %q", got)
+		}
+		// Bytes matching neither state: valid but foreign.
+		got = s.classifyMaintenanceWriteFailure(intended, storeSnapshot{maintenance: []byte("{}"), priorConfirmed: true})
+		if !strings.Contains(got, "matches neither") || strings.Contains(got, "QUIESCED from it") {
+			t.Fatalf("foreign record: %q", got)
+		}
+		// Malformed bytes in the store: a restart would halt, and the text says so.
+		if err := store.PutMeta(db.KeyMaintenance, []byte(`{"schema_version":1,"quiesced":false}`)); err != nil {
+			t.Fatal(err)
+		}
+		badRaw, _ := store.GetMeta(db.KeyMaintenance)
+		for _, snap := range []storeSnapshot{{maintenance: badRaw, priorConfirmed: true}, {maintenance: prevRaw}} {
+			got = s.classifyMaintenanceWriteFailure(intended, snap)
+			if !strings.Contains(got, "malformed") || !strings.Contains(got, "CORRUPT_STORE") || strings.Contains(got, "likely") {
+				t.Fatalf("malformed record (snapshot %v): %q", snap.priorConfirmed, got)
+			}
 		}
 	})
 
