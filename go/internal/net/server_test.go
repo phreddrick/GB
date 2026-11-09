@@ -315,18 +315,23 @@ func TestEnrollmentDisabledByDefault(t *testing.T) {
 	if n != 0 {
 		t.Fatal("disabled enrollment reached the engine")
 	}
-	// Preview enabled routes through the engine.
+	// CR-07D: the retired preview flag cannot reactivate either route.
 	_, ts2 := newTestServer(t, fe, map[string]string{"GB_ENROLL_PREVIEW": "true"})
 	resp, err = http.Post(ts2.URL+"/api/enroll", "application/json", strings.NewReader(`{"race_name":"Y","password":"abc"}`)) //nolint:gosec // G107: test URL
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("preview enroll: %d", resp.StatusCode)
 	}
-	if code, _ := get(t, ts2.URL+"/enroll"); code != 200 {
+	if code, _ := get(t, ts2.URL+"/enroll"); code != http.StatusForbidden {
 		t.Fatalf("enroll page while enabled: %d", code)
+	}
+	fe.mu.Lock()
+	defer fe.mu.Unlock()
+	if len(fe.enrolled) != 0 {
+		t.Fatal("retired preview reached engine")
 	}
 }
 

@@ -191,14 +191,16 @@ var (
 	// gbctl status) at the next start.
 	ErrShutdownTimeout = errors.New("shutdown timed out while the actor was busy; a turn may still be running and may still commit; the store will hold either the previous or the completed commit (see commit_seq at the next start)")
 	// ErrHaltedNotFlushed: shutdown completed while HALTED; in-memory state
-	// was discarded, not flushed. The store holds a complete commit: the
+	// was discarded, not flushed. Enrollment may be committed or uncertain
+	// between CR-18 records; consult the halt reason and placement evidence.
+	// For turns, the store holds a complete commit: the
 	// one before a turn whose transaction is known not to have committed,
 	// the new one when a turn committed and only its notification delivery
 	// failed, and whichever the halt reason named when the outcome was
 	// uncertain. In-memory changes made by player commands since that
 	// commit, other than what those commands wrote per record themselves,
 	// are lost (GB1-09).
-	ErrHaltedNotFlushed = errors.New("engine was halted: in-memory state was not flushed; the store holds the last complete commit")
+	ErrHaltedNotFlushed = errors.New("engine was halted: in-memory state was not flushed; inspect the halt reason and persistent records before recovery")
 	// ErrShutdownCommitFailed: the shutdown commit failed and the store
 	// still holds the previous commit (nothing of the shutdown flush was
 	// written).
@@ -207,8 +209,6 @@ var (
 	// established (the commit record could not be read back, or it changed
 	// unexpectedly); the operator checks commit_seq at the next start.
 	ErrShutdownCommitUncertain = errors.New("shutdown commit outcome uncertain; check commit_seq at the next start")
-	// ErrEnrollmentDisabled is returned when the enrollment preview is off
-	// (the default: web enrollment produces unplaced, unplayable races until
-	// Phase 3c, CR-07; Decision 9).
-	ErrEnrollmentDisabled = errors.New("enrollment is disabled on this server: web enrollment creates races without a home planet (CR-07) and stays off until Phase 3c")
+	// ErrEnrollmentDisabled covers retired preview routes and unwired trusted enrollment.
+	ErrEnrollmentDisabled = errors.New("enrollment is disabled on this server")
 )

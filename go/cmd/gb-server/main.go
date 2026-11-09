@@ -223,7 +223,7 @@ func shutdown(logger *slog.Logger, cfg *config.Config, srv *gbnet.Server, adm *a
 		// Do not close the store under the actor; the OS reclaims the file lock.
 		return exitShutdownTimout
 	case errors.Is(stopErr, engine.ErrHaltedNotFlushed):
-		logger.Error("engine was halted; in-memory state discarded, not flushed; the store holds the last complete commit", slog.String("op", "shutdown"))
+		logger.Error("engine was halted; in-memory state discarded, not flushed; inspect the halt reason and persistent records before recovery", slog.String("op", "shutdown"))
 		code = exitHaltedNoFlush
 	default:
 		logger.Error("shutdown commit did not succeed", slog.String("op", "shutdown"), slog.String("err", stopErr.Error()))

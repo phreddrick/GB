@@ -297,8 +297,8 @@ func TestGB101UpdateStartedBeforeTimeoutCompletes(t *testing.T) {
 }
 
 // TestGB101WelcomeEnrollInitTimeouts covers the remaining request paths:
-// each canceled while queued returns promptly, changes nothing, and is
-// skipped by the actor.
+// welcome/init canceled while queued never run; retired preview enrollment
+// refuses immediately even while the actor is occupied.
 func TestGB101WelcomeEnrollInitTimeouts(t *testing.T) {
 	t.Run("welcome", func(t *testing.T) {
 		s, _, _ := quietEngine(t, true)
@@ -325,7 +325,9 @@ func TestGB101WelcomeEnrollInitTimeouts(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 		resp, err := s.Enroll(ctx, &enroll.Request{RaceName: "Latecomers", Password: "pw-latecomers-123"}) //nolint:gosec // G101: test fixture credential
 		cancel()
-		expectNotExecuted(t, "enroll", err)
+		if !errors.Is(err, ErrEnrollmentDisabled) {
+			t.Fatalf("retired preview: %v", err)
+		}
 		if resp.Success || resp.Message == "" {
 			t.Fatalf("timed-out enrollment response: %+v", resp)
 		}

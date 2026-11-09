@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/phreddrick/GB/go/internal/db"
 	"github.com/phreddrick/GB/go/internal/enroll"
-	"github.com/phreddrick/GB/go/internal/model"
 	"github.com/phreddrick/GB/go/internal/universe"
 )
 
@@ -338,66 +336,9 @@ func (s *State) InitUniverse(ctx context.Context, params universe.Params, seed i
 	return rec, err
 }
 
-// EnrollPreviewNotice is attached to every successful preview enrollment.
-const EnrollPreviewNotice = "PREVIEW ONLY: the race was stored without a home planet, sectors or ships and is not playable (CR-07, Phase 3c)"
-
-// Enroll validates and stores a new race through the actor and the shared
-// store handle (CR-03: no second database open). With the preview disabled
-// nothing is read or written. The new race is also added to the in-memory
-// race list so that it can log in without a restart.
+// Enroll retires the incomplete preview writer. Even EnrollPreview=true cannot
+// create a race. The trusted CR-07D workflow is separate and never called here.
 func (s *State) Enroll(ctx context.Context, req *enroll.Request) (enroll.Response, error) {
-	if !s.cfg.EnrollPreview {
-		s.metrics.Enrollments.Inc("disabled")
-		return enroll.Response{Success: false, Message: ErrEnrollmentDisabled.Error()}, ErrEnrollmentDisabled
-	}
-	start := s.now()
-	resp, err := call(s, ctx, opEnroll, func() (enroll.Response, error) {
-		if s.Mode() != ModeServing {
-			return enroll.Response{Success: false, Message: "server is not serving (" + s.Mode().String() + ")"}, ErrNotServing
-		}
-		playerNum := 1
-		for playerNum <= model.MaxPlayers && s.races[playerNum-1] != nil {
-			playerNum++
-		}
-		if playerNum > model.MaxPlayers {
-			return enroll.Response{Success: false, Message: "No available player slots"}, nil
-		}
-		for _, r := range s.races {
-			if r != nil && strings.EqualFold(r.Name, req.RaceName) {
-				return enroll.Response{Success: false, Message: "Validation failed", Errors: []string{"a race with that name already exists"}}, nil
-			}
-		}
-		race, errs, err := enroll.Enroll(req, playerNum)
-		if err != nil {
-			return enroll.Response{Success: false, Message: "Enrollment error", Errors: []string{err.Error()}}, nil
-		}
-		if len(errs) > 0 {
-			return enroll.Response{Success: false, Message: "Validation failed", Errors: errs}, nil
-		}
-		if err := s.store.PutRace(race); err != nil {
-			return enroll.Response{Success: false, Message: "Could not save race", Errors: []string{err.Error()}}, err
-		}
-		s.races[playerNum-1] = race
-		s.publishWorld(s.status.universe)
-		return enroll.Response{
-			Success:   true,
-			PlayerNum: playerNum,
-			Message:   fmt.Sprintf("Race %q enrolled as player %d. %s", race.Name, playerNum, EnrollPreviewNotice),
-		}, nil
-	})
-	if err != nil && resp.Message == "" {
-		// Not answered by the actor (busy, canceled, stopped): report what is
-		// known about the request without implying it ran or was undone.
-		resp = enroll.Response{Success: false, Message: err.Error()}
-	}
-	label := "error"
-	switch {
-	case err == nil && resp.Success:
-		label = "ok"
-	case err == nil:
-		label = "rejected"
-	}
-	s.metrics.Enrollments.Inc(label)
-	s.adminDone(opEnroll, start, err)
-	return resp, err
+	s.metrics.Enrollments.Inc("disabled")
+	return enroll.Response{Success: false, Message: ErrEnrollmentDisabled.Error()}, ErrEnrollmentDisabled
 }
