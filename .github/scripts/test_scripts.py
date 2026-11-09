@@ -1191,6 +1191,76 @@ class TrivyPolicyTests(unittest.TestCase):
         self.assertEqual(run(good, "--expect", good, layout, want["config_digest"]).returncode, 0)
 
 
+# ----------------------------------------------- Syft installation recovery --
+class SyftRecoveryWiringTests(unittest.TestCase):
+    """Workflow contract: bounded retries must never bypass checksum verification
+    or turn an installation failure into a successful job without both SBOMs.
+    GitHub's steps.outcome is the pre-continue-on-error result; conclusion is not.
+    """
+
+    def setUp(self):
+        workflows = workflow_policy_check.load_workflows(os.path.join(REPO, ".github", "workflows"))
+        self.doc, _ = workflows["ci.yml"]
+        self.job = self.doc["jobs"]["image-sbom"]
+        self.steps = self.job["steps"]
+        self.attempts = [s for s in self.steps if str(s.get("uses", "")).startswith("anchore/")]
+
+    def test_same_pinned_verifying_action_and_release_on_all_attempts(self):
+        self.assertEqual(self.doc["env"]["SYFT_VERSION"], "v1.55.0")
+        self.assertEqual(len(self.attempts), 3)
+        for step in self.attempts:
+            self.assertEqual(step["uses"], "anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c")
+            self.assertEqual(step["with"], {"syft-version": "${{ env.SYFT_VERSION }}"})
+            self.assertNotIn("env", step)  # no installer overrides or verification bypass
+
+    def test_retries_have_finite_limits_and_only_follow_failed_attempts(self):
+        self.assertEqual(self.job["timeout-minutes"], 15)
+        self.assertNotIn("continue-on-error", self.job)
+        self.assertNotIn("if", self.job)
+        self.assertEqual([s["id"] for s in self.attempts], ["syft", "syft_retry_2", "syft_retry_3"])
+        self.assertNotIn("if", self.attempts[0])
+        for n, step in enumerate(self.attempts):
+            self.assertEqual(step["timeout-minutes"], 2)
+            if n < 2:
+                self.assertIs(step["continue-on-error"], True)
+            else:
+                self.assertNotIn("continue-on-error", step)  # exhausted retries must fail
+            if n:
+                condition = f"steps.{self.attempts[n-1]['id']}.outcome == 'failure'"
+                self.assertEqual(step["if"], condition)
+                delay = self.steps[self.steps.index(step) - 1]
+                self.assertEqual(delay["if"], condition)
+                self.assertEqual(delay["run"], f"sleep {15 * n}")
+                self.assertNotIn("continue-on-error", delay)
+
+    def test_scan_only_uses_command_from_a_successful_attempt(self):
+        scan = self.steps[self.steps.index(self.attempts[-1]) + 1]
+        selection = " || ".join(f"steps.{step['id']}.outcome == 'success' && steps.{step['id']}.outputs.cmd" for step in self.attempts)
+        self.assertEqual(scan["env"]["SYFT"], "${{ " + selection + " }}")
+        self.assertNotIn("if", scan)  # normal success gate, never always()/failure()
+        self.assertNotIn("continue-on-error", scan)
+        self.assertIn('"$SYFT" version', scan["run"])
+        self.assertIn('grep -q "Version: *${SYFT_VERSION#v}"', scan["run"])
+
+    def test_both_verified_images_spdx_and_retention_are_preserved(self):
+        self.assertEqual(self.job["needs"], "docker")
+        download = self.steps[1]
+        self.assertTrue(download["uses"].startswith("actions/download-artifact@"))
+        self.assertEqual(download["with"]["name"], "container-images")
+        scan = self.steps[self.steps.index(self.attempts[-1]) + 1]
+        self.assertEqual(scan["env"]["IMAGES_DIR"], "${{ runner.temp }}/images")
+        self.assertEqual(scan["env"]["SBOM_DIR"], "${{ runner.temp }}/sbom")
+        self.assertIn("for t in gb-server gbctl; do", scan["run"])
+        self.assertIn('digest=$(python3 .github/scripts/oci_digest.py "$IMAGES_DIR/$t.oci.tar" --field manifest_digest)', scan["run"])
+        self.assertIn('"$SYFT" scan "oci-archive:$IMAGES_DIR/$t.oci.tar" --source-name "$t" --source-version "$digest" -o "spdx-json=$SBOM_DIR/$t.spdx.json" -q', scan["run"])
+        self.assertIn('test -s "$SBOM_DIR/$t.spdx.json"', scan["run"])
+        upload = self.steps[-1]
+        self.assertTrue(upload["uses"].startswith("actions/upload-artifact@"))
+        self.assertEqual(upload["with"], {"name": "sboms", "path": "${{ runner.temp }}/sbom/", "if-no-files-found": "error", "retention-days": 90})
+        self.assertNotIn("if", upload)
+        self.assertNotIn("continue-on-error", upload)
+
+
 # ---------------------------------------------------- workflow_policy_check --
 CHECKOUT = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1"
 MINIMAL = textwrap.dedent(f"""\

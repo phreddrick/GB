@@ -536,15 +536,45 @@ jobs:
           name: container-images
           path: ${{ runner.temp }}/images
 
-      - name: Install syft (pinned)
+      # Retry the same checksum-verifying installer after transient release
+      # download failures. Only the first two attempts may recover; the third
+      # fails the job normally. No alternate/unverified installation path.
+      - name: Install syft (pinned, attempt 1 of 3)
         id: syft
+        timeout-minutes: 2
+        continue-on-error: true
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: ${{ env.SYFT_VERSION }}
+
+      - name: Wait before Syft attempt 2
+        if: steps.syft.outcome == 'failure'
+        run: sleep 15
+
+      - name: Install syft (pinned, attempt 2 of 3)
+        id: syft_retry_2
+        if: steps.syft.outcome == 'failure'
+        timeout-minutes: 2
+        continue-on-error: true
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: ${{ env.SYFT_VERSION }}
+
+      - name: Wait before Syft attempt 3
+        if: steps.syft_retry_2.outcome == 'failure'
+        run: sleep 30
+
+      - name: Install syft (pinned, attempt 3 of 3; final failure is fatal)
+        id: syft_retry_3
+        if: steps.syft_retry_2.outcome == 'failure'
+        timeout-minutes: 2
         uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           syft-version: ${{ env.SYFT_VERSION }}
 
       - name: SPDX JSON SBOM for both images
         env:
-          SYFT: ${{ steps.syft.outputs.cmd }}
+          SYFT: ${{ steps.syft.outcome == 'success' && steps.syft.outputs.cmd || steps.syft_retry_2.outcome == 'success' && steps.syft_retry_2.outputs.cmd || steps.syft_retry_3.outcome == 'success' && steps.syft_retry_3.outputs.cmd }}
           IMAGES_DIR: ${{ runner.temp }}/images
           SBOM_DIR: ${{ runner.temp }}/sbom
         run: |
