@@ -79,6 +79,22 @@ Verify after each: the previous container's exit code was 0 (`kubectl -n gb-dev 
 
 ## 7. Rollback and deletion safeguards
 
+**CR-07 enrollment/security boundary:** the disposable acceptance in
+[CR-07F](../testing/cr07f-enrollment-acceptance.md) authorizes no rollout, player
+enrollment or enabling of `GB_ENROLL_AUTHORITY_FILE` in the running deployment.
+The private operator listener must stay off player Services/Ingress. Public
+signup remains disabled; the retired preview flag cannot enable it.
+
+Actual pre-CR-07 and pre-E readers accept additive placement metadata and valid
+CR-18/CR-43 records. This is **data format compatibility**, not
+**authentication/security rollback safety**: older binaries lack dual-login and
+current-session protections and some predate durable maintenance. Before any
+separately authorized rollback, close player access, disconnect sessions,
+invalidate JWT signing authority, preserve a verified recovery copy and review
+the target binary's maintenance/login behavior. Never restart to resolve an
+uncertain enrollment; follow the CR-07E diagnosis runbook and obtain a separately
+reviewed reconciliation decision. No automated repair is available.
+
 - Bad image or config: `git revert` the digest or ConfigMap commit, sync. The PVC is untouched. While quiesced the revert's rollout completes on its own (section 5.1); the store written by an ADR-0010 engine is readable by the previous image (`meta/maintenance` is an extra meta key that older binaries ignore; they would, however, start `SERVING`).
 - A Pod that must be replaced but cannot be (not Ready on a pre-ADR-0010 image, or stuck): section 5.2, owner authorisation each time; never `--force`, never while the node is unreachable.
 - Bad platform object: revert and sync `gb-dev-platform`; if the NetworkPolicy fence is in doubt, scale the server to 0 first.

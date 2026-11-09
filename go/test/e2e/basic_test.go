@@ -122,6 +122,13 @@ func (l *logBuffer) String() string {
 func startServer(t *testing.T, dbPath string, extraEnv map[string]string) *server {
 	t.Helper()
 	serverBin, gbctlBin := binaries(t)
+	return startServerBinary(t, dbPath, extraEnv, serverBin, gbctlBin)
+}
+
+// startServerBinary permits the enrollment crash suite to select its separately
+// tagged binary. All ordinary acceptance tests still use the production build.
+func startServerBinary(t *testing.T, dbPath string, extraEnv map[string]string, serverBin, gbctlBin string) *server {
+	t.Helper()
 	port, adminPort := freePort(t), freePort(t)
 	s := &server{t: t, dbPath: dbPath, gbctlBin: gbctlBin, logs: &logBuffer{}, exited: make(chan struct{})}
 	s.addr = fmt.Sprintf("127.0.0.1:%d", port)

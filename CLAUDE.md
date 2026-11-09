@@ -166,3 +166,17 @@ CR-18 (non-atomic turn persistence) was implemented on 2026-11-07 on branch `fea
 Rules for agents working here: do not change game rules, the actor loop, persistence or networking outside the authorised phase; cite `CR-nn` / `GD-nn` ids; add inventory entries only with a finding; never modify `source/`; never modify `~/k8s-helpers`, the cluster, GitHub settings or Argo CD without the owner's explicit, separate approval; never install a container runtime on the development host; never add executable Kubernetes recovery, cleanup or deletion automation (scripts, helper libraries, Jobs, shell-evaluated API evidence) to the repository without the owner's separate authorisation, and keep `deploy/kustomize/tests/safety-check.py` passing; never add a publishing trigger, a `pull_request_target` workflow, a personal access token or a wider job permission to `.github/workflows/` (keep `.github/scripts/workflow_policy_check.py` passing; publication stays a manual owner action until Decision 31); never run kind, Docker or a container runtime on the development host (the kind job exists for hosted runners only).
 
 The C source under `source/` remains the authoritative reference for game logic during the port.
+
+CR-07A–E are merged; CR-07F's [acceptance record](docs/testing/cr07f-enrollment-acceptance.md)
+and ADR-0011 describe private operator enrollment and its verified limits.
+Shared C-derived species rules, pure placement, one atomic caller-bound bbolt
+transaction and actor installation replace the unplayable writers. Protected
+operator provisioning supplies distinct race/governor credentials; new races use
+dual-credential login. The offline `racegen` is a designer only; the old preview
+writer and public form are retired, even with `GB_ENROLL_PREVIEW=true`.
+The historical Phase1/Phase2 notes above do not enable that path. Default private
+enrollment denies without a configured universe-bound authority and separate
+God-bootstrap permission. CR-07F uses disposable processes/stores only; no live
+acceptance, deployment or public signup is implied. CR-17/CR-20, broader gameplay
+defects and both separate TypeScript applications remain open. Do not clear an
+uncertain enrollment by restart/reopen; follow the documented operator review.

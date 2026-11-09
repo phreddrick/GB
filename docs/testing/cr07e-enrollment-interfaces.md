@@ -303,6 +303,13 @@ is applied by the implementation agent.
 
 ## CR-07F and public-registration prerequisites
 
+CR-07F now supplies a [fresh acceptance matrix and handoff](cr07f-enrollment-acceptance.md)
+for these private operator interfaces, including the supported credential CLI,
+two-race real transport journey, both-race turns/restarts and real enrollment
+SIGKILL windows. ADR-0011 records the existing decisions. This supersedes the
+acceptance-pending note below only for the tested private scope; public signup,
+live deployment and security-safe rollback remain separately gated.
+
 Complete acceptance matrix and hosted CI, independent owner review, approved
 operational rollout/rollback and recovery planning remain CR-07F work. Resolve
 public identity/registration, account/credential lifecycle and rotation, rate
