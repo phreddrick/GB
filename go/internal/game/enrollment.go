@@ -117,8 +117,9 @@ func enrollmentFingerprint(req EnrollmentRequest, auth EnrollmentAuthorization) 
 	return hex.EncodeToString(sum[:]), nil
 }
 
-// EnrollTrusted is intentionally absent from net.GameIface and the admin HTTP
-// interface. It is enabled only by explicit in-process policy, never by preview
+// EnrollTrusted is intentionally absent from net.GameIface. Only the private
+// configured CR-07E operator provider may expose it through admin HTTP. It is
+// enabled only by explicit in-process policy, never by preview
 // configuration. Requests admitted during a turn/non-serving mode are refused;
 // requests queued before a transition are checked again on the actor. Started
 // timeouts follow submit's ErrStillRunning contract, not rollback semantics.
@@ -559,4 +560,10 @@ func (s *State) enrollmentWorldState() (consistent, pendingAP bool) {
 		return false, false
 	}
 	return !pendingAP, pendingAP
+}
+
+// ValidEnrollmentCredentials validates prepared representations at the private
+// operator provisioning boundary; credential acquisition remains provider-owned.
+func ValidEnrollmentCredentials(c EnrollmentCredentials) bool {
+	return preparedEnrollmentCredentials(c)
 }

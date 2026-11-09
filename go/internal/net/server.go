@@ -25,6 +25,9 @@ import (
 type GameIface interface {
 	// Authentication (runs on the actor).
 	Authenticate(ctx context.Context, raceName, password string, governor int) (AuthResult, error)
+	AuthenticateDual(ctx context.Context, raceName, racePassword, governorPassword string, governor int) (AuthResult, error)
+	ValidateSession(ctx context.Context, ident Identity) (bool, error)
+	WelcomeSession(ctx context.Context, ident Identity) (string, error)
 
 	// Command dispatch (replaces process_command in GB_server.c).
 	HandleCommand(ctx context.Context, playerNum, governor int, cmd string, sess Responder) error
@@ -43,6 +46,7 @@ type GameIface interface {
 
 // AuthResult is returned by GameIface.Authenticate.
 type AuthResult struct {
+	Revision  string
 	OK        bool
 	PlayerNum int
 	God       bool

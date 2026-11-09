@@ -55,7 +55,7 @@ func (s *State) handleAdmin(req *adminRequest) {
 	}
 	var val any
 	var err error
-	panicked := s.guard(string(req.op), func() { val, err = req.fn() }, nil)
+	panicked := s.guard(string(req.op), func() { val, err = req.fn(); s.revokeSessions() }, nil)
 	if panicked {
 		val, err = nil, ErrHalted
 	}

@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,14 +14,13 @@ import (
 
 func TestCLIDefaultsAndSharedValidation(t *testing.T) {
 	r := defaultRace()
-	if r.spec().Attributes != racegen.Default().Attributes || r.compat != racegen.Default().SectorCompat || r.password != "XXXX" || r.address != "Unknown" {
+	if r.spec().Attributes != racegen.Default().Attributes || r.compat != racegen.Default().SectorCompat || r.address != "Unknown" {
 		t.Fatal("CLI defaults changed")
 	}
 	if len(validate(&r, false)) != 0 {
 		t.Fatal("unfinished default should still allow quitting")
 	}
 	r.name = "Test"
-	r.password = "fixture-password"
 	r.compat[1] = 100
 	if errs := validate(&r, true); len(errs) > 0 {
 		t.Fatal(errs)
@@ -33,14 +36,10 @@ func TestCLIDefaultsAndSharedValidation(t *testing.T) {
 		t.Fatal("CLI did not use shared integer validation")
 	}
 	r.attr[attrIQ] = 150
-	r.password = "x"
-	if errs := validate(&r, true); !strings.Contains(strings.Join(errs, ";"), "at least 4") {
-		t.Fatal("CLI password length check lost")
+	if errs := validate(&r, true); len(errs) != 0 {
+		t.Fatal("offline designer must not require a password", errs)
 	}
-	r.password = "XXXX"
-	if errs := validate(&r, true); !strings.Contains(strings.Join(errs, ";"), "default") {
-		t.Fatal("CLI placeholder password check lost")
-	}
+
 }
 
 func TestCLIExistingModifyCommands(t *testing.T) {
@@ -102,5 +101,41 @@ func TestCLINonfiniteInput(t *testing.T) {
 	r.attr[attrMass] = math.Inf(1)
 	if len(validate(&r, true)) == 0 {
 		t.Fatal("nonfinite draft accepted")
+	}
+}
+
+func TestRetiredDatabaseFlagAndSpecRoundTrip(t *testing.T) {
+	var out, errout bytes.Buffer
+	path := filepath.Join(t.TempDir(), "world.db")
+	if code := runDesigner([]string{"-db", path}, strings.NewReader(""), &out, &errout); code == 0 {
+		t.Fatal("legacy db flag accepted")
+	}
+	if _, e := os.Stat(path); !os.IsNotExist(e) {
+		t.Fatal("database touched", e)
+	}
+	spec := racegen.Default()
+	spec.Name = "Round trip"
+	spec.Attributes.Fighters = 7
+	spec.Attributes.Fertilize = .25
+	spec.SectorCompat[racegen.Land] = 100
+	b, e := json.Marshal(spec)
+	if e != nil {
+		t.Fatal(e)
+	}
+	input := filepath.Join(t.TempDir(), "input.json")
+	if e = os.WriteFile(input, b, 0600); e != nil {
+		t.Fatal(e)
+	}
+	output := filepath.Join(t.TempDir(), "output.json")
+	if code := runDesigner([]string{"-load", input, "-save", output}, strings.NewReader(""), &out, &errout); code != 0 {
+		t.Fatal(code, errout.String())
+	}
+	b, e = os.ReadFile(output) //nolint:gosec // fixture path under t.TempDir
+	if e != nil {
+		t.Fatal(e)
+	}
+	var got racegen.Spec
+	if json.Unmarshal(b, &got) != nil || got != spec {
+		t.Fatal("lost full spec")
 	}
 }

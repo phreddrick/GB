@@ -1,26 +1,25 @@
-// racegen is the Galactic Bloodshed race creation / enrollment tool.
+// racegen is an offline Galactic Bloodshed species designer.
 // It ports the interactive logic of source/racegen.c to Go.
 //
 // Usage:
 //
-//	racegen [-db path]
+//	racegen [-load draft.json] [-save new-draft.json]
 //
 // The program runs an interactive REPL; type "help" for a list of commands.
 package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"strconv"
 	"strings"
 
-	"golang.org/x/crypto/bcrypt"
-
-	"github.com/phreddrick/GB/go/internal/db"
-	"github.com/phreddrick/GB/go/internal/model"
+	"github.com/phreddrick/GB/go/internal/enrollmentapi"
 	"github.com/phreddrick/GB/go/internal/racegen"
 )
 
@@ -46,7 +45,6 @@ const (
 // raceState holds the mutable race-in-progress during racegen.
 type raceState struct {
 	name           string
-	password       string
 	address        string
 	info           string // flavor text / description
 	homePlanetType int    // 0=Earth 1=Forest 2=Desert 3=Water 4=Airless 5=Iceball 6=Jovian
@@ -57,7 +55,7 @@ type raceState struct {
 
 func defaultRace() raceState {
 	s := racegen.Default()
-	return raceState{name: s.Name, password: "XXXX", address: "Unknown", attr: s.Attributes.Values(), compat: s.SectorCompat}
+	return raceState{name: s.Name, address: "Unknown", attr: s.Attributes.Values(), compat: s.SectorCompat}
 }
 
 func (r *raceState) spec() racegen.Spec {
@@ -75,14 +73,7 @@ func validate(r *raceState, rigorous bool) []string {
 		}
 		errs = append(errs, e.Field+": "+e.Message)
 	}
-	if rigorous {
-		if len(r.password) < 4 {
-			errs = append(errs, "Passwords are required to be at least 4 characters long.")
-		}
-		if r.password == "XXXX" {
-			errs = append(errs, "You must change your password from the default.")
-		}
-	}
+
 	return errs
 }
 
@@ -142,12 +133,13 @@ func doHelp() {
 Commands:
   print                    Print current race stats and points
   modify <field> <value>   Change a race attribute
-  enroll                   Validate and save race to database
+  save <file>              Save complete racegen.Spec (no credentials)
+  load <file>              Load a strict racegen.Spec JSON file
+  enroll                   Retired; use authenticated gbctl enroll
   quit                     Exit without saving
 
 Fields for modify:
   name <str>               Race name
-  password <str>           Password (min 4 chars)
   address <email>          Email address
   info <str>               Race description
   planet <type>            Home planet type (Earth Forest Desert Water Airless Iceball Jovian)
@@ -193,7 +185,8 @@ func doModify(r *raceState, args []string) {
 	case "name":
 		r.name = val
 	case "password":
-		r.password = val
+		fmt.Println("Credentials are not accepted by the offline designer; use gbctl credentials prepare.")
+		return
 	case "address":
 		r.address = val
 	case "info":
@@ -314,172 +307,106 @@ func doModify(r *raceState, args []string) {
 	printRace(r)
 }
 
-// buildModelRace converts raceState into a model.Race ready for storage.
-// The player number is allocated from the DB.
-func buildModelRace(r *raceState, playerNum int) *model.Race {
-	hash, err := bcrypt.GenerateFromPassword([]byte(r.password), bcrypt.DefaultCost)
-	if err != nil {
-		// Fallback: store plain-text if bcrypt fails (should never happen).
-		hash = []byte(r.password)
+// main is an offline designer only. Legacy -db is an explicit error and no DB
+// package is imported. Submission belongs exclusively to authenticated gbctl.
+func main() { os.Exit(runDesigner(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
+func runDesigner(args []string, input io.Reader, output, stderr io.Writer) int {
+	fs := flag.NewFlagSet("racegen", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	legacy := fs.String("db", "", "retired: direct database writes are forbidden")
+	load := fs.String("load", "", "load a complete racegen.Spec JSON draft")
+	save := fs.String("save", "", "save the complete draft as JSON and exit")
+	if fs.Parse(args) != nil {
+		return 1
 	}
-	hashedPassword := string(hash)
-
-	race := &model.Race{
-		PlayerNum:    playerNum,
-		Name:         r.name,
-		Password:     hashedPassword,
-		Info:         r.info,
-		Adventurism:  r.attr[attrAdvent],
-		BirthRate:    r.attr[attrBirth],
-		CollectiveIQ: r.attr[attrColIQ] >= 1.0,
-		Absorb:       r.attr[attrAbsorb] >= 1.0,
-		Pods:         r.attr[attrPods] >= 1.0,
-		Fertilize:    uint8(r.attr[attrFert]),
-		IQ:           uint8(r.attr[attrIQ]),
-		IQLimit:      uint8(r.attr[attrIQ]),
-		Fighters:     uint8(r.attr[attrFight]),
-		Mass:         r.attr[attrMass],
-		NumberSexes:  uint8(r.attr[attrSexes]),
-		Metabolism:   r.attr[attrMetab],
-		LikesBest:    uint8(r.homePlanetType),
-		Metamorph:    r.raceType == 1,
+	usedLegacy := false
+	fs.Visit(func(f *flag.Flag) { usedLegacy = usedLegacy || f.Name == "db" })
+	if usedLegacy || *legacy != "" {
+		_, _ = fmt.Fprintln(stderr, "racegen: -db is retired; use gbctl enroll through the private admin listener")
+		return 1
 	}
-	// Likes: sector compat as 0–1 fractions
-	for i := 0; i < 8 && i < len(race.Likes); i++ {
-		race.Likes[i] = r.compat[i] / 100.0
+	if len(fs.Args()) != 0 {
+		return 1
 	}
-	// Map home planet type to GB planet-type constant
-	// C: H_EARTH=0 H_FOREST=1 H_DESERT=2 H_WATER=3 H_AIRLESS=4 H_ICEBALL=5 H_JOVIAN=6
-	// model: Earth=0 Forest=6 Desert=7 Water=5 Asteroid=1 Iceball=3 GasGiant=4
-	homePlanetMap := [7]uint8{
-		model.PlanetEarth,
-		model.PlanetForest,
-		model.PlanetDesert,
-		model.PlanetWater,
-		model.PlanetAsteroid,
-		model.PlanetIceball,
-		model.PlanetGasGiant,
-	}
-	race.LikesBest = homePlanetMap[r.homePlanetType]
-
-	// Set governor 0 as active
-	race.Governors = 1
-	race.Governor[0] = model.Governor{
-		Name:     r.name,
-		Password: hashedPassword,
-		Active:   true,
-	}
-
-	return race
-}
-
-// ── main ─────────────────────────────────────────────────────────────────
-
-var flagDB = flag.String("db", "./gb.db", "path to bbolt database file")
-
-func main() {
-	flag.Parse()
-
 	r := defaultRace()
-
-	fmt.Printf("Galactic Bloodshed Race Generator\n")
-	fmt.Printf("Starting points: %d\n", startingPoints)
-	fmt.Printf("Type 'help' for a list of commands.\n\n")
-	printRace(&r)
-
-	for {
-		line := prompt("racegen> ")
-		if line == "" {
+	if *load != "" {
+		if e := loadDraft(*load, &r); e != nil {
+			_, _ = fmt.Fprintln(stderr, "racegen: invalid draft file")
+			return 1
+		}
+	}
+	if *save != "" {
+		if e := saveDraft(*save, r.spec()); e != nil {
+			_, _ = fmt.Fprintln(stderr, "racegen: could not create draft file")
+			return 1
+		}
+		return 0
+	}
+	scan := bufio.NewScanner(input)
+	_, _ = fmt.Fprintln(output, "Galactic Bloodshed offline species designer; no database access. Use gbctl enroll to submit.")
+	for scan.Scan() {
+		parts := strings.Fields(scan.Text())
+		if len(parts) == 0 {
 			continue
 		}
-		parts := strings.Fields(line)
-		cmd := strings.ToLower(parts[0])
-
-		switch cmd {
+		switch strings.ToLower(parts[0]) {
+		case "quit", "exit", "q":
+			return 0
 		case "help", "h", "?":
 			doHelp()
-
 		case "print", "p":
 			printRace(&r)
-
 		case "modify", "mod", "m":
-			if len(parts) < 3 {
-				fmt.Println("Usage: modify <field> <value>")
-			} else {
-				doModify(&r, parts[1:])
-			}
-
+			doModify(&r, parts[1:])
 		case "validate", "check":
-			errs := validate(&r, true)
-			if len(errs) == 0 {
-				fmt.Println("Race is valid.")
+			if errs := validate(&r, true); len(errs) > 0 {
+				for _, e := range errs {
+					_, _ = fmt.Fprintln(output, e)
+				}
 			} else {
-				for _, e := range errs {
-					fmt.Println(" -", e)
-				}
+				_, _ = fmt.Fprintln(output, "Design valid.")
 			}
-
-		case "enroll", "save":
-			errs := validate(&r, true)
-			if len(errs) > 0 {
-				fmt.Printf("Race (%s) unacceptable:\n", r.name)
-				for _, e := range errs {
-					fmt.Println(" -", e)
-				}
-				fmt.Println("Fix the errors above and try again.")
-				continue
+		case "save":
+			if len(parts) != 2 || saveDraft(parts[1], r.spec()) != nil {
+				_, _ = fmt.Fprintln(stderr, "racegen: save requires a new draft file path")
 			}
-
-			store, err := db.Open(*flagDB)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
-				continue
+		case "load":
+			if len(parts) != 2 || loadDraft(parts[1], &r) != nil {
+				_, _ = fmt.Fprintln(stderr, "racegen: load requires a valid draft file")
 			}
-
-			// Allocate player number = next available slot
-			races, err := store.AllRaces()
-			if err != nil {
-				store.Close()
-				fmt.Fprintf(os.Stderr, "Error reading races: %v\n", err)
-				continue
-			}
-			playerNum := 1
-			for playerNum <= model.MaxPlayers && races[playerNum-1] != nil {
-				playerNum++
-			}
-			if playerNum > model.MaxPlayers {
-				store.Close()
-				fmt.Fprintf(os.Stderr, "No free player slots.\n")
-				continue
-			}
-
-			race := buildModelRace(&r, playerNum)
-			if err := store.PutRace(race); err != nil {
-				store.Close()
-				fmt.Fprintf(os.Stderr, "Error writing race: %v\n", err)
-				continue
-			}
-			store.Close()
-			fmt.Printf("Race %q enrolled as player %d.\n", r.name, playerNum)
-
-		case "quit", "exit", "q":
-			errs := validate(&r, false)
-			if len(errs) > 0 {
-				ans := prompt("Race has issues. Quit anyway? [y/n] ")
-				if !strings.HasPrefix(strings.ToLower(ans), "y") {
-					continue
-				}
-			} else if r.name != "Unknown" {
-				ans := prompt("Quit without enrolling? [y/n] ")
-				if !strings.HasPrefix(strings.ToLower(ans), "y") {
-					continue
-				}
-			}
-			fmt.Println("Goodbye.")
-			os.Exit(0)
-
+		case "enroll":
+			_, _ = fmt.Fprintln(stderr, "racegen: direct enrollment is retired; save the draft and use gbctl enroll")
 		default:
-			fmt.Printf("Unknown command %q. Type 'help'.\n", cmd)
+			_, _ = fmt.Fprintln(stderr, "racegen: unknown command")
 		}
 	}
+	if scan.Err() != nil {
+		return 1
+	}
+	return 0
+}
+func saveDraft(path string, spec racegen.Spec) error {
+	f, e := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600) //nolint:gosec // operator-selected draft, exclusive owner-only creation
+	if e != nil {
+		return e
+	}
+	encodeErr := json.NewEncoder(f).Encode(spec)
+	closeErr := f.Close()
+	if encodeErr != nil {
+		return encodeErr
+	}
+	return closeErr
+}
+func loadDraft(path string, r *raceState) error {
+	f, e := os.Open(path) //nolint:gosec // operator-selected offline draft
+	if e != nil {
+		return e
+	}
+	defer func() { _ = f.Close() }()
+	var spec racegen.Spec
+	if e = enrollmentapi.DecodeBody(f, &spec); e != nil {
+		return e
+	}
+	*r = raceState{name: spec.Name, address: spec.Address, info: spec.Info, homePlanetType: int(spec.Homeworld), raceType: int(spec.RaceType), attr: spec.Attributes.Values(), compat: spec.SectorCompat}
+	return nil
 }

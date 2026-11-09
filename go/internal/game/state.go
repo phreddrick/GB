@@ -29,8 +29,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/phreddrick/GB/go/internal/config"
 	"github.com/phreddrick/GB/go/internal/db"
 	"github.com/phreddrick/GB/go/internal/model"
@@ -479,6 +477,7 @@ func (s *State) HandleCommand(ctx context.Context, playerNum, governor int, text
 // handlePlayerCommand runs one player command on the actor goroutine with
 // mode checks, panic isolation and metrics.
 func (s *State) handlePlayerCommand(cmd *command) {
+	defer s.revokeSessions()
 	defer close(cmd.done)
 	if !cmd.state.CompareAndSwap(reqQueued, reqStarted) {
 		// Canceled by the waiting session before it started (GB1-01): the
@@ -505,6 +504,14 @@ func (s *State) handlePlayerCommand(cmd *command) {
 	}
 	if s.testHooks != nil && s.testHooks.beforeCommandDispatch != nil {
 		s.testHooks.beforeCommandDispatch(cmd)
+	}
+	if session, ok := cmd.sess.(*net.Session); ok {
+		ident := session.AuthenticatedIdentity()
+		if ident.PlayerNum != cmd.playerNum || ident.Governor != cmd.governor || !s.validSession(ident) {
+			_ = session.Send("session authority revoked; login again\n")
+			session.Close()
+			return
+		}
 	}
 	verb := canonicalVerb(cmd.text)
 	mode := s.Mode()
@@ -754,37 +761,14 @@ func (s *State) Authenticate(ctx context.Context, raceName, password string, gov
 	// The result is returned through the reply channel only (GB1-01): a
 	// caller that timed out never reads memory the actor is still writing.
 	return call(s, ctx, opAuthenticate, func() (net.AuthResult, error) {
-		return s.authenticate(raceName, password, governor), nil
+		return s.authenticate(raceName, password, governor)
 	})
 }
 
-// authenticate is the actor-side credential check.
-func (s *State) authenticate(raceName, password string, governor int) net.AuthResult {
-	for _, race := range s.races {
-		if race == nil {
-			continue
-		}
-		if !strings.EqualFold(race.Name, raceName) {
-			continue
-		}
-		if governor < 0 || governor >= len(race.Governor) || governor > int(race.Governors) || !race.Governor[governor].Active || (governor > 0 && race.Governor[governor].Password == "") {
-			return net.AuthResult{}
-		}
-		if err := bcrypt.CompareHashAndPassword([]byte(race.Password), []byte(password)); err != nil {
-			return net.AuthResult{}
-		}
-		if governor < 0 || governor > int(race.Governors) {
-			return net.AuthResult{}
-		}
-		gov := race.Governor[governor]
-		if gov.Password != "" {
-			if err := bcrypt.CompareHashAndPassword([]byte(gov.Password), []byte(password)); err != nil {
-				return net.AuthResult{}
-			}
-		}
-		return net.AuthResult{OK: true, PlayerNum: race.PlayerNum, God: race.God}
-	}
-	return net.AuthResult{}
+// authenticate preserves the safe legacy API only for records without placement
+// history; new placements cannot bypass dual credentials, even after rotation.
+func (s *State) authenticate(raceName, password string, governor int) (net.AuthResult, error) {
+	return s.checkCredentials(raceName, password, "", governor, false)
 }
 
 // PlayerDisconnect is called when a WebSocket connection closes.

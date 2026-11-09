@@ -233,3 +233,22 @@ func TestOriginsAndPreview(t *testing.T) {
 		t.Error("enrollment preview must be off by default (Decision 9)")
 	}
 }
+
+func TestEnrollmentAuthorityIsExplicitAndEnvironmentOnly(t *testing.T) {
+	if Default().EnrollmentAuthorityFile != "" {
+		t.Fatal("operator enrollment enabled by default")
+	}
+	env := baseEnv()
+	env["GB_ENROLL_AUTHORITY_FILE"] = "/protected/authority.json"
+	cfg, _, e := Load("", MapEnv(env))
+	if e != nil || cfg.EnrollmentAuthorityFile != env["GB_ENROLL_AUTHORITY_FILE"] {
+		t.Fatal(e)
+	}
+	path := filepath.Join(t.TempDir(), "config.json")
+	if e = os.WriteFile(path, []byte(`{"enrollment_authority_file":"/not-allowed"}`), 0600); e != nil {
+		t.Fatal(e)
+	}
+	if _, _, e = Load(path, MapEnv(baseEnv())); e == nil {
+		t.Fatal("authority configured in ordinary JSON")
+	}
+}

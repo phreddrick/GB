@@ -6,11 +6,6 @@ go/cmd/gb-client/main.go	errcheck	Error return value of `resp.Body.Close` is not
 go/cmd/gb-client/main.go	errcheck	Error return value of `syscall.Syscall` is not checked	func promptPassword	syscall.Syscall(syscall.SYS_IOCTL, fd, syscall.TCSETS, uintptr(unsafe.Pointer(&noEcho)))
 go/cmd/gb-client/main.go	errcheck	Error return value of `syscall.Syscall` is not checked	func promptPassword	syscall.Syscall(syscall.SYS_IOCTL, fd, syscall.TCSETS, uintptr(unsafe.Pointer(&oldState)))
 go/cmd/gb-client/main.go	gosec	G103: Use of unsafe calls should be audited	func promptPassword	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, syscall.TCGETS, uintptr(unsafe.Pointer(&oldState))); errno != 0 {
-go/cmd/racegen/main.go	errcheck	Error return value of `store.Close` is not checked	func main	store.Close()
-go/cmd/racegen/main.go	errcheck	Error return value of `store.Close` is not checked	func main	store.Close()
-go/cmd/racegen/main.go	errcheck	Error return value of `store.Close` is not checked	func main	store.Close()
-go/cmd/racegen/main.go	errcheck	Error return value of `store.Close` is not checked	func main	store.Close()
-go/cmd/racegen/main.go	gosec	G115: integer overflow conversion int -> uint8	func buildModelRace	LikesBest: uint8(r.homePlanetType),
 go/internal/db/keys.go	gosec	G115: integer overflow conversion int -> uint16	func RaceKey	binary.BigEndian.PutUint16(k, uint16(playerNum))
 go/internal/db/store.go	errcheck	Error return value of `db.Close` is not checked	func Open	db.Close()
 go/internal/db/store.go	gosec	G115: integer overflow conversion int -> uint8	func (*Store).HasTelegrams	prefix := TelegramPrefix(uint8(playerNum), uint8(governor))
