@@ -64,3 +64,18 @@ the Go RNG becomes injectable and can be driven by the same sequence.
   not a C execution; the harness covers `cew_hit_odds` and `CEW_hit` themselves.
 - `do_damage`, `ground_attack` casualties, `produce` with resources, population
   growth: RNG value dependent.
+
+## CR-07A race design fixtures
+
+The same make targets also build/run `gb_racegen_golden`, a separate driver in
+`racegen.c` that executes the unmodified original racegen cost, covariance and
+rounding functions. It links `GB_racegen.c` for the homeworld mapping table.
+Unused interactive/world-writing sections are removed by linker section
+garbage collection, and are never called. Fixtures are consumed by
+`go/internal/racegen/golden_test.go`.
+
+See [CR-07A provenance and compatibility decisions](../../docs/testing/cr07a-racegen-rules.md)
+for the 2,292-case grid, integer calibration setup, original initializer defect,
+overflow exclusions, separate approved eight-type extension, and validation
+departures. No historical fixture reads `blah[8]`. Changes here are protected
+gate tooling and require the owner's `gate-change-reviewed` PR label.

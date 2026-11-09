@@ -1,3 +1,4 @@
 # build outputs of the golden fixture generator
 obj/
 gb_golden
+gb_racegen_golden
