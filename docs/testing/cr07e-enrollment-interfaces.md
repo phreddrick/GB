@@ -296,9 +296,10 @@ no merge/deploy/live operations. Hosted Docker/Trivy/Syft/kind checks remain CI 
 
 The owner explicitly approved removal of exactly five obsolete lint findings
 from the retired writer (four unchecked Close calls and one integer conversion).
-Required PR label: **`known-defect-added`, applied by the sole maintainer**. No
-other baseline/allowance/inventory or protected gate tooling changes. No
-`gate-change-reviewed` label is required for this scope.
+Required PR labels, **applied by the sole maintainer**: `known-defect-added` for
+those five approved removals, and `gate-change-reviewed` for the isolated-fixture
+correction below. No other baseline/allowance/inventory changes. Neither label
+is applied by the implementation agent.
 
 ## CR-07F and public-registration prerequisites
 
@@ -310,3 +311,33 @@ secure operator artifact distribution before any public enrollment. CR-17's
 between-turn direct command writes remain unchanged; CR-07D's pending-AP/world-
 agreement safeguards still prevent enrollment from overwriting them. No broad
 CR-17 rewrite or automatic repair is included. Public enrollment must remain off.
+
+
+## PR #28 hosted-CI fixture correction
+
+Run `42577189156` failed mutation scenario15: `TestOpenAPIRuleMetadataDoesNotDrift`
+could not open `../../../api/openapi/gb-v1.yaml` in the isolated repository.
+`golden-mutations.sh` previously copied only `go/` and `test/`.
+
+The only executable change adds the exact `./api/openapi/gb-v1.yaml` artifact to
+`fresh()`'s existing tar input list, preserving its repository-relative path.
+Its header now describes that dependency. All15 scenario bodies, assertion
+helpers, expected outcomes and OpenAPI drift validation remain unchanged.
+No application code, workflow, artifact, baseline or allowance changes accompany
+this correction. This is protected gate tooling: the maintainer must apply
+`gate-change-reviewed`; the existing `known-defect-added` condition also remains.
+
+Independent review: **APPROVE**. Byte comparison confirms unchanged scenarios
+and assertions. The copied artifact is byte-identical; normal drift validation
+passes, while altered IQ metadata and a missing artifact still fail.
+
+Local verification: all15 mutation scenarios produced their expected outcomes;
+helper self-tests passed100 iterations per case. Full Go tests/inventory and
+`go test -count=1 -race ./...`, build, vet, formatting, C fixture reproduction,
+lint (1,052 matched / zero new or stale), gate self-tests, govulncheck (zero
+called vulnerabilities), offline manifests, actionlint, workflow ShellCheck,
+180 workflow helper tests,17 policy checks and diff checks passed. The growth
+gate passed with locally simulated acknowledgment labels and correctly refused
+without `gate-change-reviewed`; no GitHub label was applied. Worktree-local
+TMPDIR avoided the host's unrelated invalid `/tmp` VCS marker; no VCS or test
+validation was disabled. Hosted CI must rerun on the pushed correction.
