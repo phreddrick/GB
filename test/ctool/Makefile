@@ -22,7 +22,7 @@ LDLIBS  := -lm
 REF_SRCS := shootblast.c build.c max.c dosector.c doturn.c move.c shlmisc.c misc.c rand.c
 REF_OBJS := $(patsubst %.c,obj/%.o,$(REF_SRCS))
 
-all: gb_golden
+all: gb_golden gb_racegen_golden
 
 obj:
 	mkdir -p obj
@@ -39,16 +39,27 @@ obj/stubs.o: stubs.c | obj
 gb_golden: obj/main.o obj/stubs.o $(REF_OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
-fixtures: gb_golden
+obj/racegen_golden.o: racegen.c $(SRC)/racegen.c $(SRC)/racegen.h $(SRC)/game_info.h | obj
+	$(CC) $(CFLAGS) -ffunction-sections -fdata-sections -c $< -o $@
+
+obj/GB_racegen_ref.o: $(SRC)/GB_racegen.c | obj
+	$(CC) $(CFLAGS) -ffunction-sections -fdata-sections -c $< -o $@
+
+gb_racegen_golden: obj/racegen_golden.o obj/GB_racegen_ref.o
+	$(CC) $(CFLAGS) -Wl,--gc-sections -o $@ $^ $(LDLIBS)
+
+fixtures: all
 	mkdir -p $(OUT)
 	./gb_golden $(OUT)
+	./gb_racegen_golden $(OUT)
 
-check: gb_golden
+check: all
 	rm -rf obj/check && mkdir -p obj/check
 	./gb_golden obj/check
+	./gb_racegen_golden obj/check
 	diff -r obj/check $(OUT) && echo "fixtures reproduce exactly"
 
 clean:
-	rm -rf obj gb_golden
+	rm -rf obj gb_golden gb_racegen_golden
 
 .PHONY: all fixtures check clean
