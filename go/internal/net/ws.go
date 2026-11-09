@@ -98,6 +98,18 @@ func (srv *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ident := Identity{PlayerNum: claims.PlayerNum, Governor: claims.Governor, God: claims.God, Revision: claims.Revision, ExpiresAt: claims.ExpiresAt.Unix()}
+	authCtx, cancelAuth := context.WithTimeout(r.Context(), welcomeWait)
+	current, authErr := srv.game.ValidateSession(authCtx, ident)
+	cancelAuth()
+	if authErr != nil {
+		http.Error(w, "authentication unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if !current {
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+		return
+	}
 	conn, err := srv.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		// Upgrade already wrote the HTTP error (403 for a refused origin).
@@ -106,7 +118,6 @@ func (srv *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tm := srv.timing
-	ident := Identity{PlayerNum: claims.PlayerNum, Governor: claims.Governor, God: claims.God}
 	sess := newSession(conn, newSessionID(), ident, srv.cfg.WSOutboundQueue,
 		time.Duration(srv.cfg.WSWriteTimeoutSeconds)*time.Second, tm.pingInterval)
 	log := srv.logger.With(slog.String("session_id", sess.ID), slog.Int("player", claims.PlayerNum), slog.Int("governor", claims.Governor))
@@ -196,7 +207,13 @@ func (srv *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 func (srv *Server) commandWorker(ctx context.Context, sess *Session, playerNum, governor int, cmds <-chan string, done chan<- struct{}) {
 	defer close(done)
 	wctx, cancel := context.WithTimeout(ctx, welcomeWait)
-	_ = sess.Send(srv.game.WelcomeMessage(wctx, playerNum, governor))
+	welcome, e := srv.game.WelcomeSession(wctx, sess.AuthenticatedIdentity())
+	if e != nil {
+		cancel()
+		sess.Close()
+		return
+	}
+	_ = sess.Send(welcome)
 	cancel()
 	for {
 		select {

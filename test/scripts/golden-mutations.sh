@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Adversarial checks for the golden tests and the known-defect inventory
-# (GB0-01). Each scenario runs in a fresh temporary copy of go/ and test/, never
-# in the working repository, and must produce the stated exit status:
+# (GB0-01). Each scenario runs in a fresh temporary copy of go/, test/ and the
+# required OpenAPI artifact, never in the working repository, and must produce
+# the stated exit status:
 #   1. unchanged baseline                                  -> pass, summary shows the expected XFAIL counts
 #   2. new mismatch in a previously passing row            -> fail
 #   3. the observed value of an existing XFAIL row changes -> fail
@@ -59,7 +60,7 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 fresh() {
   rm -rf "$WORK/repo"; mkdir -p "$WORK/repo"
-  (cd "$ROOT" && tar --exclude='./test/ctool/obj' --exclude='./test/ctool/gb_golden' -cf - ./go ./test) | (cd "$WORK/repo" && tar -xf -)
+  (cd "$ROOT" && tar --exclude='./test/ctool/obj' --exclude='./test/ctool/gb_golden' -cf - ./go ./test ./api/openapi/gb-v1.yaml) | (cd "$WORK/repo" && tar -xf -)
 }
 
 fresh

@@ -185,6 +185,7 @@ func (s *State) releaseTurnEffects() (err error) {
 			err = fmt.Errorf("notification delivery panicked: %v", r)
 		}
 	}()
+	s.revokeSessions()
 	for _, n := range notices {
 		switch n.kind {
 		case noticeGovernor:

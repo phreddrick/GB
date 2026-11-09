@@ -8,6 +8,7 @@ package config
 // Config holds all server and game-balance configuration.
 // A zero-value Config is not valid; use Default() to obtain sane defaults.
 type Config struct {
+	EnrollmentAuthorityFile string `json:"-"` // GB_ENROLL_AUTHORITY_FILE only; private operator policy, default disabled
 	// --- Server networking ---
 	Host    string `json:"host"`
 	Port    int    `json:"port"`     // HTTP/WebSocket port

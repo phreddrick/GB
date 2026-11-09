@@ -39,6 +39,7 @@ import (
 
 	"github.com/phreddrick/GB/go/internal/db"
 	"github.com/phreddrick/GB/go/internal/engine"
+	"github.com/phreddrick/GB/go/internal/operatorenroll"
 	"github.com/phreddrick/GB/go/internal/platform/metrics"
 	"github.com/phreddrick/GB/go/internal/universe"
 )
@@ -56,13 +57,14 @@ type Engine interface {
 
 // Options configure the listener.
 type Options struct {
-	Addr     string // host:port
-	Token    string // static bearer token (validated by config)
-	Engine   Engine
-	Logger   *slog.Logger
-	Registry *metrics.Registry // exposed at /metrics
-	Livez    http.HandlerFunc  // shared with the player listener
-	Readyz   http.HandlerFunc
+	Enrollment *operatorenroll.Provider // nil permanently denies this private operator operation
+	Addr       string                   // host:port
+	Token      string                   // static bearer token (validated by config)
+	Engine     Engine
+	Logger     *slog.Logger
+	Registry   *metrics.Registry // exposed at /metrics
+	Livez      http.HandlerFunc  // shared with the player listener
+	Readyz     http.HandlerFunc
 	// OpTimeout bounds update/segment/init requests on the server side.
 	OpTimeout time.Duration
 }
@@ -102,6 +104,8 @@ func New(opts Options) (*Server, error) {
 	if opts.Registry != nil {
 		mux.HandleFunc("/metrics", s.handleMetrics)
 	}
+	mux.Handle("/admin/v1/enroll", s.auth(http.MethodPost, s.handleEnrollment))
+	mux.Handle("/admin/v1/enroll/", s.auth(http.MethodGet, s.handleEnrollmentStatus))
 	mux.Handle("/admin/v1/status", s.auth(http.MethodGet, s.handleStatus))
 	mux.Handle("/admin/v1/update", s.auth(http.MethodPost, s.op("update", func(ctx context.Context, _ *http.Request) (any, error) {
 		return nil, opts.Engine.TriggerUpdate(ctx)
@@ -177,7 +181,7 @@ func (s *Server) auth(method string, next http.HandlerFunc) http.Handler {
 		}
 		const prefix = "Bearer "
 		h := r.Header.Get("Authorization")
-		if !strings.HasPrefix(h, prefix) || !s.TokenMatches(strings.TrimPrefix(h, prefix)) {
+		if len(r.Header.Values("Authorization")) != 1 || !strings.HasPrefix(h, prefix) || !s.TokenMatches(strings.TrimPrefix(h, prefix)) {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="gb-admin"`)
 			writeErr(w, http.StatusUnauthorized, "missing or invalid admin token")
 			s.logger.Warn("admin auth failed", slog.String("op", "admin.auth"), slog.String("remote", r.RemoteAddr), slog.String("path", r.URL.Path))
@@ -189,11 +193,13 @@ func (s *Server) auth(method string, next http.HandlerFunc) http.Handler {
 
 // Response is the JSON envelope of every admin reply.
 type Response struct {
-	OK     bool           `json:"ok"`
-	Op     string         `json:"op,omitempty"`
-	Error  string         `json:"error,omitempty"`
-	Status *engine.Status `json:"status,omitempty"`
-	Result any            `json:"result,omitempty"`
+	Code       string         `json:"code,omitempty"`
+	Validation any            `json:"validation,omitempty"`
+	OK         bool           `json:"ok"`
+	Op         string         `json:"op,omitempty"`
+	Error      string         `json:"error,omitempty"`
+	Status     *engine.Status `json:"status,omitempty"`
+	Result     any            `json:"result,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

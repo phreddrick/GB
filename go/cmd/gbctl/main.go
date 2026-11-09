@@ -38,6 +38,7 @@ import (
 
 	"github.com/phreddrick/GB/go/internal/admin"
 	"github.com/phreddrick/GB/go/internal/db"
+	"github.com/phreddrick/GB/go/internal/operatorenroll"
 )
 
 const (
@@ -64,7 +65,7 @@ func run(args []string, stdout, stderr io.Writer, lookupEnv func(string) (string
 	timeout := fs.Duration("timeout", 10*time.Minute, "overall request timeout")
 	asJSON := fs.Bool("json", false, "print the raw JSON reply")
 	fs.Usage = func() {
-		_, _ = fmt.Fprintf(stderr, "usage: gbctl [-server URL] [-timeout D] [-json] status|update|segment|quiesce|resume|universe init -seed N [-stars N] [-min-planets N] [-max-planets N]\n")
+		_, _ = fmt.Fprintf(stderr, "usage: gbctl [-server URL] [-timeout D] [-json] status|update|segment|quiesce|resume|enroll-game-id|enroll -f request.json|enroll-status -request-id ID -game GAME -account ACCOUNT|credentials prepare|universe init -seed N [-stars N] [-min-planets N] [-max-planets N]\n")
 		_, _ = fmt.Fprintf(stderr, "token: GBCTL_TOKEN or GBCTL_TOKEN_FILE (never a flag)\n")
 		fs.PrintDefaults()
 	}
@@ -77,6 +78,9 @@ func run(args []string, stdout, stderr io.Writer, lookupEnv func(string) (string
 		return exitUsage
 	}
 
+	if rest[0] == "credentials" {
+		return prepareCredentials(rest[1:], stdout, stderr)
+	}
 	token, err := tokenFromEnv(lookupEnv)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "gbctl: %v\n", err)
@@ -85,7 +89,28 @@ func run(args []string, stdout, stderr io.Writer, lookupEnv func(string) (string
 	client := &admin.Client{BaseURL: *server, Token: token, HTTP: &http.Client{Timeout: *timeout}}
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
+	if rest[0] == "enroll-game-id" {
+		if len(rest) != 1 {
+			return exitUsage
+		}
+		response, e := client.Status(ctx)
+		if e != nil || response == nil || response.Status == nil || response.Status.Universe == nil {
+			_, _ = fmt.Fprintln(stderr, "gbctl: initialized universe identity unavailable")
+			return exitServer
+		}
+		if *asJSON {
+			_ = json.NewEncoder(stdout).Encode(struct {
+				GameID string `json:"game_id"`
+			}{operatorenroll.GameID(response.Status.Universe)})
+		} else {
+			_, _ = fmt.Fprintln(stdout, operatorenroll.GameID(response.Status.Universe))
+		}
+		return exitOK
+	}
 
+	if rest[0] == "enroll" || rest[0] == "enroll-status" {
+		return enrollmentCommand(ctx, client, rest, *asJSON, stdout, stderr)
+	}
 	var resp *admin.Response
 	switch rest[0] {
 	case "status":

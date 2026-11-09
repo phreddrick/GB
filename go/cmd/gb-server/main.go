@@ -52,6 +52,7 @@ import (
 	"github.com/phreddrick/GB/go/internal/engine"
 	"github.com/phreddrick/GB/go/internal/game"
 	gbnet "github.com/phreddrick/GB/go/internal/net"
+	"github.com/phreddrick/GB/go/internal/operatorenroll"
 	"github.com/phreddrick/GB/go/internal/platform/logging"
 	"github.com/phreddrick/GB/go/internal/platform/metrics"
 )
@@ -90,6 +91,18 @@ func run() int {
 		slog.Int("moves_per_update", cfg.MovesPerUpdate), slog.Bool("enroll_preview", cfg.EnrollPreview),
 		slog.Int("shutdown_timeout_s", cfg.ShutdownTimeoutSeconds))
 
+	var enrollmentProvider *operatorenroll.Provider
+	if cfg.EnrollmentAuthorityFile != "" {
+		if cfg.AdminAddr == "" {
+			logger.Error("operator enrollment requires the private admin listener")
+			return exitConfig
+		}
+		enrollmentProvider, err = operatorenroll.Load(cfg.EnrollmentAuthorityFile)
+		if err != nil {
+			logger.Error("operator enrollment authority invalid or unreadable")
+			return exitConfig
+		}
+	}
 	registry := metrics.NewRegistry()
 
 	// 2. Store and engine.
@@ -99,6 +112,14 @@ func run() int {
 		return exitConfig
 	}
 	gameOpts := game.Options{Logger: logger, Registry: registry}
+	if enrollmentProvider != nil {
+		if enrollmentProvider.CheckStore(store) != nil {
+			logger.Error("operator authority does not match the initialized universe")
+			_ = store.Close()
+			return exitConfig
+		}
+		gameOpts.TrustedEnrollment = enrollmentProvider.Policy(store)
+	}
 	if os.Getenv("GB_TEST_HOOKS") == "1" {
 		// Test-only: used by the end-to-end shutdown and crash tests. Never
 		// set in production configuration.
@@ -137,7 +158,7 @@ func run() int {
 	var adm *admin.Server
 	if cfg.AdminAddr != "" {
 		adm, err = admin.New(admin.Options{
-			Addr: cfg.AdminAddr, Token: cfg.AdminToken, Engine: gameState, Logger: logger,
+			Addr: cfg.AdminAddr, Token: cfg.AdminToken, Engine: gameState, Logger: logger, Enrollment: enrollmentProvider,
 			Registry: registry, Livez: srv.HandleLivez, Readyz: srv.HandleReadyz,
 		})
 		if err == nil {

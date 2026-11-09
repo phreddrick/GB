@@ -1,0 +1,1203 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Galactic Bloodshed Go-owned enrollment contract",
+    "version": "1.0.0",
+    "description": "JSON-form YAML 1.2. Go racegen rules are authoritative. Duplicate or unknown properties, null values, trailing JSON, malformed numbers and incorrect fixed-array lengths are rejected. No public signup API is mounted; TypeScript racegen and gameplay applications remain separate future clients. No PENDING/ACTIVE/FAILED durable enrollment lifecycle exists."
+  },
+  "paths": {
+    "/api/enroll/options": {
+      "get": {
+        "operationId": "get_api_enroll_options",
+        "x-availability": "future-contract-only-unregistered",
+        "description": "NOT exposed in CR-07E. Pure options/cost services exist internally; public identity, signup, rate limits and durable intent management remain future work.",
+        "responses": {
+          "200": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Options"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/enroll/cost": {
+      "post": {
+        "operationId": "post_api_enroll_cost",
+        "x-availability": "future-contract-only-unregistered",
+        "description": "NOT exposed in CR-07E. Pure options/cost services exist internally; public identity, signup, rate limits and durable intent management remain future work.",
+        "responses": {
+          "200": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Spec"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/enroll": {
+      "post": {
+        "operationId": "post_api_enroll",
+        "x-availability": "future-contract-only-unregistered",
+        "description": "NOT exposed in CR-07E. Pure options/cost services exist internally; public identity, signup, rate limits and durable intent management remain future work.",
+        "responses": {
+          "200": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentIntent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/enroll/{request_id}": {
+      "get": {
+        "operationId": "get_api_enroll_request_id",
+        "x-availability": "future-contract-only-unregistered",
+        "description": "NOT exposed in CR-07E. Pure options/cost services exist internally; public identity, signup, rate limits and durable intent management remain future work.",
+        "responses": {
+          "200": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/v1/enroll": {
+      "post": {
+        "operationId": "operatorEnroll",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "description": "Private authenticated operator only. Explicit configured account/version/game binding; maximum body 65536 bytes. Default denied. No passwords in this request. First God creation requires separate server bootstrap authorization.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorEnrollment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Existing private admin bearer denial"
+          },
+          "403": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/enroll/{request_id}": {
+      "get": {
+        "operationId": "operatorEnrollmentStatus",
+        "security": [
+          {
+            "adminBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "game_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "description": "Private authorized diagnosis only; never clears uncertainty or asserts absence means rollback.",
+        "responses": {
+          "200": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEnrollmentReply"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "playerLogin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          }
+        },
+        "description": "Existing public player login, not registration. Strict 4096-byte JSON. Existing inactive governors and expired/revoked tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Validated response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginToken"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed/ambiguous login"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "503": {
+            "description": "Authentication authority unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "adminBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Private operator service principal, not ordinary player identity."
+      }
+    },
+    "schemas": {
+      "Attributes": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "adventurism": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 0.99,
+            "default": 0.4
+          },
+          "absorb": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0
+          },
+          "birthrate": {
+            "type": "number",
+            "minimum": 0.2,
+            "maximum": 1,
+            "default": 0.6
+          },
+          "collective_iq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0
+          },
+          "fertilize": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0
+          },
+          "iq": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 220,
+            "default": 150
+          },
+          "fighters": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 4
+          },
+          "pods": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0
+          },
+          "mass": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 3,
+            "default": 1
+          },
+          "sexes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 53,
+            "default": 2
+          },
+          "metabolism": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 4,
+            "default": 1
+          }
+        },
+        "required": [
+          "adventurism",
+          "absorb",
+          "birthrate",
+          "collective_iq",
+          "fertilize",
+          "iq",
+          "fighters",
+          "pods",
+          "mass",
+          "sexes",
+          "metabolism"
+        ]
+      },
+      "RaceType": {
+        "type": "integer",
+        "enum": [
+          0,
+          1
+        ],
+        "description": "0 normal; 1 metamorph. Shared Go rules enforce ability covariance and cross-field constraints."
+      },
+      "Homeworld": {
+        "type": "integer",
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "description": "0 Earth; 1 Forest; 2 Desert; 3 Water; 4 Airless; 5 Iceball; 6 Jovian. Planet mappings are returned by options."
+      },
+      "SectorCompatibility": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "minItems": 8,
+        "maxItems": 8,
+        "description": "Exact order: Sea, Land, Mountain, Gas, Ice, Woods, Sand, Plated. Go validates common terrain, gas exclusivity and homeworld constraints."
+      },
+      "Spec": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "address": {
+            "type": "string",
+            "description": "Optional physical mailing metadata; never required."
+          },
+          "info": {
+            "type": "string"
+          },
+          "race_type": {
+            "$ref": "#/components/schemas/RaceType"
+          },
+          "homeworld": {
+            "$ref": "#/components/schemas/Homeworld"
+          },
+          "attributes": {
+            "$ref": "#/components/schemas/Attributes"
+          },
+          "sector_compat": {
+            "$ref": "#/components/schemas/SectorCompatibility"
+          }
+        },
+        "required": [
+          "name",
+          "race_type",
+          "homeworld",
+          "attributes",
+          "sector_compat"
+        ]
+      },
+      "ValidationError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "NOT_FINITE",
+              "OUT_OF_RANGE",
+              "REQUIRED",
+              "BOOLEAN",
+              "INTEGER",
+              "NORMAL_ABILITY",
+              "PLATED_REQUIRED",
+              "GAS_FORBIDDEN",
+              "JOVIAN_TERRAIN",
+              "TERRAIN_COUNT",
+              "COMMON_TERRAIN",
+              "OVER_BUDGET",
+              "COST_OVERFLOW"
+            ]
+          },
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "field",
+          "message"
+        ]
+      },
+      "CostBreakdown": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 11,
+            "maxItems": 11
+          },
+          "sectors": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 8,
+            "maxItems": 8
+          },
+          "homeworld": {
+            "type": "integer"
+          },
+          "sector_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8
+          },
+          "sector_surcharge": {
+            "type": "integer"
+          },
+          "eight_type_extension": {
+            "type": "boolean"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "remaining": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attributes",
+          "sectors",
+          "homeworld",
+          "sector_count",
+          "sector_surcharge",
+          "eight_type_extension",
+          "total",
+          "remaining"
+        ]
+      },
+      "CostResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "breakdown": {
+            "$ref": "#/components/schemas/CostBreakdown"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        },
+        "required": [
+          "valid",
+          "errors"
+        ]
+      },
+      "AttributeDefinition": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "key": {
+            "type": "string",
+            "enum": [
+              "adventurism",
+              "absorb",
+              "birthrate",
+              "collective_iq",
+              "fertilize",
+              "iq",
+              "fighters",
+              "pods",
+              "mass",
+              "sexes",
+              "metabolism"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "minimum": {
+            "type": "number"
+          },
+          "default": {
+            "type": "number"
+          },
+          "maximum": {
+            "type": "number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "decimal",
+              "integer",
+              "boolean"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "minimum",
+          "default",
+          "maximum",
+          "kind"
+        ]
+      },
+      "HomeworldDefinition": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Homeworld"
+          },
+          "name": {
+            "type": "string"
+          },
+          "planet_type": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          },
+          "cost": {
+            "type": "integer"
+          },
+          "common_sectors": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            },
+            "minItems": 8,
+            "maxItems": 8
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "planet_type",
+          "cost",
+          "common_sectors"
+        ]
+      },
+      "SectorDefinition": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "Options": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "const": 1
+          },
+          "budget": {
+            "const": 1400
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttributeDefinition"
+            },
+            "minItems": 11,
+            "maxItems": 11
+          },
+          "homeworlds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HomeworldDefinition"
+            },
+            "minItems": 7,
+            "maxItems": 7
+          },
+          "sectors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SectorDefinition"
+            },
+            "minItems": 8,
+            "maxItems": 8
+          },
+          "race_types": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "const": "normal"
+              },
+              {
+                "const": "metamorph"
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "required": [
+          "schema_version",
+          "budget",
+          "attributes",
+          "homeworlds",
+          "sectors",
+          "race_types"
+        ]
+      },
+      "OperatorEnrollment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "credential_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^v1-[a-f0-9]{64}$"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "game_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^universe-[a-f0-9]{64}$"
+          },
+          "account_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/Spec"
+          },
+          "god": {
+            "type": "boolean"
+          },
+          "guest": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "credential_version",
+          "request_id",
+          "game_id",
+          "account_id",
+          "spec",
+          "god",
+          "guest"
+        ]
+      },
+      "EnrollmentIntent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/Spec"
+          }
+        },
+        "required": [
+          "request_id",
+          "spec"
+        ],
+        "description": "Future public intent only, not operational. Account/game binding and independent credential versions are resolved through an authenticated identity workflow still to be designed. This schema does not authorize signup, privilege claims, or durable pending states."
+      },
+      "Placement": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "player_num": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 53
+          },
+          "home_star": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "home_planet": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9
+          },
+          "capital_x": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 254
+          },
+          "capital_y": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 254
+          },
+          "government_ship": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "player_num",
+          "home_star",
+          "home_planet",
+          "capital_x",
+          "capital_y",
+          "government_ship",
+          "created_at"
+        ]
+      },
+      "EnrollmentStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "intent_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "schema_version": {
+            "const": 1
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "game_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "binding": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "NO_KNOWN_PLACEMENT",
+              "NOT_PERMITTED",
+              "CONFLICT",
+              "RECONCILIATION_REQUIRED",
+              "UNKNOWN"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "COMMITTED",
+              "NOT_COMMITTED",
+              "UNCERTAIN",
+              "UNKNOWN"
+            ]
+          },
+          "replay": {
+            "type": "boolean"
+          },
+          "permitted": {
+            "type": "boolean"
+          },
+          "placement": {
+            "$ref": "#/components/schemas/Placement"
+          }
+        },
+        "required": [
+          "schema_version",
+          "request_id",
+          "game_id",
+          "binding",
+          "state",
+          "outcome",
+          "replay",
+          "permitted"
+        ],
+        "description": "CONFIRMED requires COMMITTED and a complete placement. Other states omit placement. Absence is UNKNOWN, never proof of rollback. UNCERTAIN requires reconciliation. Request acceptance is not placement confirmation. intent_digest binds the complete private POST intent; binding echoes request/game/account selection and is not authentication."
+      },
+      "Failure": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_REQUEST",
+              "METHOD_NOT_ALLOWED",
+              "ENROLLMENT_NOT_AUTHORIZED",
+              "ENROLLMENT_DISABLED",
+              "OUTCOME_UNKNOWN",
+              "INVALID_IDENTITY",
+              "UNAUTHORIZED_ENROLLMENT",
+              "INVALID_NAME",
+              "INVALID_DESIGN",
+              "REQUEST_CONFLICT",
+              "ACCOUNT_ALREADY_PLACED",
+              "SLOTS_FULL",
+              "GOD_BOOTSTRAP_REQUIRED",
+              "NAME_TAKEN",
+              "CREDENTIAL_PREPARATION_FAILED",
+              "SHIP_ALLOCATION_CONFLICT",
+              "ENROLLMENT_PENDING_TURN",
+              "ENROLLMENT_RECONCILIATION_REQUIRED",
+              "ENROLLMENT_COMMITTED_ERROR",
+              "ENROLLMENT_IO",
+              "INVALID_UNIVERSE",
+              "INVALID_SEARCH_ORDER",
+              "ENROLLMENT_RANDOMNESS_FAILED",
+              "NO_HOME_PLANET",
+              "NO_CAPITAL_SECTOR",
+              "INVALID_ORBIT_CHAIN",
+              "NOT_EXECUTED",
+              "NOT_SERVING"
+            ]
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "AdminEnrollmentReply": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "enroll",
+              "enroll.status"
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_REQUEST",
+              "METHOD_NOT_ALLOWED",
+              "ENROLLMENT_NOT_AUTHORIZED",
+              "ENROLLMENT_DISABLED",
+              "OUTCOME_UNKNOWN",
+              "INVALID_IDENTITY",
+              "UNAUTHORIZED_ENROLLMENT",
+              "INVALID_NAME",
+              "INVALID_DESIGN",
+              "REQUEST_CONFLICT",
+              "ACCOUNT_ALREADY_PLACED",
+              "SLOTS_FULL",
+              "GOD_BOOTSTRAP_REQUIRED",
+              "NAME_TAKEN",
+              "CREDENTIAL_PREPARATION_FAILED",
+              "SHIP_ALLOCATION_CONFLICT",
+              "ENROLLMENT_PENDING_TURN",
+              "ENROLLMENT_RECONCILIATION_REQUIRED",
+              "ENROLLMENT_COMMITTED_ERROR",
+              "ENROLLMENT_IO",
+              "INVALID_UNIVERSE",
+              "INVALID_SEARCH_ORDER",
+              "ENROLLMENT_RANDOMNESS_FAILED",
+              "NO_HOME_PLANET",
+              "NO_CAPITAL_SECTOR",
+              "INVALID_ORBIT_CHAIN",
+              "NOT_EXECUTED",
+              "NOT_SERVING"
+            ]
+          },
+          "validation": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          },
+          "status": {
+            "type": "object",
+            "description": "Existing engine.Status; private admin status contract."
+          },
+          "result": {
+            "$ref": "#/components/schemas/EnrollmentStatus"
+          }
+        },
+        "required": [
+          "ok",
+          "op",
+          "status"
+        ]
+      },
+      "DualLogin": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "race": {
+            "type": "string",
+            "minLength": 1
+          },
+          "race_password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 72,
+            "writeOnly": true,
+            "description": "Nonempty UTF-8 credential, at most 72 bytes; no NUL or line endings. Operator provisioning requires 12..72 bytes and distinct race/governor secrets. Never place in a URL or log."
+          },
+          "governor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "governor_password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 72,
+            "writeOnly": true,
+            "description": "Nonempty UTF-8 credential, at most 72 bytes; no NUL or line endings. Operator provisioning requires 12..72 bytes and distinct race/governor secrets. Never place in a URL or log."
+          }
+        },
+        "required": [
+          "race",
+          "race_password",
+          "governor",
+          "governor_password"
+        ]
+      },
+      "LegacyLogin": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "race": {
+            "type": "string",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 72,
+            "writeOnly": true,
+            "description": "Nonempty UTF-8 credential, at most 72 bytes; no NUL or line endings. Operator provisioning requires 12..72 bytes and distinct race/governor secrets. Never place in a URL or log."
+          },
+          "governor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "race",
+          "password",
+          "governor"
+        ]
+      },
+      "Login": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/DualLogin"
+          },
+          {
+            "$ref": "#/components/schemas/LegacyLogin"
+          }
+        ],
+        "description": "Legacy accepted only for races without CR-07 placement history and safe existing governor credentials. New enrollments always require both independent checks. Mixing contracts is rejected. Errors do not reveal which credential failed."
+      },
+      "LoginToken": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Existing HS256 JWT with current credential/permission revision; revalidated on WebSocket admission and actor command admission. Never log."
+          }
+        },
+        "required": [
+          "token"
+        ]
+      }
+    }
+  }
+}

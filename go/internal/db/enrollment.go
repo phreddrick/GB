@@ -626,3 +626,23 @@ func (s *Store) EnrollmentWriteUncertain() bool {
 	defer s.enrollmentMu.Unlock()
 	return s.enrollmentUncertain
 }
+
+// EnrollmentRequiresDual classifies authentication using trusted persistent
+// placement history. Malformed metadata is an error, never legacy compatibility.
+func (s *Store) EnrollmentRequiresDual(player int) (bool, error) {
+	if player < 1 || player > model.MaxPlayers {
+		return false, enrollmentError(EnrollmentInvalid)
+	}
+	found := false
+	e := s.db.View(func(tx *bolt.Tx) error {
+		all, e := placementsTx(tx)
+		if e != nil {
+			return e
+		}
+		for _, r := range all {
+			found = found || r.Player == player
+		}
+		return nil
+	})
+	return found, asEnrollmentOptionalError(e)
+}

@@ -37,7 +37,7 @@ func newFakeEngine() *fakeEngine { return &fakeEngine{mode: engine.ModeServing, 
 
 func (f *fakeEngine) Authenticate(ctx context.Context, race, password string, governor int) (AuthResult, error) {
 	if race == "Testers" && password == "pw" {
-		return AuthResult{OK: true, PlayerNum: 1}, nil
+		return AuthResult{OK: true, PlayerNum: 1, Revision: strings.Repeat("a", 64)}, nil
 	}
 	if race == "busy" {
 		return AuthResult{}, engine.ErrEngineBusy
@@ -626,4 +626,18 @@ func pipeWS(t *testing.T) (server, client *websocket.Conn) {
 		t.Fatal("no server conn")
 	}
 	return nil, nil
+}
+
+func (f *fakeEngine) AuthenticateDual(ctx context.Context, race, racePassword, governorPassword string, g int) (AuthResult, error) {
+	return f.Authenticate(ctx, race, racePassword, g)
+}
+func (f *fakeEngine) ValidateSession(ctx context.Context, ident Identity) (bool, error) {
+	return ident.PlayerNum == 1 && ident.Governor == 0 && ident.Revision == strings.Repeat("a", 64) && ident.ExpiresAt > time.Now().Unix(), nil
+}
+func (f *fakeEngine) WelcomeSession(ctx context.Context, ident Identity) (string, error) {
+	ok, e := f.ValidateSession(ctx, ident)
+	if !ok {
+		return "", errors.New("invalid session")
+	}
+	return f.WelcomeMessage(ctx, ident.PlayerNum, ident.Governor), e
 }

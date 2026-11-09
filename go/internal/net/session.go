@@ -19,6 +19,7 @@ import (
 // the game actor never blocks on a client's TCP window (CR-23): a client
 // whose queue fills is disconnected, like the C server's MAX_OUTPUT drop.
 type Session struct {
+	authenticated Identity
 	// Identity. Set once by newSession from the verified token, before the
 	// session is published in the registry, and never written again; the
 	// registry's mutex orders those writes before every reader (GB1-02).
@@ -51,6 +52,8 @@ var ErrSessionOverflow = errors.New("session outbound queue overflow")
 
 // Identity is the authenticated identity a session is created with.
 type Identity struct {
+	Revision  string
+	ExpiresAt int64
 	PlayerNum int
 	Governor  int
 	God       bool
@@ -60,15 +63,16 @@ type Identity struct {
 // its identity already in place, and starts its writer goroutine.
 func newSession(conn *websocket.Conn, id string, ident Identity, queue int, writeTimeout, pingInterval time.Duration) *Session {
 	s := &Session{
-		PlayerNum:    ident.PlayerNum,
-		Governor:     ident.Governor,
-		God:          ident.God,
-		conn:         conn,
-		ID:           id,
-		outbound:     make(chan outMsg, queue),
-		done:         make(chan struct{}),
-		writeTimeout: writeTimeout,
-		pingInterval: pingInterval,
+		authenticated: ident,
+		PlayerNum:     ident.PlayerNum,
+		Governor:      ident.Governor,
+		God:           ident.God,
+		conn:          conn,
+		ID:            id,
+		outbound:      make(chan outMsg, queue),
+		done:          make(chan struct{}),
+		writeTimeout:  writeTimeout,
+		pingInterval:  pingInterval,
 	}
 	go s.writeLoop()
 	return s
@@ -91,12 +95,25 @@ func (s *Session) writeLoop() {
 			_ = s.conn.WriteMessage(websocket.CloseMessage, reason)
 			return
 		case m := <-s.outbound:
+			select {
+			case <-s.done:
+				return
+			default:
+			}
+			if s.expired() {
+				s.closeWith(websocket.ClosePolicyViolation, "session expired")
+				return
+			}
 			_ = s.conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
 			if err := s.conn.WriteMessage(m.kind, m.data); err != nil {
 				s.closeWith(websocket.CloseAbnormalClosure, "write failed")
 				return
 			}
 		case <-ticker.C:
+			if s.expired() {
+				s.closeWith(websocket.ClosePolicyViolation, "session expired")
+				return
+			}
 			_ = s.conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
 			if err := s.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				s.closeWith(websocket.CloseAbnormalClosure, "ping failed")
@@ -123,6 +140,10 @@ func (s *Session) SendJSON(v interface{}) error {
 }
 
 func (s *Session) enqueue(kind int, data []byte) error {
+	if s.expired() {
+		s.Close()
+		return ErrSessionClosed
+	}
 	select {
 	case <-s.done:
 		return ErrSessionClosed
@@ -331,4 +352,24 @@ type SessionInfo struct {
 	PlayerNum int  `json:"player_num"`
 	Governor  int  `json:"governor"`
 	God       bool `json:"god"`
+}
+
+// AuthenticatedIdentity returns the immutable server-derived session authority.
+func (s *Session) AuthenticatedIdentity() Identity { return s.authenticated }
+
+func (s *Session) expired() bool {
+	return s.authenticated.ExpiresAt > 0 && s.authenticated.ExpiresAt <= time.Now().Unix()
+}
+
+// RevalidateSessions is called only by the game actor at mutation boundaries.
+// Copy before invoking check: the callback must never run under the registry lock.
+func (r *SessionRegistry) RevalidateSessions(check func(Identity) bool) {
+	r.mu.RLock()
+	all := append([]*Session(nil), r.all...)
+	r.mu.RUnlock()
+	for _, session := range all {
+		if !check(session.AuthenticatedIdentity()) {
+			session.Close()
+		}
+	}
 }

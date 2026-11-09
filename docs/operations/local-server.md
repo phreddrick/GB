@@ -34,7 +34,8 @@ Precedence, lowest to highest: built-in defaults, the JSON file named by
 | `GB_TURN_STALL_TIMEOUT` | 600 | seconds without turn progress before `/livez` reports the actor stuck |
 | `GB_WS_ALLOWED_ORIGINS` | empty | comma-separated browser origins allowed to open WebSockets (`https://host[:port]`). Empty means same-origin only; requests without an `Origin` header (non-browser clients) are always allowed. |
 | `GB_WS_MAX_MESSAGE_BYTES` | 4096 | per-frame read limit; larger frames close the connection |
-| `GB_ENROLL_PREVIEW` | `false` | enables the **incomplete** web enrollment (see section 6) |
+| `GB_ENROLL_PREVIEW` | `false` | retired compatibility flag; web enrollment remains disabled |
+| `GB_ENROLL_AUTHORITY_FILE` | unset | protected private operator authority; default denies enrollment (section 6) |
 | `GB_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 | `GB_DOCS_DIR`, `GB_TLS_CERT`, `GB_TLS_KEY` | | help-file directory; TLS for the player listener |
 
@@ -93,8 +94,8 @@ database no server has open (it refuses a running server's file after the
 bbolt lock timeout) and refuses an initialised database with exit 3;
 `-skip-if-initialized` turns that into an exit-0 no-op for bootstrap scripts.
 
-Races are not created by the server in Phase 1 (section 6); use `racegen`
-offline.
+Race creation uses the explicitly configured private operator path (section 6).
+`racegen` is now an offline species designer and cannot write a game database.
 
 ## 4. Administration: `gbctl`
 
@@ -194,18 +195,27 @@ canonical command name or `unknown`), `gb_command_panics_total`,
 
 ## 6. Enrollment (CR-03, CR-07)
 
-Web enrollment is **disabled by default**: `POST /api/enroll` answers 403
-and `GET /enroll` shows a notice, and nothing is read or written. The reason
-is CR-07: enrolled races get no home planet, sectors or ships and cannot
-play; full placement is Phase 3c.
+Public enrollment is disabled and non-mutating, including with
+`GB_ENROLL_PREVIEW=true`. `POST /api/enroll` remains403 and `/enroll` displays a
+disabled notice. No public signup routes/options/cost handlers are mounted.
 
-`GB_ENROLL_PREVIEW=true` enables the form for development. The request then
-runs on the game actor against the server's own database handle (the old
-handler opened the database a second time and timed out on the bbolt lock
-after five seconds), validates as before, stores the race, adds it to the
-running server's race list so it can log in at once, and every success
-message states `PREVIEW ONLY ... not playable`. Do not enable it on a server
-the public can reach.
+CR-07E adds private, authenticated operator enrollment on the existing admin
+listener, denied unless `GB_ENROLL_AUTHORITY_FILE` explicitly supplies a protected,
+universe-bound authority and immutable prepared credential versions. Use
+`gbctl enroll -f operator-request.json` and `gbctl enroll-status -request-id ID
+-game GAME -account ACCOUNT` (each as one command). First God creation requires
+an explicit God request (`--god` or `god:true`) and separate server bootstrap authorization, disabled by default.
+Never replace a request ID after a timeout: execution may still be in progress.
+
+Password provisioning uses protected files with `gbctl credentials prepare`,
+never password command-line arguments. Race/governor credentials are independent.
+New players use dual-credential HTTP login; old tokens require fresh login.
+`racegen -db` fails safely; use designer save/load for complete species drafts.
+
+See [CR-07E interface and reconciliation record](../testing/cr07e-enrollment-interfaces.md)
+for schemas, file permissions, account/credential lifecycle, bootstrap procedure,
+status semantics, login compatibility, rollback security limits and CR-07F work.
+This documentation is not deployment or live-enrollment authorization.
 
 ## 7. Turn schedule and restarts (CR-21)
 

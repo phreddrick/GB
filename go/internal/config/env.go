@@ -102,7 +102,7 @@ func loadFile(cfg *Config, path string) error {
 	if err := json.NewDecoder(f).Decode(&raw); err != nil {
 		return fmt.Errorf("%w %s: %w", ErrConfigFile, path, err)
 	}
-	for _, k := range []string{"jwt_secret", "admin_token", "update_password", "segment_password", "external_trigger"} {
+	for _, k := range []string{"jwt_secret", "admin_token", "update_password", "segment_password", "external_trigger", "enrollment_authority_file"} {
 		if _, ok := raw[k]; ok {
 			return fmt.Errorf("%w %s: key %q is no longer accepted in the config file: secrets come from the environment (GB_JWT_SECRET, GB_ADMIN_TOKEN) and the password-triggered update endpoints were removed (CR-04, CR-36)", ErrConfigFile, path, k)
 		}
@@ -191,6 +191,7 @@ func applyEnv(cfg *Config, getenv LookupEnv) ([]string, error) {
 
 	integer("GB_UPDATE_MINUTES", &cfg.DefaultUpdateMinutes)
 	integer("GB_MOVES_PER_UPDATE", &cfg.MovesPerUpdate)
+	str("GB_ENROLL_AUTHORITY_FILE", &cfg.EnrollmentAuthorityFile)
 	str("GB_LOG_LEVEL", &cfg.LogLevel)
 	integer("GB_SHUTDOWN_TIMEOUT", &cfg.ShutdownTimeoutSeconds)
 	integer("GB_TURN_STALL_TIMEOUT", &cfg.TurnStallTimeoutSecs)
