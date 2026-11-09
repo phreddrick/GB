@@ -18,6 +18,7 @@ import (
 type Store struct {
 	db *bolt.DB
 	fenceState
+	enrollmentState
 }
 
 // Open opens (or creates) the bbolt database at the given path.
