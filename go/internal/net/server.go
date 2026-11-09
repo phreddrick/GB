@@ -261,52 +261,25 @@ func (srv *Server) handleRemovedAdmin(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "the password-triggered admin endpoints were removed (CR-04); use gbctl against the admin listener", http.StatusGone)
 }
 
-// handleEnrollPage serves the enrollment form, or the disabled notice.
+// handleEnrollPage serves only the disabled notice; the legacy form is retired.
 func (srv *Server) handleEnrollPage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if !srv.cfg.EnrollPreview {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = fmt.Fprintf(w, enrollmentDisabledHTML, engine.ErrEnrollmentDisabled.Error())
-		return
-	}
-	_, _ = w.Write([]byte(enrollmentHTML))
+	w.WriteHeader(http.StatusForbidden)
+	_, _ = fmt.Fprintf(w, enrollmentDisabledHTML, engine.ErrEnrollmentDisabled.Error())
 }
 
-// handleEnroll handles POST /api/enroll through the actor. With the preview
-// disabled (default) it returns 403 and touches nothing.
+// handleEnroll permanently refuses the retired preview route. No request is
+// decoded or forwarded, including when the deprecated preview flag is true.
 func (srv *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if !srv.cfg.EnrollPreview {
-		writeJSON(w, http.StatusForbidden, enroll.Response{Success: false, Message: engine.ErrEnrollmentDisabled.Error()})
-		return
-	}
-	var req enroll.Request
-	if err := decodeJSON(r, &req, 16<<10); err != nil {
-		writeJSON(w, http.StatusBadRequest, enroll.Response{Success: false, Message: "Invalid request", Errors: []string{err.Error()}})
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	resp, err := srv.game.Enroll(ctx, &req)
-	switch {
-	case errors.Is(err, engine.ErrEnrollmentDisabled):
-		writeJSON(w, http.StatusForbidden, resp)
-	case errors.Is(err, engine.ErrNotServing), errors.Is(err, engine.ErrEngineBusy):
-		writeJSON(w, http.StatusServiceUnavailable, resp)
-	case err != nil:
-		writeJSON(w, http.StatusInternalServerError, enroll.Response{Success: false, Message: "Enrollment failed"})
-	case !resp.Success:
-		writeJSON(w, http.StatusUnprocessableEntity, resp)
-	default:
-		writeJSON(w, http.StatusOK, resp)
-	}
+	writeJSON(w, http.StatusForbidden, enroll.Response{Success: false, Message: engine.ErrEnrollmentDisabled.Error()})
 }
 
 // --- Helpers ---

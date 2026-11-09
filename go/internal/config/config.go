@@ -40,7 +40,7 @@ type Config struct {
 	WSMaxMessageBytes      int64    `json:"ws_max_message_bytes"`       // read limit per WebSocket frame
 	WSWriteTimeoutSeconds  int      `json:"ws_write_timeout_seconds"`   // per-write deadline
 	WSOutboundQueue        int      `json:"ws_outbound_queue"`          // queued messages before a slow client is dropped
-	EnrollPreview          bool     `json:"enroll_preview"`             // enable the INCOMPLETE web enrollment preview (CR-07)
+	EnrollPreview          bool     `json:"enroll_preview"`             // deprecated compatibility setting; CR-07D ignores it and refuses preview enrollment
 
 	// --- Data directories ---
 	DataDir string `json:"data_dir"` // game data root

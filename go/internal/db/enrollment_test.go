@@ -1114,3 +1114,80 @@ func TestEnrollmentOrphanPlayerOwnership(t *testing.T) {
 		})
 	}
 }
+
+func TestEnrollmentAdmissionReadOnlyHistoryAndCapacity(t *testing.T) {
+	s, _, in := enrollmentFixture(t)
+	before := enrollmentSnapshot(t, s)
+	admission, e := s.EnrollmentAdmission(in.CallerID)
+	if e != nil || admission.NextPlayer != 1 || admission.CallerPlaced {
+		t.Fatal("empty admission", e)
+	}
+	if before != enrollmentSnapshot(t, s) {
+		t.Fatal("admission wrote")
+	}
+	if _, e = s.PutEnrollment(in); e != nil {
+		t.Fatal(e)
+	}
+	admission, e = s.EnrollmentAdmission(in.CallerID)
+	if e != nil || admission.NextPlayer != 2 || !admission.CallerPlaced {
+		t.Fatal("placed admission", e)
+	}
+	if e = s.db.Update(func(tx *bolt.Tx) error { return tx.Bucket(BucketRaces).Delete(RaceKey(1)) }); e != nil {
+		t.Fatal(e)
+	}
+	before = enrollmentSnapshot(t, s)
+	admission, e = s.EnrollmentAdmission("other-account")
+	if e != nil || admission.NextPlayer != 2 || admission.CallerPlaced {
+		t.Fatal("history alone did not reserve number", e)
+	}
+	if before != enrollmentSnapshot(t, s) {
+		t.Fatal("history read wrote")
+	}
+	if e = s.PutRace(&model.Race{PlayerNum: 63, Name: "last"}); e != nil {
+		t.Fatal(e)
+	}
+	admission, e = s.EnrollmentAdmission("other-account")
+	if e != nil || admission.NextPlayer != 64 {
+		t.Fatal("ordinary cap hint", e)
+	}
+}
+func TestEnrollmentAdmissionTaintAndCorruption(t *testing.T) {
+	for _, which := range []string{"taint", "corrupt", "identity"} {
+		t.Run(which, func(t *testing.T) {
+			s, _, in := enrollmentFixture(t)
+			caller := in.CallerID
+			switch which {
+			case "taint":
+				s.SetMetaFault(func(op string) error {
+					if op == "enrollment.commit-error" {
+						return errors.New("uncertain")
+					}
+					return nil
+				})
+				_, e := s.PutEnrollment(in)
+				assertEnrollmentError(t, e, EnrollmentIO, EnrollmentUncertain)
+				s.SetMetaFault(nil)
+			case "corrupt":
+				if e := s.PutMeta([]byte(placementPrefix+"bad"), []byte("null")); e != nil {
+					t.Fatal(e)
+				}
+			case "identity":
+				caller = "bad/id"
+			}
+			before := enrollmentSnapshot(t, s)
+			_, e := s.EnrollmentAdmission(caller)
+			code, outcome := EnrollmentCorrupt, EnrollmentNotCommitted
+			if which == "taint" {
+				code = EnrollmentIO
+				outcome = EnrollmentUncertain
+			}
+			if which == "identity" {
+				code = EnrollmentInvalid
+			}
+			assertEnrollmentError(t, e, code, outcome)
+			if before != enrollmentSnapshot(t, s) {
+				t.Fatal("rejected admission wrote")
+			}
+		})
+	}
+}

@@ -462,9 +462,11 @@ func (s *State) request(ctx context.Context, op adminOp, fn func() error) error 
 
 // testHooks are set only by tests in this package.
 type testHooks struct {
-	beforeTurn  func(kind turnKind)
-	midTurn     func(update bool) // inside doTurn, after planets and ships were processed
-	afterCommit func(kind string) // inside persistTurn, right after the transaction committed
+	enrollmentOrder         func(int) ([]int, error)
+	beforeEnrollmentInstall func()
+	beforeTurn              func(kind turnKind)
+	midTurn                 func(update bool) // inside doTurn, after planets and ships were processed
+	afterCommit             func(kind string) // inside persistTurn, right after the transaction committed
 	// afterCommandAdmit runs on the actor after a player command has been
 	// claimed (reqStarted) and before its context is consulted: the window
 	// the GB1-04 cancellation test needs to force.

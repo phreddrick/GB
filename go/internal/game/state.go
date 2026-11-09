@@ -104,24 +104,25 @@ type State struct {
 	adminCh chan *adminRequest // typed administrative and lifecycle requests
 
 	// Lifecycle (lifecycle.go).
-	modeVal      atomic.Int32  // Mode
-	draining     atomic.Bool   // set by Stop before the actor sees stopCh
-	heartbeatNs  atomic.Int64  // last actor heartbeat (unix nanoseconds)
-	progress     atomic.Uint64 // turn progress counter
-	progressNs   atomic.Int64  // last progress advance (unix nanoseconds)
-	turnStartNs  atomic.Int64  // start of the running turn, 0 when idle
-	stopCh       chan struct{}
-	stopOnce     sync.Once
-	stopped      chan struct{} // closed when the actor goroutine has exited
-	shutdownErr  error         // set by the actor during shutdown, read after <-stopped
-	statusMu     sync.Mutex
-	status       statusData
-	haltReason   string           // under statusMu
-	haltStack    string           // under statusMu
-	maint        maintenanceState // under statusMu (maintenance.go)
-	testHooks    *testHooks
-	loopStarted  bool
-	startupError error
+	modeVal          atomic.Int32  // Mode
+	draining         atomic.Bool   // set by Stop before the actor sees stopCh
+	heartbeatNs      atomic.Int64  // last actor heartbeat (unix nanoseconds)
+	progress         atomic.Uint64 // turn progress counter
+	progressNs       atomic.Int64  // last progress advance (unix nanoseconds)
+	turnStartNs      atomic.Int64  // start of the running turn, 0 when idle
+	stopCh           chan struct{}
+	stopOnce         sync.Once
+	stopped          chan struct{} // closed when the actor goroutine has exited
+	shutdownErr      error         // set by the actor during shutdown, read after <-stopped
+	statusMu         sync.Mutex
+	status           statusData
+	haltReason       string           // under statusMu
+	haltStack        string           // under statusMu
+	maint            maintenanceState // under statusMu (maintenance.go)
+	enrollmentPolicy *EnrollmentPolicy
+	testHooks        *testHooks
+	loopStarted      bool
+	startupError     error
 }
 
 type command struct {
@@ -150,9 +151,11 @@ func (c *command) outcome() error {
 
 // Options configure New. Zero values select the defaults.
 type Options struct {
-	Logger   *slog.Logger      // default: slog.Default()
-	Registry *metrics.Registry // default: a private registry
-	Now      func() time.Time  // default: time.Now
+	// TrustedEnrollment is never configured by production transports in CR-07D.
+	TrustedEnrollment *EnrollmentPolicy
+	Logger            *slog.Logger      // default: slog.Default()
+	Registry          *metrics.Registry // default: a private registry
+	Now               func() time.Time  // default: time.Now
 	// TestTurnDelay, when positive, makes every turn sleep this long (in
 	// small slices that advance the progress counter) before processing.
 	// It exists only so the shutdown tests can observe a turn in flight;
@@ -184,6 +187,10 @@ func New(cfg *config.Config, store *db.Store, opts Options) (*State, error) {
 		stopCh:  make(chan struct{}),
 		stopped: make(chan struct{}),
 	}
+	if opts.TrustedEnrollment != nil && opts.TrustedEnrollment.Authorize != nil && opts.TrustedEnrollment.Prepare != nil {
+		policy := *opts.TrustedEnrollment
+		s.enrollmentPolicy = &policy
+	}
 	if opts.TestTurnDelay > 0 {
 		delay := opts.TestTurnDelay
 		s.testHooks = &testHooks{beforeTurn: func(turnKind) {
@@ -204,7 +211,11 @@ func New(cfg *config.Config, store *db.Store, opts Options) (*State, error) {
 	if err != nil {
 		return nil, fmt.Errorf("check universe: %w", err)
 	}
-	if initialized {
+	if store.EnrollmentWriteUncertain() {
+		// Reusing a tainted handle cannot restart timers, restore/write a schedule
+		// or turn an ambiguous enrollment into an implicit recovery transaction.
+		s.halt("enrollment commit outcome uncertain on reused store handle; operator reconciliation required; no startup schedule write or shutdown flush", "")
+	} else if initialized {
 		corrupt, err := s.validateStoreCommit()
 		if err != nil {
 			return nil, fmt.Errorf("validate store: %w", err)
@@ -755,6 +766,9 @@ func (s *State) authenticate(raceName, password string, governor int) net.AuthRe
 		}
 		if !strings.EqualFold(race.Name, raceName) {
 			continue
+		}
+		if governor < 0 || governor >= len(race.Governor) || governor > int(race.Governors) || !race.Governor[governor].Active || (governor > 0 && race.Governor[governor].Password == "") {
+			return net.AuthResult{}
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(race.Password), []byte(password)); err != nil {
 			return net.AuthResult{}

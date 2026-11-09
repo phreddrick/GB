@@ -571,3 +571,58 @@ func (s *Store) enrollmentReadback(caller, request string) (r *PlacementRecord) 
 	r, _ = s.GetPlacement(caller, request)
 	return r
 }
+
+// EnrollmentAdmission is a read-only hint for the authoritative actor. History
+// counts toward numbering; lookup must precede acting on CallerPlaced or capacity.
+type EnrollmentAdmission struct {
+	NextPlayer   int
+	CallerPlaced bool
+}
+
+// EnrollmentAdmission validates metadata and the handle's uncertainty guard.
+// It reserves nothing; PutEnrollment remains the final transaction authority.
+func (s *Store) EnrollmentAdmission(callerID string) (EnrollmentAdmission, error) {
+	s.enrollmentMu.Lock()
+	defer s.enrollmentMu.Unlock()
+	if s.enrollmentUncertain {
+		return EnrollmentAdmission{}, &EnrollmentError{Code: EnrollmentIO, Outcome: EnrollmentUncertain}
+	}
+	if !enrollmentToken(callerID, 128) {
+		return EnrollmentAdmission{}, enrollmentError(EnrollmentInvalid)
+	}
+	result := EnrollmentAdmission{NextPlayer: 1}
+	e := s.db.View(func(tx *bolt.Tx) error {
+		all, e := placementsTx(tx)
+		if e != nil {
+			return e
+		}
+		for _, r := range all {
+			if r.Player >= result.NextPlayer {
+				result.NextPlayer = r.Player + 1
+			}
+			if r.CallerID == callerID {
+				result.CallerPlaced = true
+			}
+		}
+		return tx.Bucket(BucketRaces).ForEach(func(k, v []byte) error {
+			var r model.Race
+			if enrollmentDecode(v, &r) != nil || r.PlayerNum < 1 || r.PlayerNum > model.MaxPlayers || !bytes.Equal(k, RaceKey(r.PlayerNum)) {
+				return enrollmentError(EnrollmentCorrupt)
+			}
+			if r.PlayerNum >= result.NextPlayer {
+				result.NextPlayer = r.PlayerNum + 1
+			}
+			return nil
+		})
+	})
+	return result, asEnrollmentOptionalError(e)
+}
+
+// EnrollmentWriteUncertain preserves the CR-07C guard when a caller attempts
+// to construct another actor on the same handle. It is read-only and is not a
+// reconciliation operation; a fresh handle is not an approved recovery policy.
+func (s *Store) EnrollmentWriteUncertain() bool {
+	s.enrollmentMu.Lock()
+	defer s.enrollmentMu.Unlock()
+	return s.enrollmentUncertain
+}

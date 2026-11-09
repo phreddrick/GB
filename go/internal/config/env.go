@@ -38,7 +38,7 @@ import (
 //	GB_TURN_STALL_TIMEOUT   liveness: seconds without turn progress before the actor is considered stuck
 //	GB_WS_ALLOWED_ORIGINS   comma-separated browser origins allowed to open WebSockets (empty = same-origin only)
 //	GB_WS_MAX_MESSAGE_BYTES per-frame read limit
-//	GB_ENROLL_PREVIEW       "true" enables the incomplete enrollment preview (CR-07); default off
+//	GB_ENROLL_PREVIEW       legacy compatibility flag, ignored since CR-07D; enrollment stays disabled
 //	GB_DOCS_DIR             help-file directory
 //	GB_TLS_CERT, GB_TLS_KEY TLS certificate and key for the player listener
 

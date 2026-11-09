@@ -501,8 +501,8 @@ func TestUninitializedStoreAndAdminInit(t *testing.T) {
 }
 
 // TestEnrollmentDisabledDoesNotTouchStore (CR-03, Decision 9): the default
-// refuses enrollment without reading or writing, and the preview path uses
-// the actor's store handle (no second open, no five-second lock timeout).
+// refuses enrollment without reading or writing, including when the retired
+// preview flag is set (no second open and no alternate actor writer).
 func TestEnrollmentDisabledDoesNotTouchStore(t *testing.T) {
 	s, store, cfg := newTestEngine(t, true)
 	req := &enroll.Request{RaceName: "Newcomers", Password: "secret1", IQ: 50, Fertilize: 50, BirthRate: 0.5, Mass: 1, Metabolism: 1, NumberSexes: 2, Adventurism: 50}
@@ -520,41 +520,17 @@ func TestEnrollmentDisabledDoesNotTouchStore(t *testing.T) {
 		t.Fatal("disabled enrollment mutated the store")
 	}
 
-	// Preview enabled: runs through the actor against the shared handle.
+	// The retired flag cannot reactivate the incomplete writer.
 	cfg.EnrollPreview = true
-	start = time.Now()
 	resp, err = s.Enroll(ctxT(t, 5*time.Second), req)
-	if err != nil || !resp.Success || resp.PlayerNum != 2 {
-		t.Fatalf("preview enrollment: %+v %v", resp, err)
-	}
-	if d := time.Since(start); d > 2*time.Second {
-		t.Fatalf("preview enrollment took %s; the old path timed out after 5 s on the bbolt lock", d)
-	}
-	if !strings.Contains(resp.Message, "PREVIEW ONLY") {
-		t.Fatalf("preview response must say it is incomplete: %q", resp.Message)
+	if !errors.Is(err, ErrEnrollmentDisabled) || resp.Success {
+		t.Fatalf("retired preview: %v", err)
 	}
 	_, _, races2, _, _ := store.Counts()
-	if races2 != races0+1 {
-		t.Fatalf("race not stored: %d -> %d", races0, races2)
+	if races2 != races0 {
+		t.Fatal("retired preview wrote a race")
 	}
-	// The new race can authenticate without a restart (memory updated too).
-	auth, err := s.Authenticate(ctxT(t, 5*time.Second), "Newcomers", "secret1", 0)
-	if err != nil || !auth.OK || auth.PlayerNum != 2 {
-		t.Fatalf("auth after enrollment: %+v %v", auth, err)
-	}
-	// Duplicate name is rejected without an error.
-	resp, err = s.Enroll(ctxT(t, 5*time.Second), req)
-	if err != nil || resp.Success {
-		t.Fatalf("duplicate enrollment: %+v %v", resp, err)
-	}
-	// Validation failures are reported.
-	bad := *req
-	bad.RaceName = "Bad"
-	bad.IQ = 0
-	resp, err = s.Enroll(ctxT(t, 5*time.Second), &bad)
-	if err != nil || resp.Success || len(resp.Errors) == 0 {
-		t.Fatalf("invalid enrollment: %+v %v", resp, err)
-	}
+
 }
 
 // TestAuthenticateThroughActor: credentials are checked on the actor, so a
