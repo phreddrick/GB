@@ -1,0 +1,424 @@
+{
+  "schema": 1,
+  "baseline": "d9a90e9da0ceeb81bc35ff032ff3fa30d070c90b",
+  "branch": "feature/cr17b-coupled-record-transactions",
+  "environment": {
+    "date_utc": "2026-11-10",
+    "go": "go1.27.3 linux/amd64",
+    "GOCACHE": "/tmp/cr07a-cache",
+    "TMPDIR": "/tmp/GB-cr17b/test/ctool/obj/tmp",
+    "stores": "disposable only"
+  },
+  "scope": "complete exploration dump only; CR-17 remains open",
+  "source_sha256": {
+    "go/internal/db/command.go": "e4bf3ebd414689f94040e53656e213ea11fa67c6aeb79e511181c162efb09c29",
+    "go/internal/db/command_test.go": "ef5c96f2764d3ae45e47423dac537408cbb9a68c9bac7894ff07d812b906caba",
+    "go/internal/db/meta.go": "13ab4545883a4be4cb2bf4ef988c9571fb70ed1b568a2e5f7478cff9be9f0d58",
+    "go/internal/db/store.go": "7beb317bb3c8cd087366891563a8c1cb5044cd53e947f2820b21005f65b9eb2f",
+    "go/internal/game/command_crash_test.go": "f2c74856479cf50c6a0f08757517a77223e6355001599b5caa4939cbbd3353e2",
+    "go/internal/game/command_records.go": "31f924387f2f722c0f55c45e45fd7791c6a16a9fe99db5a67dea73a6840f093d",
+    "go/internal/game/command_records_test.go": "b3538e1509e539cb319917d2b4a56d518607bcc6694b0cf523b69e1d3b8fe5b1",
+    "go/internal/game/commands_load.go": "a353ce72c4886c00cae5ca9082bb5a7c552327fd293f088e381fd6f982c1de91",
+    "go/internal/game/lifecycle.go": "cda5f42f56abbe9ba69bf8306619172701db180db18c22dc671d888d08652af6",
+    "go/internal/game/state.go": "8732a3b8b5c55153c9b34ae3429adc888834565c1727eec816d3f82a8a08a5f6"
+  },
+  "runs": {
+    "normal": {
+      "command": "go test -count=1 -json ./...",
+      "exit_code": 0,
+      "output_sha256": "2e003ad5317881566f9d80c1b4decf927af20cd7f1cc3393c114e6236d27c0c1",
+      "test_nodes": {
+        "pass": 3352,
+        "skip": 2
+      },
+      "top_level_tests": {
+        "pass": 342,
+        "skip": 2
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 20
+      },
+      "failures": [],
+      "skips": [
+        {
+          "package": "github.com/phreddrick/GB/go/internal/net",
+          "test": "TestGB104LongCommandWithProductionTiming"
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/test/e2e",
+          "test": "TestGB104RealEngineLongTurnKeepsHealthyClient"
+        }
+      ],
+      "new_cr17b_nodes": {
+        "pass": 137
+      },
+      "new_cr17b_roots": 24
+    },
+    "first_race": {
+      "command": "GB_LONG_TESTS=1 go test -count=1 -race -json ./...",
+      "exit_code": 1,
+      "output_sha256": "f9d9f3c437aae8e098183f3b593a78c16266f3feb47233ed43d7d1276c28ea76",
+      "test_nodes": {
+        "pass": 3353,
+        "fail": 1
+      },
+      "top_level_tests": {
+        "pass": 343,
+        "fail": 1
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 19,
+        "fail": 1
+      },
+      "failures": [
+        {
+          "package": "github.com/phreddrick/GB/go/internal/net",
+          "test": "TestGB102DisconnectAndShutdownDuringRegistration"
+        }
+      ],
+      "skips": [],
+      "new_cr17b_nodes": {
+        "pass": 137
+      },
+      "new_cr17b_roots": 24
+    },
+    "final_race": {
+      "command": "GB_LONG_TESTS=1 go test -count=1 -race -json ./...",
+      "exit_code": 0,
+      "output_sha256": "2d3a06ed18f13dddaaf923a5ac9466d80a1119f0f19751ec51a763ad26961646",
+      "test_nodes": {
+        "pass": 3354
+      },
+      "top_level_tests": {
+        "pass": 344
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 20
+      },
+      "failures": [],
+      "skips": [],
+      "new_cr17b_nodes": {
+        "pass": 137
+      },
+      "new_cr17b_roots": 24
+    }
+  },
+  "checks": [
+    {
+      "command": "gofmt -l .",
+      "exit_code": 0,
+      "result": "empty",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "test/scripts/golden-mutations.sh",
+      "exit_code": 0,
+      "result": "15/15 expected results",
+      "output_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927"
+    },
+    {
+      "command": "make -C test/ctool check",
+      "exit_code": 0,
+      "result": "fixtures reproduce exactly",
+      "output_sha256": "02e8a99802ee3d560d691928b130c6b7ec53499911205a8c118afb52d6eb1bb4"
+    },
+    {
+      "command": "test/scripts/inventory-check.sh",
+      "exit_code": 0,
+      "result": "all tested entries reconciled",
+      "output_sha256": "30d0927b58b3b4c414671e40dcaed79ab628581ea0208836c083a3ec99e9d02a"
+    },
+    {
+      "command": "test/scripts/gate-approval-selftest.sh",
+      "exit_code": 0,
+      "result": "all scenarios behaved as required",
+      "output_sha256": "0793630382f69a970efd2f3edf88526ac84ceb8872a21698f7a010f41e5001fc"
+    },
+    {
+      "command": "test/scripts/lint-gate-selftest.sh",
+      "exit_code": 0,
+      "result": "all scenarios behaved as required",
+      "output_sha256": "6ea4bed7f2e7a16c013da2374ce82243234d5f153b354f56b3dd5ae2b6c97a76"
+    },
+    {
+      "command": "test/scripts/golden-mutations-selftest.sh",
+      "exit_code": 0,
+      "result": "all cases as required;100iterations each",
+      "output_sha256": "97c280045f4c80954a3ebf2f84dded376fa8e0bb927df473cb6f0c71880d6bd0"
+    },
+    {
+      "command": "test/scripts/lint-gate.sh /tmp/cr17b-lint.json",
+      "exit_code": 0,
+      "result": "1010baseline/report/matched;0new/0stale",
+      "output_sha256": "a689bc97c3a5b9896e71aef994d20d9cdd5bb71974931ec44d5d404f56b33beb"
+    },
+    {
+      "command": "deploy/kustomize/tests/run.sh --require-published-image",
+      "exit_code": 0,
+      "result": "143structural checks plusmutations/safety;21schema-valid resources",
+      "output_sha256": "da3c61e90be407ddb52d08066d858e00133bbbb7bcdda09dcb03163a1c0ebe55"
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts -p test_*.py",
+      "exit_code": 0,
+      "result": "184tests pass",
+      "output_sha256": "0d1bed33f7ef60e178511529f45e38579fea6c078ab40cde2f8d7b7afbbc1db6"
+    },
+    {
+      "command": "python3 .github/scripts/workflow_policy_check.py",
+      "exit_code": 0,
+      "result": "17policy checks pass",
+      "output_sha256": "1015c29937e20b246a556a9fb77e9bd66a1835c17a882dd110bec18ab3c90eb2"
+    },
+    {
+      "command": "actionlint -no-color",
+      "exit_code": 0,
+      "result": "empty",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "shellcheck -S warning .github/scripts/*.sh",
+      "exit_code": 0,
+      "result": "empty",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...",
+      "exit_code": 0,
+      "result": "zero reachable vulnerabilities;17 non-reachable module findings",
+      "output_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994"
+    },
+    {
+      "command": "go mod verify",
+      "exit_code": 0,
+      "result": "all modules verified",
+      "output_sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd"
+    },
+    {
+      "command": "go mod tidy -diff",
+      "exit_code": 0,
+      "result": "empty",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go build ./...",
+      "exit_code": 0
+    },
+    {
+      "command": "go vet ./...",
+      "exit_code": 0
+    },
+    {
+      "command": "PR_LABELS_JSON='[\"known-defect-added\"]' test/scripts/growth-gate.sh origin/master",
+      "exit_code": 0,
+      "result": "8 unique/10occurrencepure removals; no protected tooling; local label simulation is not owner acknowledgment",
+      "output_sha256": "6444f1f163ceb7295e0a452a7ec3f5c042f9e3fee1a7b188bc3e8175cc6bb0d2"
+    },
+    {
+      "command": "git diff --check && git diff --cached --check",
+      "exit_code": 0,
+      "note": "Evidence patch uses zero context to avoid context indentation whitespace; verified git apply --check --unidiff-zero against baseline archive"
+    }
+  ],
+  "new_test_cases": [
+    "internal/db:TestCommandRecordsAtomicAndReopen",
+    "internal/db:TestCommandRecordsRollbackFailures/command.before/panic=false",
+    "internal/db:TestCommandRecordsRollbackFailures/command.before/panic=true",
+    "internal/game:TestCR17BDumpCrashChild",
+    "internal/db:TestCommandRecordsRollbackFailures/command.validated/panic=false",
+    "internal/db:TestCommandRecordsRollbackFailures/command.validated/panic=true",
+    "internal/db:TestCommandRecordsRollbackFailures/command.write:1/panic=false",
+    "internal/db:TestCommandRecordsRollbackFailures/command.write:1/panic=true",
+    "internal/db:TestCommandRecordsRollbackFailures/command.write:2/panic=false",
+    "internal/db:TestCommandRecordsRollbackFailures/command.write:2/panic=true",
+    "internal/db:TestCommandRecordsRollbackFailures/command.write:3/panic=false",
+    "internal/db:TestCommandRecordsRollbackFailures/command.write:3/panic=true",
+    "internal/db:TestCommandRecordsRollbackFailures/command.before-commit/panic=false",
+    "internal/db:TestCommandRecordsRollbackFailures/command.before-commit/panic=true",
+    "internal/db:TestCommandRecordsRollbackFailures",
+    "internal/db:TestCommandRecordsCommittedAndUncertain/command.commit-error/panic=false/readfail=false",
+    "internal/db:TestCommandRecordsCommittedAndUncertain/command.commit-error/panic=false/readfail=true",
+    "internal/db:TestCommandRecordsCommittedAndUncertain/command.commit-error/panic=true/readfail=false",
+    "internal/db:TestCommandRecordsCommittedAndUncertain/command.commit-error/panic=true/readfail=true",
+    "internal/db:TestCommandRecordsCommittedAndUncertain/command.after-commit/panic=false/readfail=false",
+    "internal/db:TestCommandRecordsCommittedAndUncertain/command.after-commit/panic=false/readfail=true",
+    "internal/db:TestCommandRecordsCommittedAndUncertain/command.after-commit/panic=true/readfail=false",
+    "internal/db:TestCommandRecordsCommittedAndUncertain/command.after-commit/panic=true/readfail=true",
+    "internal/db:TestCommandRecordsCommittedAndUncertain",
+    "internal/db:TestCommandRecordsValidation/planet_outside_star",
+    "internal/db:TestCommandRecordsValidation/no_stars",
+    "internal/db:TestCommandRecordsValidation/nil_proposed_star",
+    "internal/db:TestCommandRecordsValidation/unknown_star",
+    "internal/db:TestCommandRecordsValidation/wrong_AP",
+    "internal/db:TestCommandRecordsValidation/star_identity",
+    "internal/db:TestCommandRecordsValidation/missing_read-only_planet",
+    "internal/db:TestCommandRecordsValidation/geometry",
+    "internal/db:TestCommandRecordsValidation/source",
+    "internal/db:TestCommandRecordsValidation/recipient",
+    "internal/db:TestCommandRecordsValidation/sector_alias_mutation",
+    "internal/db:TestCommandRecordsValidation/duplicate_planet",
+    "internal/db:TestCommandRecordsValidation/missing_AP_star",
+    "internal/db:TestCommandRecordsValidation/unsupported_stockpile",
+    "internal/db:TestCommandRecordsValidation/nil_planet",
+    "internal/db:TestCommandRecordsValidation/unshared_planet",
+    "internal/db:TestCommandRecordsValidation/NaN",
+    "internal/db:TestCommandRecordsValidation/nil_expected_star",
+    "internal/db:TestCommandRecordsValidation/duplicate_star",
+    "internal/db:TestCommandRecordsValidation/orbit_head",
+    "internal/db:TestCommandRecordsValidation/planet_identity",
+    "internal/db:TestCommandRecordsValidation",
+    "internal/db:TestCommandRecordsStalePreimages/star_AP",
+    "internal/db:TestCommandRecordsStalePreimages/star_flag",
+    "internal/db:TestCommandRecordsStalePreimages/planet_resource",
+    "internal/db:TestCommandRecordsStalePreimages/read-only_planet",
+    "internal/db:TestCommandRecordsStalePreimages/missing_planet",
+    "internal/db:TestCommandRecordsStalePreimages/noncanonical_JSON",
+    "internal/db:TestCommandRecordsStalePreimages",
+    "internal/db:TestCommandRecordsOrbitalIntegrity/missing",
+    "internal/db:TestCommandRecordsOrbitalIntegrity/cycle",
+    "internal/db:TestCommandRecordsOrbitalIntegrity/wrong_orbit",
+    "internal/db:TestCommandRecordsOrbitalIntegrity/dead",
+    "internal/db:TestCommandRecordsOrbitalIntegrity",
+    "internal/db:TestCommandRecordsFenceAndConcurrentConflict/fence",
+    "internal/db:TestCommandRecordsFenceAndConcurrentConflict/second_check",
+    "internal/db:TestCommandRecordsFenceAndConcurrentConflict/one_handle",
+    "internal/db:TestCommandRecordsFenceAndConcurrentConflict",
+    "internal/db:TestCommandRecordsFinalPreconditionInsideTransaction",
+    "internal/db:TestCommandRecordsCompetingAdaptersUseOneTransaction",
+    "internal/game:TestCR17BDumpRealProcessCrash/command.before",
+    "internal/game:TestCR17BDumpRealProcessCrash/command.write:1",
+    "internal/game:TestCR17BDumpRealProcessCrash/command.before-commit",
+    "internal/game:TestCR17BDumpRealProcessCrash/command.after-commit",
+    "internal/game:TestCR17BDumpRealProcessCrash",
+    "internal/game:TestCR17BDumpGameplayAndBoundaries/one_star",
+    "internal/game:TestCR17BDumpGameplayAndBoundaries/all_known",
+    "internal/game:TestCR17BDumpGameplayAndBoundaries/AP_star_not_selected",
+    "internal/game:TestCR17BDumpGameplayAndBoundaries/duplicate_stars",
+    "internal/game:TestCR17BDumpGameplayAndBoundaries/self_dump",
+    "internal/game:TestCR17BDumpGameplayAndBoundaries/unexplored_selected",
+    "internal/game:TestCR17BDumpGameplayAndBoundaries",
+    "internal/game:TestCR17BDumpFailures/command.before/panic=false",
+    "internal/game:TestCR17BDumpFailures/command.before/panic=true",
+    "internal/game:TestCR17BDumpFailures/command.validated/panic=false",
+    "internal/game:TestCR17BDumpFailures/command.validated/panic=true",
+    "internal/game:TestCR17BDumpFailures/command.write:1/panic=false",
+    "internal/game:TestCR17BDumpFailures/command.write:1/panic=true",
+    "internal/game:TestCR17BDumpFailures/command.write:2/panic=false",
+    "internal/game:TestCR17BDumpFailures/command.write:2/panic=true",
+    "internal/game:TestCR17BDumpFailures/command.write:3/panic=false",
+    "internal/game:TestCR17BDumpFailures/command.write:3/panic=true",
+    "internal/game:TestCR17BDumpFailures/command.before-commit/panic=false",
+    "internal/game:TestCR17BDumpFailures/command.before-commit/panic=true",
+    "internal/game:TestCR17BDumpFailures/command.commit-error/panic=false",
+    "internal/game:TestCR17BDumpFailures/command.commit-error/panic=true",
+    "internal/game:TestCR17BDumpFailures/command.after-commit/panic=false",
+    "internal/game:TestCR17BDumpFailures/command.after-commit/panic=true",
+    "internal/game:TestCR17BDumpFailures/fence/panic=false",
+    "internal/game:TestCR17BDumpFailures/fence/panic=true",
+    "internal/game:TestCR17BDumpFailures",
+    "internal/game:TestCR17BDumpUncertainReadbackUnavailable",
+    "internal/game:TestCR17BDumpInstallationAndDeliveryFailures/panic_before_installation",
+    "internal/game:TestCR17BDumpInstallationAndDeliveryFailures/replaced_pointer",
+    "internal/game:TestCR17BDumpInstallationAndDeliveryFailures/delivery_panic",
+    "internal/game:TestCR17BDumpInstallationAndDeliveryFailures",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/dump",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/dump_missing",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/dump_2_missing-star",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/dump_2_0",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/dump_2_999999999999999999999",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/dump_2_1junk",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/dump_2_1_500",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/source_guest",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/recipient_guest",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/no_AP",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/governor",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/quiesced",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal/halted",
+    "internal/game:TestCR17BDumpInvalidAndModeRefusal",
+    "internal/game:TestCR17BDumpStaleAndMissingActorState/legacy_load",
+    "internal/game:TestCR17BDumpStaleAndMissingActorState/store_star_AP",
+    "internal/game:TestCR17BDumpStaleAndMissingActorState/store_unchanged_planet",
+    "internal/game:TestCR17BDumpStaleAndMissingActorState/missing_actor_planet",
+    "internal/game:TestCR17BDumpStaleAndMissingActorState/actor_planet_identity",
+    "internal/game:TestCR17BDumpStaleAndMissingActorState/actor_identity",
+    "internal/game:TestCR17BDumpStaleAndMissingActorState",
+    "internal/game:TestCR17BDumpOutputWaitsForCommit",
+    "internal/game:TestCR17BDumpSerializationAndShutdown/second_command",
+    "internal/game:TestCR17BDumpSerializationAndShutdown/quiesce",
+    "internal/game:TestCR17BDumpSerializationAndShutdown/shutdown",
+    "internal/game:TestCR17BDumpSerializationAndShutdown",
+    "internal/game:TestCR17BDumpQueuedCancellationAndTurn",
+    "internal/game:TestCR17BDumpEnrollmentAndAPBoundary",
+    "internal/game:TestCR17BDumpStarNamesAndReadOnlyPlanets",
+    "internal/game:TestCR17BDumpAllStarsRollback/command.write:2/panic=false",
+    "internal/game:TestCR17BDumpAllStarsRollback/command.write:2/panic=true",
+    "internal/game:TestCR17BDumpAllStarsRollback/command.write:5/panic=false",
+    "internal/game:TestCR17BDumpAllStarsRollback/command.write:5/panic=true",
+    "internal/game:TestCR17BDumpAllStarsRollback/command.write:9/panic=false",
+    "internal/game:TestCR17BDumpAllStarsRollback/command.write:9/panic=true",
+    "internal/game:TestCR17BDumpAllStarsRollback",
+    "internal/game:TestCR17BDumpStartedCancellation"
+  ],
+  "transport_diagnosis": {
+    "evidence": "cr17b-transport-validation-note.txt",
+    "package_unchanged": true,
+    "new_command_call_path": false,
+    "tests": [
+      {
+        "source": "baseline archive",
+        "count": 20,
+        "exit_code": 0,
+        "output_sha256": "93df56542945d2c4042c7598198d55f2a954bc70635a9241602834537954d76e"
+      },
+      {
+        "source": "CR17B",
+        "count": 20,
+        "exit_code": 0,
+        "output_sha256": "008c548acb343f389ab6fad04ad9e51c2341c5679b2e31786b0fffc532390d6c"
+      },
+      {
+        "source": "baseline archive",
+        "count": 100,
+        "exit_code": 1,
+        "failure": "one iteration: connection8close1006unexpectedEOF,want1012",
+        "output_sha256": "044fc39d26f2991cf30d7ffcf2467573e1c9e3cac3d474941e388ff3b8812545"
+      },
+      {
+        "source": "independent CR17B",
+        "count": 30,
+        "exit_code": 0,
+        "output_sha256": "fa23dc504f9fbaddd043fd8caff72ae24fe54d68dacea9c87726e028b7bb2515"
+      }
+    ],
+    "disposition": "separate transport follow-up; no test/protocol/source weakened or changed"
+  },
+  "pre_fix_evidence": {
+    "cr17b-pre-fix-instrumentation.patch": "db0151340c7b74150fc5378fbb9264bd31e1cea51e606ee524d5d4753af75593",
+    "cr17b-pre-fix-records.json.gz": "bd1c514cb14c76b4ae29731cbf6da203fd37a9ac3657b08edd1d2546dea52eab",
+    "cr17b-pre-fix-reproducer.go.txt": "f3fcab3101a99209aaa0013d9a6da7a21b51c3061dcbadc0af7e33870abb8cc8",
+    "cr17b-pre-fix.txt": "76cb703bb6ca7608bd4c7b40bdb3d6f832f760e77955786c4adfb21f3bff453c"
+  },
+  "independent_review": {
+    "decision": "APPROVE WITH CONDITIONS after final source, test and execution-ledger review; no blocking defect in migrated dump",
+    "fresh_critical_output_sha256": "2ef4894a7e323ab196916896c9cc9e3ded7204803870e3da426d0ddd0a2f3409",
+    "critical_db_seconds": 1.103,
+    "critical_game_seconds": 13.868,
+    "prior_focused_output_sha256": "5444b93d8ed2ad345f12015151b201087a2105200df68b686f608f9e2eb08554",
+    "prior_db_seconds": 3.215,
+    "prior_game_seconds": 55.111,
+    "conditions": [
+      "maintainer-applied known-defect-added",
+      "normal owner review",
+      "green hosted CI"
+    ]
+  },
+  "required_labels": [
+    "known-defect-added"
+  ],
+  "labels_applied_by_agent": [],
+  "data_format_change": false,
+  "hosted_ci": "not submitted yet; Docker/scanning/kind are hosted work"
+}

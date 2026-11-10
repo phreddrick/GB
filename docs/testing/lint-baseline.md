@@ -1,6 +1,15 @@
 # Static-analysis baseline (Phase 0, shrunk by Phase 1)
 
-**CR-17A update (2026-11-10 UTC): current total 1,020.** The bounded route and
+**CR-17B update (2026-11-10 UTC): current total 1,010.** Replacing the old
+`cmdDump` body removes exactly ten stale findings: eight unchecked `sess.Send`
+occurrences, one unchecked `fmt.Sscanf`, and one G115 planet-index conversion.
+No finding is added or moved. The new transaction/actor code and tests pass the
+same lint configuration without baseline additions. The maintainer must apply
+`known-defect-added` under CLAUDE.md; a technical pure-reduction pass or simulated
+local label is not owner acknowledgment. Protected gate tooling is unchanged.
+The prior counts below are historical provenance.
+
+**CR-17A update (2026-11-10 UTC): historical total 1,020.** The bounded route and
 stockpile-transfer correction removes exactly 32 obsolete errcheck occurrences
 from `cmdRoute` and `cmdTransfer`: three unchecked scans and 29 unchecked text
 sends. New/reworked paths explicitly handle parsing and mark transport delivery

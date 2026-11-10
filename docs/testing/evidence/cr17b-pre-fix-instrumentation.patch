@@ -1,0 +1,11 @@
+--- a/go/internal/game/commands_load.go
++++ b/go/internal/game/commands_load.go
+@@ -678,0 +679,3 @@
++		if s.testHooks != nil && s.testHooks.afterLegacyDumpStar != nil {
++			s.testHooks.afterLegacyDumpStar()
++		}
+--- a/go/internal/game/lifecycle.go
++++ b/go/internal/game/lifecycle.go
+@@ -465,0 +466,2 @@
++	afterLegacyDumpStar func() // temporary pre-fix reproduction only
++

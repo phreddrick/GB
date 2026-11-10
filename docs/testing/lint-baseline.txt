@@ -379,17 +379,8 @@ go/internal/game/commands_fire.go	gosec	G115: integer overflow conversion int ->
 go/internal/game/commands_fire.go	gosec	G115: integer overflow conversion int -> uint32	func (*State).doFire	s.ships[uint32(toShipNo)] = to
 go/internal/game/commands_fire.go	gosec	G115: integer overflow conversion int -> uint32	func (*State).doFire	to, ok := s.ships[uint32(toShipNo)]
 go/internal/game/commands_fire.go	staticcheck	QF1003: could use tagged switch on to.WhatOrbits	func (*State).protectorRetaliate	if to.WhatOrbits == model.LevelStar {
-go/internal/game/commands_load.go	errcheck	Error return value of `fmt.Sscanf` is not checked	func (*State).cmdDump	fmt.Sscanf(arg, "%d", &sn)
 go/internal/game/commands_load.go	errcheck	Error return value of `fmt.Sscanf` is not checked	func (*State).cmdJettison	fmt.Sscanf(args[2], "%d", &amt)
 go/internal/game/commands_load.go	errcheck	Error return value of `fmt.Sscanf` is not checked	func (*State).doLoad	fmt.Sscanf(args[2], "%d", &amt)
-go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdDump	sess.Send("Cheater!\n")
-go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdDump	sess.Send("Cheater!\n")
-go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdDump	sess.Send("Dump to whom?\n")
-go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdDump	sess.Send("Exploration Data transferred.\n")
-go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdDump	sess.Send("No such player.\n")
-go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdDump	sess.Send("No such player.\n")
-go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdDump	sess.Send("Only leaders are allowed to use dump.\n")
-go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdDump	sess.Send("You are not in a star system.\n")
 go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdJettison	sess.Send("Internal error: race not found.\n")
 go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdJettison	sess.Send("Jettison what?\n")
 go/internal/game/commands_load.go	errcheck	Error return value of `sess.Send` is not checked	func (*State).cmdJettison	sess.Send("No such commodity valid.\n")
@@ -461,7 +452,6 @@ go/internal/game/commands_load.go	gosec	G115: integer overflow conversion int ->
 go/internal/game/commands_load.go	gosec	G115: integer overflow conversion int -> uint32	func (*State).doLoad	planet.Info[p-1].Troops -= uint32(amt)
 go/internal/game/commands_load.go	gosec	G115: integer overflow conversion int -> uint64	func (*State).doLoad	planet.Popn -= uint64(amt)
 go/internal/game/commands_load.go	gosec	G115: integer overflow conversion int -> uint64	func (*State).doLoad	planet.Troops -= uint64(amt)
-go/internal/game/commands_load.go	gosec	G115: integer overflow conversion int -> uint8	func (*State).cmdDump	pl, err := s.store.GetPlanet(uint8(sn), uint8(j))
 go/internal/game/commands_load.go	gosec	G115: integer overflow conversion int -> uint8	func (*State).cmdJettison	if ship.Owner != uint8(p) || !ship.Alive {
 go/internal/game/commands_load.go	gosec	G115: integer overflow conversion int -> uint8	func (*State).doLoad	if ship.Owner != uint8(p) || !ship.Alive {
 go/internal/game/commands_load.go	gosec	G115: integer overflow conversion int -> uint8	func (*State).doLoad	sect.Owner = uint8(p)

@@ -1,0 +1,17 @@
+Baseline: d9a90e9da0ceeb81bc35ff032ff3fa30d070c90b
+Command: GOCACHE=/tmp/cr07a-cache TMPDIR=/tmp/GB-cr17b/test/ctool/obj/tmp go -C go test ./internal/game -run ^TestCR17BPreFixDumpPartialWrite$ -count=1 -v
+Expected exit: 1. Temporary hook runs after actual legacy PutStar; raises existing fence for subsequent PutPlanet calls. Full affected records in cr17b-pre-fix-records.json.gz.
+
+=== RUN   TestCR17BPreFixDumpPartialWrite
+    dump_reproduction_test.go:80: first boundary: recipient star explored=true, planets=false/false; after failure: actor/store AP=49/50, premature success=true
+    dump_reproduction_test.go:82: known failure left partial exploration/AP records
+    dump_reproduction_test.go:85: actor/store disagreement after failed command
+    dump_reproduction_test.go:88: success escaped after failed planet writes
+    dump_reproduction_test.go:104: segment: star explored=true planets=false/false AP=49
+    dump_reproduction_test.go:104: update: star explored=true planets=false/false AP=63
+    dump_reproduction_test.go:104: restart: star explored=true planets=false/false AP=63
+--- FAIL: TestCR17BPreFixDumpPartialWrite (0.16s)
+FAIL
+inventory validation for internal/game SKIPPED: -run filter active; run the full package tests to validate the inventory
+FAIL	github.com/phreddrick/GB/go/internal/game	0.166s
+FAIL

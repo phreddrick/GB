@@ -463,6 +463,8 @@ func (s *State) request(ctx context.Context, op adminOp, fn func() error) error 
 
 // testHooks are set only by tests in this package.
 type testHooks struct {
+	beforeCommandInstall func() // private CR-17B confirmed-commit installation fault
+
 	// planetCommandWrite is a package-private CR-17A fault boundary. Tests wrap
 	// the real PutPlanet to exercise errors/panics before or after its commit.
 	// No production option, environment key or transport configures it.

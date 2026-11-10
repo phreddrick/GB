@@ -1,0 +1,113 @@
+package game
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/phreddrick/GB/go/internal/model"
+)
+
+type dumpReproductionState struct {
+	ActorStar     *model.Star     `json:"actor_star"`
+	StoredStar    *model.Star     `json:"stored_star"`
+	ActorPlanets  []*model.Planet `json:"actor_planets"`
+	StoredPlanets []*model.Planet `json:"stored_planets"`
+	Output        string          `json:"output,omitempty"`
+}
+
+// Desired atomic assertions, run before any persistence fix. The only runtime
+// instrumentation is a temporary callback after the actual legacy PutStar.
+func TestCR17BPreFixDumpPartialWrite(t *testing.T) {
+	f := newEnrollmentActor(t)
+	a := enrollActor(t, f, actorEnrollmentRequest("operator")).Placement
+	enrollActor(t, f, actorEnrollmentRequest("account-2"))
+	onEnrollmentActor(t, f, func() {
+		st := f.state.stars[a.Star]
+		st.Explored &^= uint64(1) << 1
+		st.AP[0] = 50
+		if e := f.store.PutStar(st); e != nil {
+			t.Error(e)
+		}
+		for _, p := range f.state.planets[a.Star] {
+			p.Info[0].Explored = true
+			p.Info[1].Explored = false
+			if e := f.store.PutPlanet(p); e != nil {
+				t.Error(e)
+			}
+		}
+	})
+	evidence := map[string]dumpReproductionState{}
+	capture := func() dumpReproductionState {
+		st := *f.state.stars[a.Star]
+		disk, e := f.store.GetStar(a.Star)
+		if e != nil {
+			t.Error(e)
+		}
+		snap := dumpReproductionState{ActorStar: &st, StoredStar: disk}
+		for n := uint8(0); n < st.NumPlanets; n++ {
+			snap.ActorPlanets = append(snap.ActorPlanets, copyCommandPlanet(f.state.planets[a.Star][n]))
+			p, e := f.store.GetPlanet(a.Star, n)
+			if e != nil {
+				t.Error(e)
+			}
+			snap.StoredPlanets = append(snap.StoredPlanets, p)
+		}
+		return snap
+	}
+	onEnrollmentActor(t, f, func() {
+		evidence["before"] = capture()
+		f.state.testHooks.afterLegacyDumpStar = func() {
+			if _, ok := evidence["after-first-write"]; !ok {
+				evidence["after-first-write"] = capture()
+				f.store.SetWriteFence(true)
+			}
+		}
+	})
+	r := &recordingResponder{}
+	if e := f.state.HandleCommand(ctxT(t, 10*time.Second), 1, 0, fmt.Sprintf("dump 2 %d", int(a.Star)+1), r); e != nil {
+		t.Fatal(e)
+	}
+	f.store.SetWriteFence(false)
+	onEnrollmentActor(t, f, func() { f.state.testHooks.afterLegacyDumpStar = nil; evidence["after-failure"] = capture() })
+	after := evidence["after-failure"]
+	after.Output = r.text()
+	evidence["after-failure"] = after
+	t.Logf("first boundary: recipient star explored=%t, planets=%t/%t; after failure: actor/store AP=%d/%d, premature success=%t", evidence["after-first-write"].StoredStar.IsExplored(2), evidence["after-first-write"].StoredPlanets[0].Info[1].Explored, evidence["after-first-write"].StoredPlanets[1].Info[1].Explored, after.ActorStar.AP[0], after.StoredStar.AP[0], strings.Contains(after.Output, "Data transferred"))
+	if !reflect.DeepEqual(after.StoredStar, evidence["before"].StoredStar) || !reflect.DeepEqual(after.StoredPlanets, evidence["before"].StoredPlanets) {
+		t.Error("known failure left partial exploration/AP records")
+	}
+	if !reflect.DeepEqual(after.ActorStar, after.StoredStar) || !reflect.DeepEqual(after.ActorPlanets, after.StoredPlanets) {
+		t.Error("actor/store disagreement after failed command")
+	}
+	if strings.Contains(after.Output, "Data transferred") {
+		t.Error("success escaped after failed planet writes")
+	}
+	for _, stage := range []string{"segment", "update", "restart"} {
+		var e error
+		switch stage {
+		case "segment":
+			e = f.state.TriggerSegment(ctxT(t, 10*time.Second))
+		case "update":
+			e = f.state.TriggerUpdate(ctxT(t, 10*time.Second))
+		case "restart":
+			f.restart(t)
+		}
+		if e != nil {
+			t.Fatal(e)
+		}
+		onEnrollmentActor(t, f, func() { evidence[stage] = capture() })
+		t.Logf("%s: star explored=%t planets=%t/%t AP=%d", stage, evidence[stage].StoredStar.IsExplored(2), evidence[stage].StoredPlanets[0].Info[1].Explored, evidence[stage].StoredPlanets[1].Info[1].Explored, evidence[stage].StoredStar.AP[0])
+	}
+	b, e := json.Marshal(evidence)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile("/tmp/cr17b-pre-fix-records.json", b, 0600); e != nil {
+		t.Fatal(e)
+	}
+}
