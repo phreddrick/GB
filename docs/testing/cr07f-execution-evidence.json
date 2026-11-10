@@ -1,0 +1,535 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "7556c6c5a64694ee2af42730442c5369a3169db2",
+  "environment": "Linux x86_64, Go1.27.3, isolated loopback processes and disposable bbolt stores only",
+  "cache": "GOCACHE=/tmp/cr07a-cache; TMPDIR=/tmp/GB-cr07f/test/ctool/obj/tmp; no cached test outcomes",
+  "changed_go_source_sha256": {
+    "go/cmd/gb-server/enrollment_acceptance_off.go": "de560589ecd62adfaa1f6755da15b762c838124f15476ba33c49397efc76bf99",
+    "go/cmd/gb-server/enrollment_acceptance_on.go": "c2dee66bfaa29b38281c51b267b9e3859a09f4f7d73d0d56bf49daa9efbcb0ee",
+    "go/cmd/gb-server/main.go": "c5aedcc8480166411e4847b43fd1568027947bc58e2424f3a5e444057edcbfe9",
+    "go/internal/game/enrollment_acceptance_test.go": "c29739ef62dd08e43722aa3a7004850f291061859f6b1b50a95095f37ed6d735",
+    "go/test/acceptance/empire.go": "4acc935cf04ff6b2774ccea8ca607311ccad04a348e5dc9f3db68d3c40258260",
+    "go/test/e2e/basic_test.go": "6c6c7fc272aa131210fc05e40567a737768383802aa4aee7ad45bf6c5ed05cde",
+    "go/test/e2e/enrollment_acceptance_test.go": "4f507d9d38deefda919bec1b147e15ed46cfcb9261cbb69b57a05578606de25d",
+    "go/test/e2e/enrollment_crash_test.go": "54d92086266b98d7b29c5f557372070541d93a4ba41b936b16bbdc56f7842875"
+  },
+  "runs": {
+    "U": {
+      "command": "go -C go test -count=1 -json ./...",
+      "started_at": "2026-11-09T10:33:36.908310192-07:00",
+      "finished_at": "2026-11-09T10:34:10.173904017-07:00",
+      "passed": 3133,
+      "skipped": 2,
+      "tested_packages": 20,
+      "package_seconds": {
+        "cmd/gbctl": 0.407,
+        "cmd/makeuniv": 0.015,
+        "cmd/racegen": 0.009,
+        "internal/admin": 3.391,
+        "internal/config": 0.008,
+        "internal/db": 1.069,
+        "internal/enrollmentapi": 0.009,
+        "internal/game": 16.934,
+        "internal/net": 7.55,
+        "internal/operatorenroll": 0.31,
+        "internal/platform/logging": 0.008,
+        "internal/platform/metrics": 0.014,
+        "internal/racegen": 0.282,
+        "internal/testutil": 1.92,
+        "internal/universe": 0.087,
+        "internal/wirejson": 0.012,
+        "test/e2e": 31.347,
+        "tools/growthgate": 0.073,
+        "tools/inventorycheck": 0.011,
+        "tools/lintdiff": 0.036
+      }
+    },
+    "R": {
+      "command": "GB_LONG_TESTS=1 go -C go test -count=1 -race -json ./...",
+      "started_at": "2026-11-09T10:33:39.523267222-07:00",
+      "finished_at": "2026-11-09T10:36:31.588348651-07:00",
+      "passed": 3135,
+      "skipped": 0,
+      "tested_packages": 20,
+      "package_seconds": {
+        "cmd/gbctl": 7.239,
+        "cmd/makeuniv": 1.064,
+        "cmd/racegen": 1.042,
+        "internal/admin": 12.457,
+        "internal/config": 1.036,
+        "internal/db": 14.021,
+        "internal/enrollmentapi": 1.064,
+        "internal/game": 126.421,
+        "internal/net": 75.54,
+        "internal/operatorenroll": 5.474,
+        "internal/platform/logging": 1.036,
+        "internal/platform/metrics": 1.127,
+        "internal/racegen": 2.29,
+        "internal/testutil": 3.192,
+        "internal/universe": 1.8900000000000001,
+        "internal/wirejson": 1.069,
+        "test/e2e": 166.336,
+        "tools/growthgate": 1.176,
+        "tools/inventorycheck": 1.062,
+        "tools/lintdiff": 1.094
+      }
+    }
+  },
+  "matrix_test_results": {
+    "TestAcceptanceScenario": {
+      "package": "test/e2e",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentCapacityAndHistoricalSlots": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentChangedCredentialReference": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentCompletePlacement": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentConcurrentRequests": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentCredentialFailures": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentIdentityConflicts": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentMaintenanceRetryGate": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentModesAndDraining": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentNoHomeOrCapital": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentOrderingAndPolicyDisabled": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentPendingCommandAPWaitsForTurn": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentPostCommitAndUncertainty": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentPreexistingStoreDrift": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentQueuedCancellationAndStartedTimeout": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentReadbackAndInstallFailures": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentRetryAfterScheduledTurnAndDestruction": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentRetryDoesNotPrepareOrSearch": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentSecurityAndCommandVisibility": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentStaleTransactionPreconditions": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentTransactionFailures": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentTurnSerialization": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestActorEnrollmentUncertainStoreCannotBeReused": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestApprovedEightTypeExtensionAndOverflow": {
+      "package": "internal/racegen",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestAuthenticateThroughActor": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestCR07EOperatorEnrollmentAndDualLogin": {
+      "package": "test/e2e",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestCR07FActorInitialEmpires": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestCR07FEnrollmentCrashWindows": {
+      "package": "test/e2e",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestCR07FEnrollmentQuiesceAndShutdown": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestCR07FFinalSlotCompetition": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestCR07FGeneratedUniverseJourney": {
+      "package": "test/e2e",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestCR07FProductionBuildIgnoresCrashHook": {
+      "package": "test/e2e",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestCR07FTurnAdmission": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestCredentialCLIProtectedInputsAndNoSecretOutput": {
+      "package": "cmd/gbctl",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentCR07BAndCompatibleStartup": {
+      "package": "internal/db",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentCommitOutcomes": {
+      "package": "internal/db",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentConcurrentSlotsAndShips": {
+      "package": "internal/db",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentCurrentSessionAuthority": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentExactlyOneWriteTransaction": {
+      "package": "internal/db",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentFence": {
+      "package": "internal/db",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentFenceWhileWaitingToWrite": {
+      "package": "internal/db",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentFreeListAndDeadRecords": {
+      "package": "internal/db",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentRollbackFaultStages": {
+      "package": "internal/db",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestEnrollmentStatusFailureEvidence": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestLegacyLoginAndStrictEnrollmentHistory": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestNumericBoundaries": {
+      "package": "internal/racegen",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestOriginalCCosts": {
+      "package": "internal/racegen",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestOriginalCMetadata": {
+      "package": "internal/racegen",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestOriginalCRounding": {
+      "package": "internal/racegen",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestOriginsAndPreview": {
+      "package": "internal/config",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestPlacementAllHomeworlds": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestPlacementCapitalAndSpecies": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestPlacementFailuresLeaveInputsUnchanged": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestPlacementInitialFields": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestPlacementOrbitChains": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestPlacementSearchRules": {
+      "package": "internal/game",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestPreparationFailureAndGameBinding": {
+      "package": "internal/operatorenroll",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestPrivateEnrollmentTimeoutAndUncertainty": {
+      "package": "internal/admin",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestProvisionAndImmutableAuthority": {
+      "package": "internal/operatorenroll",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestPureRepeatableAndMetadataIsolation": {
+      "package": "internal/racegen",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestQuiesceSurvivesCrashAndRestart": {
+      "package": "test/e2e",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestRetiredDatabaseFlagAndSpecRoundTrip": {
+      "package": "cmd/racegen",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestSpecJSONAndNumericTypes": {
+      "package": "internal/racegen",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestStrictSpec": {
+      "package": "internal/wirejson",
+      "U": "PASS",
+      "R": "PASS"
+    },
+    "TestValidation": {
+      "package": "internal/racegen",
+      "U": "PASS",
+      "R": "PASS"
+    }
+  },
+  "new_test_nodes": {
+    "TestCR07FGeneratedUniverseJourney": "PASS",
+    "TestCR07FActorInitialEmpires": "PASS",
+    "TestCR07FFinalSlotCompetition": "PASS",
+    "TestCR07FEnrollmentQuiesceAndShutdown/quiesce": "PASS",
+    "TestCR07FEnrollmentQuiesceAndShutdown/shutdown": "PASS",
+    "TestCR07FEnrollmentQuiesceAndShutdown": "PASS",
+    "TestCR07FTurnAdmission/scheduled-timer": "PASS",
+    "TestCR07FTurnAdmission/enrollment-queued-before-turn-start": "PASS",
+    "TestCR07FTurnAdmission": "PASS",
+    "TestCR07FEnrollmentCrashWindows/before-request": "PASS",
+    "TestCR07FEnrollmentCrashWindows/enrollment.before": "PASS",
+    "TestCR07FEnrollmentCrashWindows/enrollment.construct": "PASS",
+    "TestCR07FEnrollmentCrashWindows/enrollment.race": "PASS",
+    "TestCR07FEnrollmentCrashWindows/enrollment.before-commit": "PASS",
+    "TestCR07FEnrollmentCrashWindows/enrollment.after-commit": "PASS",
+    "TestCR07FEnrollmentCrashWindows": "PASS",
+    "TestCR07FProductionBuildIgnoresCrashHook": "PASS"
+  },
+  "local_gates": [
+    {
+      "command": "gofmt -l go",
+      "result": "PASS"
+    },
+    {
+      "command": "go -C go build ./...",
+      "result": "PASS"
+    },
+    {
+      "command": "go -C go vet ./...",
+      "result": "PASS"
+    },
+    {
+      "command": "test/scripts/inventory-check.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "make -C test/ctool check",
+      "result": "PASS"
+    },
+    {
+      "command": "test/scripts/golden-mutations.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "test/scripts/golden-mutations-selftest.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "test/scripts/lint-gate.sh /tmp/cr07f-lint-final.json",
+      "result": "PASS"
+    },
+    {
+      "command": "test/scripts/lint-gate-selftest.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "test/scripts/gate-approval-selftest.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "PR_LABELS_JSON='[]' test/scripts/growth-gate.sh origin/master",
+      "result": "PASS"
+    },
+    {
+      "command": "deploy/kustomize/tests/run.sh --require-published-image",
+      "result": "PASS"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .github/scripts -p 'test_*.py'",
+      "result": "PASS"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/workflow_policy_check.py",
+      "result": "PASS"
+    },
+    {
+      "command": "actionlint -no-color",
+      "result": "PASS"
+    },
+    {
+      "command": "shellcheck -S warning .github/scripts/*.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "go -C go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...",
+      "result": "PASS"
+    },
+    {
+      "command": "go -C go mod verify",
+      "result": "PASS"
+    },
+    {
+      "command": "go -C go mod tidy -diff",
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --cached --check",
+      "result": "PASS"
+    }
+  ],
+  "older_readers": [
+    {
+      "commit": "fc5688ced0ac998cf77f192027db90536597d3fb",
+      "command": "CR07C_OLD_READER=<actual exported test binary> go -C go test ./internal/db -run ^TestEnrollmentCR07BAndCompatibleStartup$ -count=1 -v",
+      "result": "PASS"
+    },
+    {
+      "commit": "7c5b3921e5c5222b7a581d7175a7c3160ea5bbd2",
+      "command": "CR07C_OLD_READER=<actual exported test binary> go -C go test ./internal/db -run ^TestEnrollmentCR07BAndCompatibleStartup$ -count=1 -v",
+      "result": "PASS"
+    }
+  ],
+  "independent_execution": {
+    "actor_seconds": 0.516,
+    "journey_seconds": 4.652,
+    "crash_and_normal_build_seconds": 14.87,
+    "result": "Final APPROVE WITH CONDITIONS; no unresolved blocking finding; private CR-07F PASS WITH CONDITIONS. Source hashes, matrix, U/R logs and gate evidence independently checked; own actor/journey/crash execution PASS; formatting/build/vet/diff independently rerun."
+  },
+  "limitations": [
+    "Hosted container/scans/SBOM/kind checks pending PR run",
+    "Data readability is not authentication/security rollback safety",
+    "No physical fsync/disk failure injection or live operational acceptance",
+    "CR-17 and CR-20 remain open; public signup and TypeScript applications are not implemented"
+  ],
+  "required_acknowledgment_labels": []
+}

@@ -217,6 +217,19 @@ for schemas, file permissions, account/credential lifecycle, bootstrap procedure
 status semantics, login compatibility, rollback security limits and CR-07F work.
 This documentation is not deployment or live-enrollment authorization.
 
+[CR-07F acceptance](../testing/cr07f-enrollment-acceptance.md) records fresh
+disposable-server evidence for two complete empires, real dual login and
+WebSocket `cs`/`survey`/`map`/`capital`, update/segment/restart durability,
+historical retries and crash atomicity. ADR-0011 records the implemented
+boundary. The shipped `gb-client` still uses legacy single-password login;
+new races need a client supporting both credentials. Public TypeScript signup
+and gameplay clients remain future work. No live universe was tested or changed.
+
+An enrollment halt requires the CR-07E reconciliation procedure before any
+restart or resume. In particular, the CR-18 commit record does not identify a
+between-turn enrollment outcome; preserve placement metadata and ship free-list
+evidence too. Never use a fresh Store handle to clear an uncertain-write guard.
+
 ## 7. Turn schedule and restarts (CR-21)
 
 The schedule (next update, next segment, update and segment counters,

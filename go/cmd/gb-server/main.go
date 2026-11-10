@@ -120,6 +120,7 @@ func run() int {
 		}
 		gameOpts.TrustedEnrollment = enrollmentProvider.Policy(store)
 	}
+	configureEnrollmentAcceptance(store, logger)
 	if os.Getenv("GB_TEST_HOOKS") == "1" {
 		// Test-only: used by the end-to-end shutdown and crash tests. Never
 		// set in production configuration.

@@ -224,6 +224,33 @@ Several of these are structural, not esoteric: `governors/appoint/revoke` and `g
 - **High, VERIFIED (read).** Enrollment is unauthenticated and unrate-limited (`server.go:192`); anyone can fill all 64 race slots. `enroll.go:97-101` falls back to storing the plaintext password if bcrypt fails.
 - **Medium.** `enroll.go:105-113` maps home type 4 "Airless" to `PlanetAsteroid`; C's `H_AIRLESS` corresponds to the Mars type (`racegen.h:126`, `vars.h` planet types). A newly enrolled race is not visible to the running server (CR-09 below).
 
+**CR-07F acceptance addendum (2026-11-09; disposable environments only):**
+the original findings above remain the historical review of `71eaee7`.
+[CR-07F's requirement matrix and fresh execution record](../testing/cr07f-enrollment-acceptance.md)
+and ADR-0011 describe the merged CR-07A–E replacement and its acceptance limits.
+
+- **CR-07: private operator enrollment implementation accepted subject to the
+  CR-07F review/hosted checks.** Complete C-derived race, colony, star and
+  government fields are asserted independently on actor and persisted models;
+  actual gbctl/HTTP/dual-login/WebSocket commands, two races, update/segment,
+  restart, historical retry and real transaction SIGKILL windows are exercised.
+  Separate race/governor credentials have no plaintext fallback. This closes
+  the unplayable-empire defect for the supported private actor path, without
+  claiming public registration or broader gameplay correctness.
+- **CR-08: unsafe form retired; public designer remains deferred.** The legacy
+  mislabeled form cannot enroll, even with the preview flag. Correct Go-owned
+  sector metadata, strict complete-spec contracts and OpenAPI drift checks are
+  covered. A replacement public TypeScript species UI has not been delivered.
+- **CR-09: closed for the supported actor path.** Both new races are immediately
+  visible, authenticate and execute real commands without restart; actor/store
+  installation, following turns and shutdown/restart preserve their identities.
+  Offline direct enrollment writers have been removed rather than supported.
+
+This does not close CR-17 or CR-20, change defect allowances, complete Phase3c,
+authorize rollout or enable public signup. Actual older-reader tests prove data
+compatibility only; rollback to weaker authentication needs separately approved
+access/session/signing-key precautions.
+
 ### 4.9 Protocol and session parity
 
 - Login changed from `<race_password> <governor_password>` (no username) to `{race, password, governor}` plus JWT. This is a reasonable modernisation but it is undocumented as a deliberate change, and `Authenticate` (`state.go:387-410`) requires the governor password to equal the password supplied for the race, which is not how C governors work (governors have their own passwords, `races.h`).
