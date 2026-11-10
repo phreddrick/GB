@@ -531,6 +531,8 @@ func (s *State) handlePlayerCommand(cmd *command) {
 	result := "ok"
 	if panicked {
 		result = "panic"
+	} else if s.Mode() == ModeHalted {
+		result = "halted"
 	} else if verb == "unknown" {
 		result = "unknown"
 	}

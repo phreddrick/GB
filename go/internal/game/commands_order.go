@@ -13,6 +13,7 @@ package game
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/phreddrick/GB/go/internal/model"
@@ -1004,13 +1005,13 @@ func (s *State) cmdRoute(p, g int, args []string, sess net.Responder) {
 	dir := s.dirs[p-1][g]
 
 	if dir.Level != model.LevelPlan {
-		sess.Send("You have to 'cs' to a planet to examine routes.\n")
+		_ = sess.Send("You have to 'cs' to a planet to examine routes.\n")
 		return
 	}
 
-	planet, err := s.store.GetPlanet(dir.StarNum, dir.PlanetNum)
-	if err != nil || planet == nil {
-		sess.Send("Planet data not found.\n")
+	planet := s.planets[dir.StarNum][dir.PlanetNum]
+	if planet == nil {
+		_ = sess.Send("Planet data not found.\n")
 		return
 	}
 
@@ -1032,16 +1033,15 @@ func (s *State) cmdRoute(p, g int, args []string, sess net.Responder) {
 			line += "  unload: "
 			line += routeCommodStr(r.Unload)
 			line += fmt.Sprintf("  -> %s\n", destName)
-			sess.Send(line)
+			_ = sess.Send(line)
 		}
-		sess.Send("Done.\n")
+		_ = sess.Send("Done.\n")
 		return
 	}
 
-	i := 0
-	fmt.Sscanf(args[0], "%d", &i)
-	if i < 1 || i > model.MaxRoutes {
-		sess.Send("Bad route number.\n")
+	i, err := strconv.Atoi(args[0])
+	if err != nil || i < 1 || i > model.MaxRoutes {
+		_ = sess.Send("Bad route number.\n")
 		return
 	}
 
@@ -1062,69 +1062,74 @@ func (s *State) cmdRoute(p, g int, args []string, sess net.Responder) {
 				line += "  unload: " + routeCommodStr(r.Unload)
 			}
 			line += fmt.Sprintf("  ->  %s\n", destName)
-			sess.Send(line)
+			_ = sess.Send(line)
 		}
-		sess.Send("Done.\n")
+		_ = sess.Send("Done.\n")
 		return
 	}
 
-	// Route modification.
+	// Route modification: stage one actor-derived record, not a database copy.
+	next := planetEdit(planet)
+	route := &next.Info[p-1].Route[i-1]
 	sub := strings.ToLower(args[1])
+	if len(args) != 2 && !matchCmd(sub, "land") && !matchCmd(sub, "load") && !matchCmd(sub, "unload") {
+		_ = sess.Send("Usage: route <n> <order> [argument]\n")
+		return
+	}
 	switch {
 	case matchCmd(sub, "activate"):
-		planet.Info[p-1].Route[i-1].Set = true
-		sess.Send("Set.\n")
+		route.Set = true
 	case matchCmd(sub, "deactivate"):
-		planet.Info[p-1].Route[i-1].Set = false
-		sess.Send("Set.\n")
+		route.Set = false
 	case matchCmd(sub, "land"):
-		if len(args) < 3 {
-			sess.Send("Usage: route <n> land <x,y>\n")
+		if len(args) != 3 {
+			_ = sess.Send("Usage: route <n> land <x,y>\n")
 			return
 		}
-		var x, y int
-		fmt.Sscanf(args[2], "%d,%d", &x, &y)
+		coordinates := strings.Split(args[2], ",")
+		if len(coordinates) != 2 {
+			_ = sess.Send("Bad sector coordinates.\n")
+			return
+		}
+		x, xerr := strconv.Atoi(coordinates[0])
+		y, yerr := strconv.Atoi(coordinates[1])
 		maxX := int(planet.MaxX) - 1
 		maxY := int(planet.MaxY) - 1
-		if x < 0 || x > maxX || y < 0 || y > maxY {
-			sess.Send("Bad sector coordinates.\n")
+		if xerr != nil || yerr != nil || x < 0 || x > maxX || y < 0 || y > maxY {
+			_ = sess.Send("Bad sector coordinates.\n")
 			return
 		}
-		planet.Info[p-1].Route[i-1].X = uint8(x)
-		planet.Info[p-1].Route[i-1].Y = uint8(y)
-		sess.Send("Set.\n")
+		route.X = uint8(x) //nolint:gosec // checked 0 <= x < uint8 map width
+		route.Y = uint8(y) //nolint:gosec // checked 0 <= y < uint8 map height
 	case matchCmd(sub, "load"):
-		if len(args) < 3 {
-			sess.Send("Usage: route <n> load <fdxr>\n")
+		if len(args) != 3 {
+			_ = sess.Send("Usage: route <n> load <fdxr>\n")
 			return
 		}
-		planet.Info[p-1].Route[i-1].Load = parseCommodMask(args[2])
-		sess.Send("Set.\n")
+		route.Load = parseCommodMask(args[2])
 	case matchCmd(sub, "unload"):
-		if len(args) < 3 {
-			sess.Send("Usage: route <n> unload <fdxr>\n")
+		if len(args) != 3 {
+			_ = sess.Send("Usage: route <n> unload <fdxr>\n")
 			return
 		}
-		planet.Info[p-1].Route[i-1].Unload = parseCommodMask(args[2])
-		sess.Send("Set.\n")
+		route.Unload = parseCommodMask(args[2])
 	default:
 		// Treat as a destination place.
 		place := s.getplace(p, g, args[1], true)
 		if place.Err {
-			sess.Send("Illegal destination.\n")
+			_ = sess.Send("Illegal destination.\n")
 			return
 		}
 		if place.Level != model.LevelPlan {
-			sess.Send("You have to designate a planet.\n")
+			_ = sess.Send("You have to designate a planet.\n")
 			return
 		}
-		planet.Info[p-1].Route[i-1].DestStar = place.StarNum
-		planet.Info[p-1].Route[i-1].DestPlanet = place.PlanetNum
-		sess.Send("Set.\n")
+		route.DestStar = place.StarNum
+		route.DestPlanet = place.PlanetNum
 	}
 
-	if err := s.store.PutPlanet(planet); err != nil {
-		s.logError("PutPlanet", err)
+	if s.commitPlanetEdit(planet, next, sess) {
+		_ = sess.Send("Set.\n")
 	}
 }
 

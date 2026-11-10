@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/phreddrick/GB/go/internal/db"
+	"github.com/phreddrick/GB/go/internal/model"
 )
 
 const (
@@ -462,6 +463,10 @@ func (s *State) request(ctx context.Context, op adminOp, fn func() error) error 
 
 // testHooks are set only by tests in this package.
 type testHooks struct {
+	// planetCommandWrite is a package-private CR-17A fault boundary. Tests wrap
+	// the real PutPlanet to exercise errors/panics before or after its commit.
+	// No production option, environment key or transport configures it.
+	planetCommandWrite      func(*model.Planet) error
 	enrollmentOrder         func(int) ([]int, error)
 	beforeEnrollmentInstall func()
 	beforeTurn              func(kind turnKind)

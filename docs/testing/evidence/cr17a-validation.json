@@ -1,0 +1,1126 @@
+{
+  "schema": 1,
+  "source_baseline": "57fa9f1b219d3d2c69e09da544218fdd43801a3c",
+  "branch": "feature/cr17a-planet-state-ownership",
+  "execution_environment": {
+    "go": "go1.27.3",
+    "platform": "linux/amd64",
+    "date_utc": "2026-11-10",
+    "stores": "disposable only",
+    "GOCACHE": "/tmp/cr07a-cache",
+    "TMPDIR": "/tmp/GB-cr17a/test/ctool/obj/tmp"
+  },
+  "scope": "route and planet stockpile transfer only; four other original mutable GetPlanet paths deferred; CR-17 remains open",
+  "implementation_sha256": {
+    "go/internal/game/commands_load.go": "775981cbd82940171a37dca29a4316c3671f6f4dc5c0a6ccdcd77a5c7b1fae44",
+    "go/internal/game/commands_order.go": "e7a3f7a60759386df580c1b8fcbc702a3305245394414cbf274a872c09561dd9",
+    "go/internal/game/planet_command.go": "e2bd9d50d4ad66bd15ae9d4cff1ac41cfa8e6ed46364d9bef2c682ba2bd37c23",
+    "go/internal/game/lifecycle.go": "5044c1a8046d3603e1ba9d0391a86f7a78501eeecfe254f16bf1267ad9664f02",
+    "go/internal/game/state.go": "bd40e9251f0e5786bf95529c514b7dda3a50dc43ccdff2abcc6b8b0a8b47b61d",
+    "go/internal/game/planet_ownership_test.go": "8ba3efdd31b3e4e360daa2662fc5ae3484490bf47716bd9a2e2e3f533a9fd2c4"
+  },
+  "full_runs": {
+    "all": {
+      "command": "go test -count=1 -json ./...",
+      "exit_code": 0,
+      "raw_output_sha256": "de8cdd7a29dd5eac8644f9bff7628662d6bb94f1d5f015c9e6223af2ea1c5084",
+      "nodes": {
+        "pass": 3214,
+        "skip": 2
+      },
+      "top_level_tests": {
+        "pass": 317,
+        "skip": 2
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 20
+      },
+      "skipped_tests": [
+        {
+          "Package": "github.com/phreddrick/GB/go/internal/net",
+          "Test": "TestGB104LongCommandWithProductionTiming"
+        },
+        {
+          "Package": "github.com/phreddrick/GB/go/test/e2e",
+          "Test": "TestGB104RealEngineLongTurnKeepsHealthyClient"
+        }
+      ],
+      "new_cr17a_nodes": [
+        {
+          "test": "TestCR17ALegacyLoadCannotBeOverwrittenByPlanetEdit/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ALegacyLoadCannotBeOverwrittenByPlanetEdit/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ALegacyLoadCannotBeOverwrittenByPlanetEdit",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/before-error",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/before-panic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/fence",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/after-error",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/after-panic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/before-error",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/before-panic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/fence",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/after-error",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/after-panic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_0_activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_99_activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1x_activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_99999999999999999999999999_activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_activate_extra",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_deactivate_extra",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_bad",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_0,",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_0,0,1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_-1,0",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_3,0",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_0,2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_load",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_unload",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_load_f_extra",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_/missing/place",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_1_extra",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_missing_r_1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_z_1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_-1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_junk",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_1junk",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_999999999999999999999999999999",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_1001",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/deactivate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/land_2,1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/load_fdrx",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/unload_rx",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/destination",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/r/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/r/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/x/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/x/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/&/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/&/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/f/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/f/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/d/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/d/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/resource-boundary-0",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/resource-boundary-1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/resource-boundary-1000",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AEnrollmentAdmissionAfterPlanetEdit/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AEnrollmentAdmissionAfterPlanetEdit/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AEnrollmentAdmissionAfterPlanetEdit",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditEffectsWaitForWrite/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditEffectsWaitForWrite/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditEffectsWaitForWrite",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused/QUIESCED/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused/QUIESCED/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused/HALTED/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused/HALTED/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AStartedEditFinishesBeforeShutdown/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AStartedEditFinishesBeforeShutdown/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AStartedEditFinishesBeforeShutdown",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AUnreadablePreimageHaltsWithoutWrite",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditsSurviveBoundaries/merchant-route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditsSurviveBoundaries/stockpile-transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditsSurviveBoundaries",
+          "result": "pass"
+        }
+      ],
+      "executed_packages": [
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/gb-client",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/gb-server",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/makeuniv",
+          "result": "pass",
+          "seconds": 0.027
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/racegen",
+          "result": "pass",
+          "seconds": 0.045
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/engine",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/enroll",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/model",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/config",
+          "result": "pass",
+          "seconds": 0.036
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/test/acceptance",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/logging",
+          "result": "pass",
+          "seconds": 0.038
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/wirejson",
+          "result": "pass",
+          "seconds": 0.027
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/enrollmentapi",
+          "result": "pass",
+          "seconds": 0.063
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/metrics",
+          "result": "pass",
+          "seconds": 0.049
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/universe",
+          "result": "pass",
+          "seconds": 0.166
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/inventorycheck",
+          "result": "pass",
+          "seconds": 0.013
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/lintdiff",
+          "result": "pass",
+          "seconds": 0.026
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/growthgate",
+          "result": "pass",
+          "seconds": 0.077
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/operatorenroll",
+          "result": "pass",
+          "seconds": 0.426
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/racegen",
+          "result": "pass",
+          "seconds": 0.449
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/gbctl",
+          "result": "pass",
+          "seconds": 0.76
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/testutil",
+          "result": "pass",
+          "seconds": 1.776
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/db",
+          "result": "pass",
+          "seconds": 1.893
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/admin",
+          "result": "pass",
+          "seconds": 3.33
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/net",
+          "result": "pass",
+          "seconds": 7.463
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/game",
+          "result": "pass",
+          "seconds": 23.64
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/test/e2e",
+          "result": "pass",
+          "seconds": 32.955
+        }
+      ]
+    },
+    "race": {
+      "command": "GB_LONG_TESTS=1 go test -count=1 -race -json ./...",
+      "exit_code": 0,
+      "raw_output_sha256": "f87034d577742264c5b122e449b32d28b47b3d1dbf70a0a64db6dda22e3a52df",
+      "nodes": {
+        "pass": 3216
+      },
+      "top_level_tests": {
+        "pass": 319
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 20
+      },
+      "skipped_tests": [],
+      "new_cr17a_nodes": [
+        {
+          "test": "TestCR17ALegacyLoadCannotBeOverwrittenByPlanetEdit/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ALegacyLoadCannotBeOverwrittenByPlanetEdit/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ALegacyLoadCannotBeOverwrittenByPlanetEdit",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/before-error",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/before-panic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/fence",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/after-error",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/route/after-panic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/before-error",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/before-panic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/fence",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/after-error",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures/transfer/after-panic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditWriteFailures",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_0_activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_99_activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1x_activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_99999999999999999999999999_activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_activate_extra",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_deactivate_extra",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_bad",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_0,",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_0,0,1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_-1,0",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_3,0",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_land_0,2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_load",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_unload",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_load_f_extra",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/route_1_/missing/place",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_1_extra",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_missing_r_1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_z_1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_-1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_junk",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_1junk",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_999999999999999999999999999999",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate/transfer_2_r_1001",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AInvalidPlanetCommandsDoNotMutate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/activate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/deactivate",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/land_2,1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/load_fdrx",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/unload_rx",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads/destination",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ARouteFieldsAndActorReads",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/r/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/r/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/x/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/x/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/&/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/&/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/f/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/f/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/d/1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/d/2",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/resource-boundary-0",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/resource-boundary-1",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic/resource-boundary-1000",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17ATransferCommoditiesAndArithmetic",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AEnrollmentAdmissionAfterPlanetEdit/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AEnrollmentAdmissionAfterPlanetEdit/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AEnrollmentAdmissionAfterPlanetEdit",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditEffectsWaitForWrite/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditEffectsWaitForWrite/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditEffectsWaitForWrite",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused/QUIESCED/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused/QUIESCED/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused/HALTED/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused/HALTED/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AQuiescedAndHaltedPlanetEditsAreRefused",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AStartedEditFinishesBeforeShutdown/route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AStartedEditFinishesBeforeShutdown/transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AStartedEditFinishesBeforeShutdown",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17AUnreadablePreimageHaltsWithoutWrite",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditsSurviveBoundaries/merchant-route",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditsSurviveBoundaries/stockpile-transfer",
+          "result": "pass"
+        },
+        {
+          "test": "TestCR17APlanetEditsSurviveBoundaries",
+          "result": "pass"
+        }
+      ],
+      "executed_packages": [
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/gb-client",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/gb-server",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/engine",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/enroll",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/racegen",
+          "result": "pass",
+          "seconds": 1.056
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/makeuniv",
+          "result": "pass",
+          "seconds": 1.065
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/config",
+          "result": "pass",
+          "seconds": 1.035
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/enrollmentapi",
+          "result": "pass",
+          "seconds": 1.044
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/model",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/test/acceptance",
+          "result": "skip",
+          "seconds": 0
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/logging",
+          "result": "pass",
+          "seconds": 1.03
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/wirejson",
+          "result": "pass",
+          "seconds": 1.03
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/inventorycheck",
+          "result": "pass",
+          "seconds": 1.036
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/lintdiff",
+          "result": "pass",
+          "seconds": 1.101
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/metrics",
+          "result": "pass",
+          "seconds": 1.124
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/growthgate",
+          "result": "pass",
+          "seconds": 1.1320000000000001
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/universe",
+          "result": "pass",
+          "seconds": 1.821
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/racegen",
+          "result": "pass",
+          "seconds": 2.232
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/testutil",
+          "result": "pass",
+          "seconds": 3.195
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/gbctl",
+          "result": "pass",
+          "seconds": 7.6370000000000005
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/operatorenroll",
+          "result": "pass",
+          "seconds": 5.283
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/admin",
+          "result": "pass",
+          "seconds": 12.195
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/db",
+          "result": "pass",
+          "seconds": 14.046
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/net",
+          "result": "pass",
+          "seconds": 75.565
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/test/e2e",
+          "result": "pass",
+          "seconds": 163.399
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/game",
+          "result": "pass",
+          "seconds": 192.311
+        }
+      ]
+    }
+  },
+  "checks": [
+    {
+      "command": "gofmt -l .",
+      "exit_code": 0,
+      "result": "empty: formatted",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "test/scripts/golden-mutations.sh",
+      "exit_code": 0,
+      "result": "15/15 expected outcomes",
+      "output_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927"
+    },
+    {
+      "command": "make -C test/ctool check",
+      "exit_code": 0,
+      "result": "fixtures reproduce exactly",
+      "output_sha256": "5da19cac34a3aea2b1e8058300f47d995f627f487ad4aa97f1ae526e98c799aa"
+    },
+    {
+      "command": "test/scripts/inventory-check.sh",
+      "exit_code": 0,
+      "result": "all tested entries reconciled; no inventory changes",
+      "output_sha256": "30ad0bc82bdd22f7a31acc3f20f04acb3e571c871453a294a7fdfa95095d3750"
+    },
+    {
+      "command": "test/scripts/lint-gate.sh",
+      "exit_code": 0,
+      "result": "baseline/report/matched 1020; new/stale 0",
+      "output_sha256": "8b4fde87e2a6b70fd25e5929aa3ac9a3066792b5d11a272e3d7fb1de3efcf4a7"
+    },
+    {
+      "command": "deploy/kustomize/tests/run.sh --require-published-image",
+      "exit_code": 0,
+      "result": "143 structural assertions; all21resources valid; mutation/safety pass",
+      "output_sha256": "a536a4d16d1113835351112021c8e73e2593bdf1fd65dc120330ebb668759af4"
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts -p test_*.py",
+      "exit_code": 0,
+      "result": "184 tests pass",
+      "output_sha256": "0e3b4f7e6e15b3409018a2e5a9346970fa2a4b624242f6981593c1c3eebfd91c"
+    },
+    {
+      "command": "python3 .github/scripts/workflow_policy_check.py",
+      "exit_code": 0,
+      "result": "17 policy checks pass",
+      "output_sha256": "1015c29937e20b246a556a9fb77e9bd66a1835c17a882dd110bec18ab3c90eb2"
+    },
+    {
+      "command": "actionlint -no-color",
+      "exit_code": 0,
+      "result": "empty output",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "shellcheck -S warning .github/scripts/*.sh",
+      "exit_code": 0,
+      "result": "empty output",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...",
+      "exit_code": 0,
+      "result": "zero reachable vulnerabilities;17 non-reachable module findings",
+      "output_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994"
+    },
+    {
+      "command": "go mod verify",
+      "exit_code": 0,
+      "result": "all modules verified",
+      "output_sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd"
+    },
+    {
+      "command": "go mod tidy -diff",
+      "exit_code": 0,
+      "result": "empty output",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go build ./...",
+      "exit_code": 0
+    },
+    {
+      "command": "go vet ./...",
+      "exit_code": 0
+    },
+    {
+      "command": "PR_LABELS_JSON='[\"known-defect-added\"]' test/scripts/growth-gate.sh origin/master",
+      "exit_code": 0,
+      "result": "22 unique /32 occurrence removals; no protected tooling; local label simulation is not owner acknowledgment",
+      "output_sha256": "43a06d7c18aec826b791d3926e6abff8cb24e9ae2a901e4abbcf6bb94917afb0"
+    },
+    {
+      "command": "git diff --check && git diff --cached --check",
+      "exit_code": 0
+    }
+  ],
+  "pre_fix": {
+    "baseline": "57fa9f1b219d3d2c69e09da544218fdd43801a3c",
+    "expected_exit_code": 1,
+    "desired_regressions_failed": 2,
+    "independent_reproduction": true,
+    "preserved_output": "cr17a-pre-fix.txt",
+    "preserved_output_sha256": "087b0a62ab0b5d592cecd718d6d7bfb59ec2251ed273f6076bbbfb966c454cb7"
+  },
+  "hosted_ci": "not yet submitted; container/scanning/kind must run on GitHub Actions",
+  "independent_review": {
+    "decision": "APPROVE WITH CONDITIONS",
+    "scope": "route and planet stockpile transfer only; no blocking finding within corrected paths",
+    "reviewed_areas": [
+      "all six original planet paths and additional direct writes",
+      "actor/store ownership and proposal aliases",
+      "planet/ship/sector invariants",
+      "multi-record and AP limits",
+      "write-error/panic safety",
+      "turn and restart persistence",
+      "CR-18 fence/atomic commits",
+      "CR-43 quiescence/shutdown",
+      "CR-07 admission",
+      "genuine baseline reproduction and scope"
+    ],
+    "fresh_independent_runs": [
+      {
+        "result": "PASS",
+        "description": "focused CR-17A race suite",
+        "seconds": 58.346,
+        "output_sha256": "0c8c4314c0c730cf39366c35cecf3a64b550f00d3fac9ac3772f1fb58c53ebd0"
+      },
+      {
+        "result": "PASS",
+        "description": "final build/vet and mode/effect/shutdown race tests",
+        "seconds": 8.109,
+        "output_sha256": "baf6ae80a4462cb391d06261a69b6f59f0b9ab9b5eb21e9154afdad7109e4d27"
+      }
+    ],
+    "conditions": [
+      "maintainer-applied known-defect-added",
+      "owner review",
+      "green hosted CI"
+    ],
+    "remaining_work": "four coupled-record original paths; AP/command crash atomicity, effects and deduplication remain CR-17 follow-up"
+  }
+}
