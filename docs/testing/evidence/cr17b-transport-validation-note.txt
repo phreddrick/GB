@@ -1,0 +1,30 @@
+CR-17B validation exception and diagnosis (2026-11-10 UTC)
+
+The first complete GB_LONG_TESTS=1 go test -count=1 -race -json ./... run
+failed one unchanged transport test. All CR-17A/B and database tests passed;
+no DATA RACE diagnostic was reported. This failure is preserved, not skipped.
+
+remediation_test.go:559: connection 9 ended with websocket: close 1006 (abnormal closure): unexpected EOF, want 1012
+
+The same assertion reproduced against an isolated git archive of the exact
+master source d9a90e9da0ceeb81bc35ff032ff3fa30d070c90b:
+GOCACHE=/tmp/cr07a-cache TMPDIR=/tmp/GB-cr17b/test/ctool/obj/tmp
+go -C /tmp/GB-cr17b-baseline-check/go test -count=100 -race ./internal/net
+-run '^TestGB102DisconnectAndShutdownDuringRegistration$'
+Exit 1; one iteration reported:
+remediation_test.go:559: connection 8 ended with websocket: close 1006 (abnormal closure): unexpected EOF, want 1012
+
+Separate 20-repeat baseline and 20-repeat CR-17B runs passed. Independent
+reviewer also passed 30 repeats. This is intermittent, not a new CR-17B call
+path: internal/net uses its unchanged fake engine for this test and does not
+import internal/game or internal/db. The net package and module files are
+byte-for-byte unchanged from the baseline.
+
+Source review identified a possible mechanism in Session.writeLoop: its
+outbound-message branch returns immediately when done closes, bypassing the
+close-frame write in the outer done branch. Transport correction is outside
+this bounded command-persistence PR and remains separate follow-up. No close
+code assertion, listener logic, protocol or source was changed to pass.
+
+A fresh full race run is recorded separately in the execution ledger. Its
+result must not erase this initial failure or imply the transport defect is fixed.

@@ -19,6 +19,7 @@ type Store struct {
 	db *bolt.DB
 	fenceState
 	enrollmentState
+	commandState
 }
 
 // Open opens (or creates) the bbolt database at the given path.

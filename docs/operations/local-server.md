@@ -441,9 +441,19 @@ process killed during the turn body, and one exiting from inside the open
 commit transaction) assert this; the known-defect entry
 `persistence/non-atomic-turn-flush` records the pending acceptance.
 
+**Bounded command improvements (CR-17A/B):** route configuration and planet
+stockpile transfers use checked actor-derived single-planet proposals. A complete
+`dump` now commits exploration changes and its one AP debit together, including
+all participating star/planet preimages. Unexpected participant disagreement
+(including earlier volatile AP changes) fails closed and halts; it is never
+blindly merged. Unknown commit outcomes require operator reconciliation and
+must not be retried by reopening the store. No automatic repair/resume is added.
+Transfer AP remains volatile until a normal commit; broader commands still have
+the limitations below. These source guarantees do not assert live deployment.
+
 **Not yet guaranteed:** player commands between turns still write per
-record (`PutShip`, `PutPlanet`, `PutRace` at about 70 sites) and six
-handlers read planets through the store (CR-11, CR-17), so a command that
+record (`PutShip`, `PutPlanet`, `PutRace` at about 70 sites) and three original
+mutable planet paths still read separate store copies (CR-11, CR-17), so a command that
 fails or is interrupted between two of its own writes is not atomic, a
 command that changes memory without writing is persisted only by the next
 commit, and not every database mutation is turn-atomic. Live notifications

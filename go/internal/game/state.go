@@ -209,7 +209,9 @@ func New(cfg *config.Config, store *db.Store, opts Options) (*State, error) {
 	if err != nil {
 		return nil, fmt.Errorf("check universe: %w", err)
 	}
-	if store.EnrollmentWriteUncertain() {
+	if store.CommandWriteUncertain() {
+		s.halt("command commit outcome uncertain on reused store handle; operator reconciliation required; no startup schedule write or shutdown flush", "")
+	} else if store.EnrollmentWriteUncertain() {
 		// Reusing a tainted handle cannot restart timers, restore/write a schedule
 		// or turn an ambiguous enrollment into an implicit recovery transaction.
 		s.halt("enrollment commit outcome uncertain on reused store handle; operator reconciliation required; no startup schedule write or shutdown flush", "")

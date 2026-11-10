@@ -21,7 +21,6 @@ package game
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/phreddrick/GB/go/internal/model"
 	"github.com/phreddrick/GB/go/internal/net"
@@ -595,105 +594,7 @@ func (s *State) jettisonCheck(p, g, amt, max int, sess net.Responder) (int, bool
 // Transfers star/planet exploration data to another player.
 // Mirrors dump() in load.c.
 func (s *State) cmdDump(p, g int, args []string, sess net.Responder) {
-	dir := s.dirs[p-1][g]
-
-	star := s.stars[dir.StarNum]
-	if star == nil {
-		sess.Send("You are not in a star system.\n")
-		return
-	}
-	if !s.enoughAP(p, g, star.AP[p-1], 1) {
-		return
-	}
-
-	if len(args) < 1 {
-		sess.Send("Dump to whom?\n")
-		return
-	}
-
-	target := s.getPlayerArg(args[0])
-	if target == 0 {
-		sess.Send("No such player.\n")
-		return
-	}
-
-	srcRace := s.raceByNum(p)
-	dstRace := s.raceByNum(target)
-	if srcRace == nil || dstRace == nil {
-		sess.Send("No such player.\n")
-		return
-	}
-	if dstRace.Guest {
-		sess.Send("Cheater!\n")
-		return
-	}
-	if srcRace.Guest {
-		sess.Send("Cheater!\n")
-		return
-	}
-	if g != 0 {
-		sess.Send("Only leaders are allowed to use dump.\n")
-		return
-	}
-
-	// Transfer star and planet exploration bits.
-	// If no place args: transfer all known stars.
-	// Otherwise: transfer each named star.
-	starNums := []int{}
-	if len(args) < 2 {
-		for i, st := range s.stars {
-			if st != nil && st.IsExplored(p) {
-				starNums = append(starNums, i)
-			}
-		}
-	} else {
-		for _, arg := range args[1:] {
-			// Resolve star by name or number.
-			sn := -1
-			for i, st := range s.stars {
-				if st != nil && strings.EqualFold(st.Name, arg) {
-					sn = i
-					break
-				}
-			}
-			if sn < 0 {
-				fmt.Sscanf(arg, "%d", &sn)
-				sn-- // convert 1-based input to 0-based
-			}
-			if sn >= 0 && sn < len(s.stars) && s.stars[sn] != nil {
-				starNums = append(starNums, sn)
-			}
-		}
-	}
-
-	for _, sn := range starNums {
-		st := s.stars[sn]
-		if !st.IsExplored(p) {
-			continue
-		}
-		st.SetExplored(target)
-		if err := s.store.PutStar(st); err != nil {
-			s.logError("PutStar", err)
-			continue
-		}
-		for j := 0; j < int(st.NumPlanets); j++ {
-			pl, err := s.store.GetPlanet(uint8(sn), uint8(j))
-			if err != nil || pl == nil {
-				continue
-			}
-			if pl.Info[p-1].Explored {
-				pl.Info[target-1].Explored = true
-				if err := s.store.PutPlanet(pl); err != nil {
-					s.logError("PutPlanet", err)
-				}
-			}
-		}
-	}
-
-	s.deductAPs(p, g, 1, int(dir.StarNum), false)
-
-	s.warnRace(target, fmt.Sprintf("%s [%d] has given you exploration data.\n", srcRace.Name, p))
-	sess.Send("Exploration Data transferred.\n")
+	s.dumpExploration(p, g, args, sess)
 }
 
 // cmdTransfer handles "transfer <player> <commodity> <amount>".

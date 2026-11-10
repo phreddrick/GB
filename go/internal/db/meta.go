@@ -391,6 +391,7 @@ func (s *Store) ClearMaintenanceWithSchedule(sched *ScheduleRecord) error {
 	return s.metaFault("maintenance.clear.committed")
 }
 
+// SetMetaFault also supplies the command.* stages documented in command.go.
 // SetMetaFault installs a test-only fault hook consulted by PutMaintenance
 // and ClearMaintenanceWithSchedule at named stages: "maintenance.put" and
 // "maintenance.clear" before the transaction opens (nothing is written),
