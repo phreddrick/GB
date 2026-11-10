@@ -285,6 +285,22 @@ These are the findings that stop the server from being usable or deployable at a
 - **CR-07** (enrollment produces unplayable races) and **CR-19** (assault never captures), above.
 - **CR-09, High, VERIFIED (read).** `State.races` is loaded once in `loadAll` (`state.go:129`) and never refreshed (`loadAll` has one caller: `New`). A race enrolled via `racegen` or `/api/enroll` (were it working) cannot log in until the server restarts, because `Authenticate` iterates the stale slice. The C server has the same limitation but offers `@@reset`; Go has neither `@@reset` nor a reload path.
 - **CR-17 (persistence), High, VERIFIED (read).** Two sources of truth for planets. `commands_load.go:124, 679, 725` and `commands_order.go:665, 936, 1009` call `s.store.GetPlanet(...)`, mutate the returned copy and `PutPlanet` it, while `s.planets` keeps the old copy. The next `flushAll` (`turn.go:516-521`) writes the stale in-memory planet back, reverting the load, unload or order. Ships have the opposite rule (database wins at turn start, CR-11). Stars and races have a third rule (memory wins, written on flush). No record type has a single owner.
+
+  **CR-17A bounded implementation (2026-11-10 UTC; acceptance on feature branch).**
+  `route` and planet-stockpile `transfer` now propose edits from the actor's
+  planet, compare the full stored preimage, write one planet transaction and
+  install the confirmed record before success output. A disagreement, read
+  failure, write error or panic halts without installing the proposal or flushing
+  stale memory at shutdown. Fresh regressions reproduced both original losses
+  through real actor dispatch, segment, update and restart; the corrected paths
+  pass those boundaries and failure tests. The other four original mutable
+  GetPlanet paths (load/unload, dump, factory activation, telescope aiming) remain
+  open because their coupled planet/ship/star/race writes need a separately
+  reviewed transaction/effect boundary. AP deductions retain the existing
+  between-turn volatile policy; no complete command atomicity, crash-safe
+  acknowledgment or deduplication is claimed. CR-11 and CR-20 remain open. See
+  [implementation and evidence](../testing/cr17a-planet-state-ownership.md).
+
 - **CR-18 (persistence), High, VERIFIED (read).** `flushAll` is not atomic: one bbolt transaction per star, per planet and per race (`turn.go:508-530`), plus separate transactions for power, blocks and sdata (`:472-482`). A crash or SIGTERM during the flush leaves some planets at turn N+1 and others at turn N, with ships (written first in one batch) already at N+1. There is no turn-number stamp in the records to detect this.
 - **CR-21, High, VERIFIED (read).** Timing is not restored. `scheduleTimers` (`state.go:167-178`) sets the next update to now plus 30 minutes on every start; the comment says "In a real server, restore from GetMeta here". `persistTiming` writes `update_time` and `segment_time` that nothing reads. Every restart delays the update and resets the segment counter, and `numUpdates` restarts at 1 so the "DOING UPDATE n" announcements repeat.
 - **High, VERIFIED (read).** `handleVictory` is reached every update in Go (`turn.go:452`), guarded only by `cfg.Victory` (default false). In C it is never called from `do_turn`. With CR-12 making the threshold 0 for small universes, enabling `victory` would declare every race a winner after five updates.

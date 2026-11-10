@@ -20,6 +20,7 @@ package game
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/phreddrick/GB/go/internal/model"
@@ -702,7 +703,7 @@ func (s *State) cmdTransfer(p, g int, args []string, sess net.Responder) {
 	dir := s.dirs[p-1][g]
 
 	if dir.Level != model.LevelPlan {
-		sess.Send("You need to be in planet scope to do this.\n")
+		_ = sess.Send("You need to be in planet scope to do this.\n")
 		return
 	}
 
@@ -711,83 +712,69 @@ func (s *State) cmdTransfer(p, g int, args []string, sess net.Responder) {
 		return
 	}
 
-	if len(args) < 3 {
-		sess.Send("Usage: transfer <player> <commodity> <amount>\n")
+	if len(args) != 3 {
+		_ = sess.Send("Usage: transfer <player> <commodity> <amount>\n")
 		return
 	}
 
 	target := s.getPlayerArg(args[0])
 	if target == 0 {
-		sess.Send("No such player.\n")
+		_ = sess.Send("No such player.\n")
 		return
 	}
 
-	planet, err := s.store.GetPlanet(dir.StarNum, dir.PlanetNum)
-	if err != nil || planet == nil {
-		sess.Send("Planet data not found.\n")
+	planet := s.planets[dir.StarNum][dir.PlanetNum]
+	if planet == nil {
+		_ = sess.Send("Planet data not found.\n")
 		return
 	}
 
 	commod := args[1][0]
-	give := 0
-	fmt.Sscanf(args[2], "%d", &give)
-
-	if give < 0 {
-		sess.Send("You must specify a positive amount.\n")
+	give, err := strconv.Atoi(args[2])
+	if err != nil || give < 0 {
+		_ = sess.Send("You must specify a positive amount.\n")
 		return
 	}
 
 	location := fmt.Sprintf("%s/%s:", star.Name, star.PlanetNames[dir.PlanetNum])
-
+	next := planetEdit(planet)
+	var from, to *uint16
+	var units string
 	switch commod {
 	case 'r':
-		if give > int(planet.Info[p-1].Resource) {
-			sendf(sess, "You don't have %d on this planet.\n", give)
-		} else {
-			planet.Info[p-1].Resource -= uint16(give)
-			planet.Info[target-1].Resource += uint16(give)
-			msg := fmt.Sprintf("%s %d resources transferred from player %d to player #%d\n", location, give, p, target)
-			sess.Send(msg)
-			s.warnRace(target, msg)
-		}
+		from, to, units = &next.Info[p-1].Resource, &next.Info[target-1].Resource, "resources"
 	case 'x', '&':
-		if give > int(planet.Info[p-1].Crystals) {
-			sendf(sess, "You don't have %d on this planet.\n", give)
-		} else {
-			planet.Info[p-1].Crystals -= uint16(give)
-			planet.Info[target-1].Crystals += uint16(give)
-			msg := fmt.Sprintf("%s %d crystal(s) transferred from player %d to player #%d\n", location, give, p, target)
-			sess.Send(msg)
-			s.warnRace(target, msg)
-		}
+		from, to, units = &next.Info[p-1].Crystals, &next.Info[target-1].Crystals, "crystal(s)"
 	case 'f':
-		if give > int(planet.Info[p-1].Fuel) {
-			sendf(sess, "You don't have %d fuel on this planet.\n", give)
-		} else {
-			planet.Info[p-1].Fuel -= uint16(give)
-			planet.Info[target-1].Fuel += uint16(give)
-			msg := fmt.Sprintf("%s %d fuel transferred from player %d to player #%d\n", location, give, p, target)
-			sess.Send(msg)
-			s.warnRace(target, msg)
-		}
+		from, to, units = &next.Info[p-1].Fuel, &next.Info[target-1].Fuel, "fuel"
 	case 'd':
-		if give > int(planet.Info[p-1].Destruct) {
-			sendf(sess, "You don't have %d destruct on this planet.\n", give)
-		} else {
-			planet.Info[p-1].Destruct -= uint16(give)
-			planet.Info[target-1].Destruct += uint16(give)
-			msg := fmt.Sprintf("%s %d destruct transferred from player %d to player #%d\n", location, give, p, target)
-			sess.Send(msg)
-			s.warnRace(target, msg)
-		}
+		from, to, units = &next.Info[p-1].Destruct, &next.Info[target-1].Destruct, "destruct"
 	default:
-		sess.Send("What?\n")
+		_ = sess.Send("What?\n")
+		return
 	}
-
-	if err := s.store.PutPlanet(planet); err != nil {
-		s.logError("PutPlanet", err)
+	if give > int(*from) {
+		// Preserve the commodity-specific refusal text, but invalid commands
+		// no longer rewrite the planet or spend AP.
+		if commod == 'f' || commod == 'd' {
+			sendf(sess, "You don't have %d %s on this planet.\n", give, units)
+		} else {
+			sendf(sess, "You don't have %d on this planet.\n", give)
+		}
+		return
+	}
+	// Bounded by the uint16 source balance; retain C's unsigned assignment
+	// arithmetic (including self-transfer and destination wrap behavior).
+	amount := uint16(give) //nolint:gosec // give is nonnegative and <= uint16 source
+	*from -= amount
+	*to += amount
+	if !s.commitPlanetEdit(planet, next, sess) {
+		return
 	}
 	s.deductAPs(p, g, 1, int(dir.StarNum), false)
+	msg := fmt.Sprintf("%s %d %s transferred from player %d to player #%d\n", location, give, units, p, target)
+	_ = sess.Send(msg)
+	s.warnRace(target, msg)
 }
 
 // cmdMount handles "mount <ships>" — mount a crystal on a ship.

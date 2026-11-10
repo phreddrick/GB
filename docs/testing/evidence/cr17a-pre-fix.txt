@@ -1,0 +1,68 @@
+CR-17A pre-fix reproduction
+Runtime baseline: 57fa9f1b219d3d2c69e09da544218fdd43801a3c
+Only the new initialized-world fixture and desired regression assertions were added.
+Command: GOCACHE=/tmp/cr07a-cache TMPDIR=<ignored worktree scratch> go -C go test ./internal/game -run ^TestCR17APlanetEditsSurviveBoundaries$ -count=1 -v
+Expected exit: 1 (actor/store disagreement followed by lost persisted edits).
+
+=== RUN   TestCR17APlanetEditsSurviveBoundaries
+=== RUN   TestCR17APlanetEditsSurviveBoundaries/merchant-route
+    planet_ownership_test.go:106: command: actor planet does not contain the complete intended edit
+    planet_ownership_test.go:129: command: route actor/store=false/true; crystal balances actor=100/10 store=100/10
+    planet_ownership_test.go:131: command: conflicting actor/store planet state
+    planet_ownership_test.go:134: command: successfully persisted command edit was erased
+    planet_ownership_test.go:129: segment: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    planet_ownership_test.go:134: segment: successfully persisted command edit was erased
+    planet_ownership_test.go:129: update: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    planet_ownership_test.go:134: update: successfully persisted command edit was erased
+    planet_ownership_test.go:129: restart: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    planet_ownership_test.go:134: restart: successfully persisted command edit was erased
+=== RUN   TestCR17APlanetEditsSurviveBoundaries/stockpile-transfer
+    planet_ownership_test.go:106: command: actor planet does not contain the complete intended edit
+    planet_ownership_test.go:129: command: route actor/store=false/false; crystal balances actor=100/10 store=93/17
+    planet_ownership_test.go:131: command: conflicting actor/store planet state
+    planet_ownership_test.go:134: command: successfully persisted command edit was erased
+    planet_ownership_test.go:129: segment: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    planet_ownership_test.go:134: segment: successfully persisted command edit was erased
+    planet_ownership_test.go:129: update: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    planet_ownership_test.go:134: update: successfully persisted command edit was erased
+    planet_ownership_test.go:129: restart: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    planet_ownership_test.go:134: restart: successfully persisted command edit was erased
+--- FAIL: TestCR17APlanetEditsSurviveBoundaries (0.21s)
+    --- FAIL: TestCR17APlanetEditsSurviveBoundaries/merchant-route (0.15s)
+    --- FAIL: TestCR17APlanetEditsSurviveBoundaries/stockpile-transfer (0.06s)
+FAIL
+inventory validation for internal/game SKIPPED: -run filter active; run the full package tests to validate the inventory
+FAIL	github.com/phreddrick/GB/go/internal/game	0.215s
+FAIL
+
+Independent reproduction from a git archive of the same baseline:
+=== RUN   TestCR17APlanetEditsSurviveBoundaries
+=== RUN   TestCR17APlanetEditsSurviveBoundaries/merchant-route
+    cr17a_independent_reproduction_test.go:98: command: actor planet does not contain the complete intended edit
+    cr17a_independent_reproduction_test.go:121: command: route actor/store=false/true; crystal balances actor=100/10 store=100/10
+    cr17a_independent_reproduction_test.go:123: command: conflicting actor/store planet state
+    cr17a_independent_reproduction_test.go:126: command: successfully persisted command edit was erased
+    cr17a_independent_reproduction_test.go:121: segment: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    cr17a_independent_reproduction_test.go:126: segment: successfully persisted command edit was erased
+    cr17a_independent_reproduction_test.go:121: update: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    cr17a_independent_reproduction_test.go:126: update: successfully persisted command edit was erased
+    cr17a_independent_reproduction_test.go:121: restart: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    cr17a_independent_reproduction_test.go:126: restart: successfully persisted command edit was erased
+=== RUN   TestCR17APlanetEditsSurviveBoundaries/stockpile-transfer
+    cr17a_independent_reproduction_test.go:98: command: actor planet does not contain the complete intended edit
+    cr17a_independent_reproduction_test.go:121: command: route actor/store=false/false; crystal balances actor=100/10 store=93/17
+    cr17a_independent_reproduction_test.go:123: command: conflicting actor/store planet state
+    cr17a_independent_reproduction_test.go:126: command: successfully persisted command edit was erased
+    cr17a_independent_reproduction_test.go:121: segment: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    cr17a_independent_reproduction_test.go:126: segment: successfully persisted command edit was erased
+    cr17a_independent_reproduction_test.go:121: update: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    cr17a_independent_reproduction_test.go:126: update: successfully persisted command edit was erased
+    cr17a_independent_reproduction_test.go:121: restart: route actor/store=false/false; crystal balances actor=100/10 store=100/10
+    cr17a_independent_reproduction_test.go:126: restart: successfully persisted command edit was erased
+--- FAIL: TestCR17APlanetEditsSurviveBoundaries (0.25s)
+    --- FAIL: TestCR17APlanetEditsSurviveBoundaries/merchant-route (0.18s)
+    --- FAIL: TestCR17APlanetEditsSurviveBoundaries/stockpile-transfer (0.07s)
+FAIL
+inventory validation for internal/game SKIPPED: -run filter active; run the full package tests to validate the inventory
+FAIL	github.com/phreddrick/GB/go/internal/game	0.254s
+FAIL
