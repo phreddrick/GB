@@ -82,17 +82,25 @@ func newSession(conn *websocket.Conn, id string, ident Identity, queue int, writ
 func (s *Session) writeLoop() {
 	ticker := time.NewTicker(s.pingInterval)
 	defer ticker.Stop()
-	defer func() { _ = s.conn.Close() }()
+	// The writer owns the connection and every data/control write. Emit the
+	// recorded close frame on ALL exit paths, including the outbound-message
+	// branch when done closes between dequeue and delivery. Previously that
+	// branch returned without a close frame, yielding intermittent 1006/EOF
+	// instead of the shutdown's 1012. A locally detected transport failure
+	// records 1006, which is a reserved code and must never be sent on the wire.
+	defer func() {
+		if r := s.closeReason.Load(); r != nil {
+			reason := []byte(*r)
+			if len(reason) >= 2 && int(reason[0])*256+int(reason[1]) != websocket.CloseAbnormalClosure {
+				_ = s.conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
+				_ = s.conn.WriteMessage(websocket.CloseMessage, reason)
+			}
+		}
+		_ = s.conn.Close()
+	}()
 	for {
 		select {
 		case <-s.done:
-			// Best-effort close frame with the recorded reason.
-			reason := websocket.FormatCloseMessage(websocket.CloseGoingAway, "")
-			if r := s.closeReason.Load(); r != nil {
-				reason = []byte(*r)
-			}
-			_ = s.conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
-			_ = s.conn.WriteMessage(websocket.CloseMessage, reason)
 			return
 		case m := <-s.outbound:
 			select {
