@@ -76,14 +76,24 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func freePort(t *testing.T) int {
+// freeListenerPorts holds both loopback listeners open until both ports are
+// selected. Calling a free-port helper twice and closing its listener between
+// calls can return the same port, making the subprocess fail at startup.
+// Ports must be released before gb-server can bind them; a different process
+// could still claim one in that short interval.
+func freeListenerPorts(t *testing.T) (playerPort, adminPort int) {
 	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	player, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = l.Close() }()
-	return l.Addr().(*net.TCPAddr).Port
+	defer func() { _ = player.Close() }()
+	admin, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = admin.Close() }()
+	return player.Addr().(*net.TCPAddr).Port, admin.Addr().(*net.TCPAddr).Port
 }
 
 // server is a running gb-server subprocess.
@@ -129,7 +139,7 @@ func startServer(t *testing.T, dbPath string, extraEnv map[string]string) *serve
 // tagged binary. All ordinary acceptance tests still use the production build.
 func startServerBinary(t *testing.T, dbPath string, extraEnv map[string]string, serverBin, gbctlBin string) *server {
 	t.Helper()
-	port, adminPort := freePort(t), freePort(t)
+	port, adminPort := freeListenerPorts(t)
 	s := &server{t: t, dbPath: dbPath, gbctlBin: gbctlBin, logs: &logBuffer{}, exited: make(chan struct{})}
 	s.addr = fmt.Sprintf("127.0.0.1:%d", port)
 	s.admin = fmt.Sprintf("http://127.0.0.1:%d", adminPort)

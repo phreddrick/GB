@@ -71,9 +71,11 @@ func exitCode(t *testing.T, err error) int {
 }
 
 func baseEnv(t *testing.T, dbPath string) map[string]string {
+	t.Helper()
+	playerPort, adminPort := freeListenerPorts(t)
 	return map[string]string{
-		"GB_ADDR":        fmt.Sprintf("127.0.0.1:%d", freePort(t)),
-		"GB_ADMIN_ADDR":  fmt.Sprintf("127.0.0.1:%d", freePort(t)),
+		"GB_ADDR":        fmt.Sprintf("127.0.0.1:%d", playerPort),
+		"GB_ADMIN_ADDR":  fmt.Sprintf("127.0.0.1:%d", adminPort),
 		"GB_DB_PATH":     dbPath,
 		"GB_JWT_SECRET":  jwtSecret,
 		"GB_ADMIN_TOKEN": adminToken,
