@@ -30,6 +30,9 @@ import (
 //
 // Mirrors order() in order.c.
 func (s *State) cmdOrder(p, g int, args []string, sess net.Responder) {
+	if s.handleTelescopeOrder(p, g, args, sess) {
+		return
+	}
 	if s.handleLandedFactoryOrder(p, g, args, sess) {
 		return
 	}
@@ -64,6 +67,11 @@ func (s *State) cmdOrder(p, g int, args []string, sess net.Responder) {
 // giveOrders processes a subcommand and updates the ship's orders.
 // Mirrors give_orders() in order.c.
 func (s *State) giveOrders(p, g int, args []string, ship *model.Ship, sess net.Responder) {
+	if isTelescope(ship) && len(args) > 0 && matchCmd(strings.ToLower(args[0]), "aim") {
+		_ = sess.Send("Telescope aiming requires the complete staged command; no orders changed.\n")
+		return
+	}
+
 	if len(args) == 0 {
 		return
 	}
@@ -568,9 +576,6 @@ func (s *State) giveOrders(p, g int, args []string, ship *model.Ship, sess net.R
 		if ship.Type != model.OtypeTract && ship.Type != model.OtypeGtele {
 			s.useFuel(ship, s.cfg.FuelManeuver)
 		}
-		if ship.Type == model.OtypeGtele || ship.Type == model.OtypeStele {
-			s.mkExplAimedAt(p, g, ship, sess)
-		}
 		sendf(sess, "Aimed at %s\n", s.prinAimedAt(p, g, ship))
 
 	case matchCmd(sub, "intensity"):
@@ -887,66 +892,6 @@ func (s *State) dispPlace(p, g int, place model.Place) string {
 		return fmt.Sprintf("#%d", place.ShipNo)
 	default:
 		return "/"
-	}
-}
-
-// mkExplAimedAt marks the aimed-at location as explored by the player.
-// Used by survey telescope (OtypeStele) and gravity telescope (OtypeGtele).
-// Mirrors mk_expl_aimed_at() in order.c.
-func (s *State) mkExplAimedAt(p, g int, ship *model.Ship, sess net.Responder) {
-	if ship.Special.AimedAt == nil {
-		return
-	}
-	aa := ship.Special.AimedAt
-	snum := int(aa.StarNum)
-
-	switch aa.Level {
-	case model.LevelUniv:
-		sess.Send("There is nothing out here to aim at.")
-
-	case model.LevelStar:
-		st := s.stars[snum]
-		if st == nil {
-			return
-		}
-		sendf(sess, "Star %s ", s.prinAimedAt(p, g, ship))
-		d := dist(ship.XPos, ship.YPos, st.XPos, st.YPos)
-		rng := teleRange(ship.Type, ship.Tech)
-		if d <= rng {
-			st.SetExplored(p)
-			if err := s.store.PutStar(st); err != nil {
-				s.logError("PutStar", err)
-			}
-			sendf(sess, "Surveyed, distance %g.\n", d)
-		} else {
-			sendf(sess, "Too far to see (%g, max %g).\n", d, rng)
-		}
-
-	case model.LevelPlan:
-		st := s.stars[snum]
-		if st == nil {
-			return
-		}
-		pl, err := s.store.GetPlanet(uint8(snum), aa.PlanetNum)
-		if err != nil || pl == nil {
-			return
-		}
-		sendf(sess, "Planet %s ", s.prinAimedAt(p, g, ship))
-		d := dist(ship.XPos, ship.YPos, st.XPos+pl.XPos, st.YPos+pl.YPos)
-		rng := teleRange(ship.Type, ship.Tech)
-		if d <= rng {
-			st.SetExplored(p)
-			pl.Info[p-1].Explored = true
-			if err := s.store.PutPlanet(pl); err != nil {
-				s.logError("PutPlanet", err)
-			}
-			sendf(sess, "Surveyed, distance %g.\n", d)
-		} else {
-			sendf(sess, "Too far to see (%g, max %g).\n", d, rng)
-		}
-
-	case model.LevelShip:
-		sess.Send("You can't see anything of use there.\n")
 	}
 }
 

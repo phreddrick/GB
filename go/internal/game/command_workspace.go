@@ -11,14 +11,25 @@ import (
 
 // commandWorkspace is private to one actor operation. It is deliberately typed
 // and has no database/Tx callback or arbitrary write interface. The first user
-// is one landed factory activation; other handlers are NOT automatically staged.
+// is one landed factory activation; telescope aiming is the second explicit
+// user. Other handlers are NOT automatically staged.
 type commandWorkspace struct {
 	s       *State
 	ships   map[uint32]workspaceShip
 	planets map[[2]uint8]workspacePlanet
 	stars   map[uint8]workspaceStar
 	effects commandEffects
+	races   map[int]workspaceRace
+	data    *workspaceStarData
+	scope   *workspaceScope
 }
+type workspaceRace struct{ actor, before *model.Race }
+type workspaceStarData struct{ actor, before *model.StarData }
+type workspaceScope struct {
+	player, governor int
+	before           model.Directory
+}
+
 type workspaceShip struct{ actor, before, next *model.Ship }
 type workspacePlanet struct{ actor, before, next *model.Planet }
 type workspaceStar struct{ actor, before, next *model.Star }
@@ -87,7 +98,45 @@ func (w *commandWorkspace) star(n uint8) (*model.Star, error) {
 	w.stars[n] = workspaceStar{actor, &before, &next}
 	return &next, nil
 }
+func (w *commandWorkspace) race(p int) (*model.Race, error) {
+	if p < 1 || p > len(w.s.races) || w.s.races[p-1] == nil || w.s.races[p-1].PlayerNum != p {
+		return nil, errors.New("inconsistent race context")
+	}
+	if w.races == nil {
+		w.races = map[int]workspaceRace{}
+	}
+	if r, ok := w.races[p]; ok {
+		return r.before, nil
+	}
+	actor := w.s.races[p-1]
+	before := *actor
+	w.races[p] = workspaceRace{actor, &before}
+	return &before, nil
+}
+func (w *commandWorkspace) starData() (*model.StarData, error) {
+	if w.data != nil {
+		return w.data.before, nil
+	}
+	if w.s.sdata == nil {
+		return nil, errors.New("missing universe context")
+	}
+	before := *w.s.sdata
+	w.data = &workspaceStarData{w.s.sdata, &before}
+	return &before, nil
+}
 func (w *commandWorkspace) owns() bool {
+	for p, r := range w.races {
+		if p < 1 || p > len(w.s.races) || w.s.races[p-1] != r.actor || !reflect.DeepEqual(r.actor, r.before) {
+			return false
+		}
+	}
+	if w.data != nil && (w.s.sdata != w.data.actor || !reflect.DeepEqual(w.s.sdata, w.data.before)) {
+		return false
+	}
+	if w.scope != nil && !reflect.DeepEqual(w.s.dirs[w.scope.player-1][w.scope.governor], w.scope.before) {
+		return false
+	}
+
 	for n, e := range w.ships {
 		if w.s.ships[n] != e.actor || !reflect.DeepEqual(e.actor, e.before) {
 			return false

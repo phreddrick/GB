@@ -1,0 +1,9 @@
+=== RUN   TestTelescopeBaselineReproducer
+    telescope_before_test.go:68: actor/store: shipfuel 9.7/10.0 planetexplored false/true starexplored true/false output="    #       name       sp orbits     destin     options\nPlanet /AimTarget/Sight Surveyed, distance 0.\nAimed at /AimTarget/Sight\n   77 =                 0 /Star-1/1  L 0,0     \n"
+    telescope_before_test.go:70: expected atomic actor/store agreement; actual independent telescope writes split state
+    telescope_before_test.go:74: segment/update/restart erased telescope aim or exploration
+--- FAIL: TestTelescopeBaselineReproducer (0.14s)
+FAIL
+inventory validation for internal/game SKIPPED: -run filter active; run the full package tests to validate the inventory
+FAIL	github.com/phreddrick/GB/go/internal/game	0.145s
+FAIL

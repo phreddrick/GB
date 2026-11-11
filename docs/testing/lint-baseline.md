@@ -1,6 +1,13 @@
 # Static-analysis baseline (Phase 0, shrunk by Phase 1)
 
-**CR-17C update (2026-11-11 UTC): current total 1,008.** The retired landed
+**Telescope aiming update (2026-11-11 UTC): current total 1,005.** Retiring
+`mkExplAimedAt` removes exactly three stale entries: two unchecked `sess.Send`
+calls and its G115 `int -> uint8` GetPlanet index conversion. No allowance is
+added or moved; the maintainer must apply `known-defect-added`. A local simulated
+label is not acknowledgment. Protected gate tooling is unchanged. Prior totals
+below are historical.
+
+**CR-17C landed-factory update (2026-11-11 UTC): historical total 1,008.** The retired landed
 branch of `activateFactory` removes exactly two stale entries: its unchecked
 `Send("Planet not found.")` and the G115 `uint16(2 * BuildCost)` conversion.
 No allowance is added or moved; the remaining carrier branch is unchanged.
