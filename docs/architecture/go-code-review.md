@@ -483,3 +483,16 @@ Acceptance criteria for "tested enough to refactor": the formula golden tests co
 **Not reviewed in depth:** `commands_profile.go` (847 lines), `commands_power.go`, `commands_teleg.go` beyond its header, `commands_tech.go`, `commands_misc.go` beyond grep, `model/shipdata.go` ability table values against `shipdata.h`. These should be covered by the golden-test effort rather than by further reading.
 
 **Not executed:** race detector under load, Longhorn flush timing, any C binary (the C tree was not built in this session), any cluster change.
+
+**CR-17C telescope follow-up:** explicit-ID survey/gravity `order ... aim` now
+stages ship aim/fuel/mass/notification plus target star/planet exploration in one
+checked transaction, installing actor objects and releasing bounded output only
+after confirmed persistence. Invalid/mixed telescope selections cannot enter the
+old writer. Source/carrier and target-ship chains are read witnesses; unrelated
+target star/planet child chains are preserved, not rewritten. No AP is added.
+The pre-existing Go/C telescope range offsets remain different and are explicitly
+preserved for this persistence-only migration. See
+[`cr17c-telescope-aiming.md`](../testing/cr17c-telescope-aiming.md) for fresh
+failure/crash evidence, validation and review. CR-17, CR-11 and CR-20 remain open;
+carrier activation, cargo, other aim users and broader staging/dedup/outbox work
+are not declared fixed.

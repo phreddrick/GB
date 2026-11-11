@@ -1,0 +1,93 @@
+package game
+
+import (
+	"fmt"
+	"github.com/phreddrick/GB/go/internal/model"
+	"testing"
+	"time"
+)
+
+type telescopeFixture struct {
+	*factoryFixture
+	target uint8
+}
+
+func newTelescopeFixture(t *testing.T, kind model.ShipType) *telescopeFixture {
+	t.Helper()
+	f := &telescopeFixture{factoryFixture: newFactoryFixture(t)}
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		sh := f.state.ships[f.factory]
+		sh.Type = kind
+		sh.Fuel = 10
+		sh.Mass = 100
+		sh.Tech = 0
+		sh.Special.AimedAt = &model.AimedAtSpecial{Intensity: 37}
+		sh.Notified = true
+		for _, st := range f.state.stars {
+			if st.Number != f.star && st.NumPlanets > 0 {
+				f.target = st.Number
+				break
+			}
+		}
+		st := f.state.stars[f.target]
+		st.Name = "AimTarget"
+		st.PlanetNames[0] = "Sight"
+		st.XPos = sh.XPos
+		st.YPos = sh.YPos
+		st.Explored &^= 1
+		pl := f.state.planets[f.target][0]
+		pl.XPos = 0
+		pl.YPos = 0
+		pl.Info[0].Explored = false
+		if e := f.store.PutShip(sh); e != nil {
+			t.Error(e)
+		}
+		if e := f.store.PutStar(st); e != nil {
+			t.Error(e)
+		}
+		if e := f.store.PutPlanet(pl); e != nil {
+			t.Error(e)
+		}
+	})
+	return f
+}
+
+type telescopeWorld struct {
+	ActorShip, StoredShip     *model.Ship
+	ActorStar, StoredStar     *model.Star
+	ActorPlanet, StoredPlanet *model.Planet
+}
+
+func (f *telescopeFixture) capture(t *testing.T) telescopeWorld {
+	t.Helper()
+	sh, e := f.store.GetShip(f.factory)
+	if e != nil {
+		t.Error(e)
+	}
+	st, e := f.store.GetStar(f.target)
+	if e != nil {
+		t.Error(e)
+	}
+	pl, e := f.store.GetPlanet(f.target, 0)
+	if e != nil {
+		t.Error(e)
+	}
+	a := *f.state.stars[f.target]
+	return telescopeWorld{factoryCopyShip(t, f.state.ships[f.factory]), sh, &a, st, planetEdit(f.state.planets[f.target][0]), pl}
+}
+func (f *telescopeFixture) snapshotAim(t *testing.T) telescopeWorld {
+	t.Helper()
+	var x telescopeWorld
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() { x = f.capture(t) })
+	return x
+}
+func (f *telescopeFixture) aim(t *testing.T, target string) string {
+	t.Helper()
+	return f.command(t, fmt.Sprintf("order #%d aim %s", f.factory, target))
+}
+func (f *telescopeFixture) stopAim(t *testing.T) {
+	t.Helper()
+	if e := f.state.Stop(ctxT(t, 10*time.Second)); e != nil {
+		t.Fatal(e)
+	}
+}

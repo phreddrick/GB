@@ -1,0 +1,77 @@
+package game
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/phreddrick/GB/go/internal/model"
+	"os"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+)
+
+type telescopeBeforeResponder struct {
+	f      *telescopeFixture
+	t      *testing.T
+	during *telescopeWorld
+	text   string
+}
+
+func (r *telescopeBeforeResponder) Send(s string) error {
+	r.text += s
+	if strings.Contains(s, "Surveyed, distance") {
+		x := r.f.capture(r.t)
+		r.during = &x
+		r.f.store.SetWriteFence(true)
+	}
+	return nil
+}
+func (r *telescopeBeforeResponder) SendJSON(any) error { return nil }
+func TestTelescopeBaselineReproducer(t *testing.T) {
+	f := newTelescopeFixture(t, model.OtypeStele)
+	before := f.snapshotAim(t)
+	r := &telescopeBeforeResponder{f: f, t: t}
+	if e := f.state.HandleCommand(ctxT(t, 10*time.Second), 1, 0, "order #77 aim /AimTarget/Sight", r); e != nil {
+		t.Fatal(e)
+	}
+	f.store.SetWriteFence(false)
+	after := f.snapshotAim(t)
+	if r.during == nil || f.store.FencedWrites() != 1 {
+		t.Fatal("real failure boundary not reached")
+	}
+	records := map[string]any{"baseline": "43f84de0cb6b4125b83a34d4118a75a4cee3205d", "before": before, "after_planet_write_before_ship_save": r.during, "after_failed_ship_write": after, "output": r.text}
+	for _, kind := range []string{"segment", "update"} {
+		var e error
+		if kind == "segment" {
+			e = f.state.TriggerSegment(ctxT(t, 10*time.Second))
+		} else {
+			e = f.state.TriggerUpdate(ctxT(t, 10*time.Second))
+		}
+		if e != nil {
+			t.Fatal(e)
+		}
+		records[kind] = f.snapshotAim(t)
+	}
+	f.stopAim(t)
+	f.open(t)
+	records["restart"] = f.snapshotAim(t)
+	b, e := json.MarshalIndent(records, "", "  ")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if p := os.Getenv("TELESCOPE_BASELINE_EVIDENCE"); p != "" {
+		if e := os.WriteFile(p, b, 0600); e != nil {
+			t.Fatal(e)
+		}
+	}
+	t.Logf("actor/store: shipfuel %.1f/%.1f planetexplored %t/%t starexplored %t/%t output=%q", after.ActorShip.Fuel, after.StoredShip.Fuel, after.ActorPlanet.Info[0].Explored, after.StoredPlanet.Info[0].Explored, after.ActorStar.IsExplored(1), after.StoredStar.IsExplored(1), r.text)
+	if !reflect.DeepEqual(after.ActorShip, after.StoredShip) || !reflect.DeepEqual(after.ActorPlanet, after.StoredPlanet) || !reflect.DeepEqual(after.ActorStar, after.StoredStar) {
+		t.Error("expected atomic actor/store agreement; actual independent telescope writes split state")
+	}
+	x := f.snapshotAim(t)
+	if !x.ActorPlanet.Info[0].Explored || x.ActorShip.Special.AimedAt.Level != model.LevelPlan {
+		t.Error("segment/update/restart erased telescope aim or exploration")
+	}
+	fmt.Sprint(before)
+}

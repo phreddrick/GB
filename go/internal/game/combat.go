@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/phreddrick/GB/go/internal/commandrules"
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
@@ -64,10 +65,7 @@ func (s *State) gunRange(race *model.Race, ship *model.Ship, mode int) float64 {
 // teleRange returns the telescope observation range.
 // Mirrors tele_range() in shootblast.c.
 func teleRange(shipType model.ShipType, tech float64) float64 {
-	if shipType == model.OtypeGtele {
-		return math.Log1p(tech)*400 + model.SystemGravConst/375
-	}
-	return math.Log1p(tech)*1500 + model.SystemGravConst/100
+	return commandrules.TelescopeRange(shipType, tech)
 }
 
 // hitOdds computes the per-gun hit probability (0–100) and a range factor.
