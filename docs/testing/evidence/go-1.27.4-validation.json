@@ -1,0 +1,199 @@
+{
+  "baseline": "51fd2b45658e28e580e6df70009984149f9bf561",
+  "recorded_at_utc": "2026-11-11T04:37:50.919903+00:00",
+  "environment": {
+    "go": "go1.27.4 linux/amd64",
+    "GOTOOLCHAIN": "local",
+    "GOCACHE": "/tmp/cr07a-cache",
+    "TMPDIR": "/tmp/GB-go-1.27.4/test/ctool/obj/tmp",
+    "isolation": "Disposable local stores and loopback subprocesses only; no live game or container runtime"
+  },
+  "checks": [
+    {
+      "command": "go build ./...",
+      "result": "PASS",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "test -z \"$(gofmt -l go)\"",
+      "result": "PASS",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go vet ./...",
+      "result": "PASS",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go test -count=1 -json ./...",
+      "result": "PASS",
+      "log_sha256": "fd92009a6006e0adb5bb99123abcf9af3e1cceb2b4a493566fbe8d08aeadfcfe",
+      "test_nodes": {
+        "pass": 3353,
+        "skip": 2
+      },
+      "top_level": {
+        "pass": 343,
+        "skip": 2
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 20
+      }
+    },
+    {
+      "command": "GB_LONG_TESTS=1 go test -count=1 -race -json ./...",
+      "result": "PASS",
+      "log_sha256": "0c13ed9705b2bc11dfde60ec33215b750bea4af6574b84fc1cea0d5cfea19acc",
+      "test_nodes": {
+        "pass": 3355
+      },
+      "top_level": {
+        "pass": 345
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 20
+      }
+    },
+    {
+      "command": "GOTOOLCHAIN=local go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./... (Go1.27.4)",
+      "result": "PASS",
+      "log_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994",
+      "reachable": 0,
+      "non_reachable_module_findings": 17
+    },
+    {
+      "command": "GOTOOLCHAIN=local /usr/local/go/bin/go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./... (Go1.27.3)",
+      "result": "EXPECTED FAILURE",
+      "log_sha256": "0b3da17331cc7d245ef8a527a2eaed8d9a294509b999f23cba48ebfe62bcde8e",
+      "finding": "GO-2026-6859",
+      "outer_go_run_exit": 1,
+      "inner_scanner_exit": 3
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts -p \"test_*.py\" -v",
+      "result": "PASS",
+      "log_sha256": "8f0ef527b2b8c54a5cb48e805b168a289e90d6e278971e11463d4cc7a75bdeda",
+      "tests": 188,
+      "new_toolchain_tests": 4
+    },
+    {
+      "command": "python3 .github/scripts/workflow_policy_check.py",
+      "result": "PASS",
+      "log_sha256": "1015c29937e20b246a556a9fb77e9bd66a1835c17a882dd110bec18ab3c90eb2",
+      "checks": 17
+    },
+    {
+      "command": "actionlint -no-color (v1.7.12)",
+      "result": "PASS",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "shellcheck -S warning .github/scripts/*.sh (v0.11.0, exact CI policy)",
+      "result": "PASS",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "shellcheck .github/scripts/*.sh (default informational severity)",
+      "result": "PRE-EXISTING INFO DIAGNOSTICS",
+      "log_sha256": "ea0416bb04c752dac54cb878f39ebaf36a08dad48dac890a29c2916218bfe6aa",
+      "diagnostics": [
+        "SC2015 image-checks.sh:115",
+        "SC2015 publish-push.sh:110"
+      ]
+    },
+    {
+      "command": "deploy/kustomize/tests/run.sh --require-published-image",
+      "result": "PASS",
+      "log_sha256": "07bb9e81b93fe23ac492e72e1cc3320563b76e739e97c2badee3e2ca83fdfa19",
+      "resources_valid": 21
+    },
+    {
+      "command": "make -C test/ctool check",
+      "result": "PASS",
+      "log_sha256": "7637d693670fa97eace71f0a367df10c0ab892dc15c733299a8b3b638fcdf382"
+    },
+    {
+      "command": "test/scripts/golden-mutations.sh",
+      "result": "PASS",
+      "log_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927",
+      "scenarios": 15
+    },
+    {
+      "command": "test/scripts/inventory-check.sh",
+      "result": "PASS",
+      "log_sha256": "07e109b9d19226edf7407f9ace27d48ee94c6f037712d690dabf1e5bdba5efa5"
+    },
+    {
+      "command": "test/scripts/lint-gate.sh /tmp/gb-go1274-evidence/lint.json",
+      "result": "PASS",
+      "log_sha256": "a689bc97c3a5b9896e71aef994d20d9cdd5bb71974931ec44d5d404f56b33beb"
+    },
+    {
+      "command": "test/scripts/gate-approval-selftest.sh",
+      "result": "PASS",
+      "log_sha256": "0793630382f69a970efd2f3edf88526ac84ceb8872a21698f7a010f41e5001fc"
+    },
+    {
+      "command": "test/scripts/lint-gate-selftest.sh",
+      "result": "PASS",
+      "log_sha256": "4a768a5a055d701386d7f38020652b26535fa92c5ba40e2f853d672723390e3c"
+    },
+    {
+      "command": "test/scripts/golden-mutations-selftest.sh",
+      "result": "PASS",
+      "log_sha256": "97c280045f4c80954a3ebf2f84dded376fa8e0bb927df473cb6f0c71880d6bd0"
+    },
+    {
+      "command": "PR_LABELS_JSON=[] test/scripts/growth-gate.sh origin/master",
+      "result": "EXPECTED REFUSAL",
+      "log_sha256": "0db06a36d09d4301b417d084b19f8b719bf9d535a2ef3e990917b9b4781276ee"
+    },
+    {
+      "command": "PR_LABELS_JSON=[\"gate-change-reviewed\"] test/scripts/growth-gate.sh origin/master",
+      "result": "PASS (LOCAL SIMULATION ONLY)",
+      "log_sha256": "7fab59657c3be3e6fc9f61ddc50dcf24a8e3285ed21c20ca2a90d516c92aafd5"
+    },
+    {
+      "command": "go mod verify",
+      "result": "PASS",
+      "log_sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd"
+    },
+    {
+      "command": "go mod tidy -diff",
+      "result": "PASS",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "tested_file_sha256": {
+    ".github/scripts/image-checks.sh": "35c7acc3ee7164854a7ad9140a015456a1b40ac9d139e5d6840378389ff39260",
+    ".github/scripts/test_go_toolchain.py": "29ba697fd1b2974fd8761545f26fd587fc0d503a6d69c8e4ec938299a73f0e1e",
+    ".github/workflows/ci.yml": "39852295cff6caa43846ccf6a71fc2f9e608abf8204116a6de9e9c32a4f72f6c",
+    ".github/workflows/digest-update-pr.yml": "82df3276e98c8321cfd7d97597d8e6b859e538efb1f0d2215e941d1ecb6b25bb",
+    ".github/workflows/publish-images.yml": "b411e0b86b5173b30a505e618f4e626df720b6fd10d531cd627b045bde30ccf8",
+    "CLAUDE.md": "8f120d553edbfd57529b4a4a70734b07e83a724089757987305169bb3849115d",
+    "Dockerfile": "ea6bd6363d81f9bebdb18a27e194d200eba3552ec251ffe50efcb4c17621e3a5",
+    "deploy/docker/Dockerfile": "90e16578e2702f31c9bf67ac96d076400186a91031d916fc9aa3c0ba897c35a0",
+    "deploy/docker/README.md": "928dd821d2fea27c32284fc34d4883ab3922c68b2643b5de2ccff74c863e795d",
+    "docs/architecture/adr/0006-image-registry-and-digest-pinning.md": "7279d72b4e42c3d88bcd2a5e6fdc69fdd20a3b41e24c74453597fcb331ea69e3",
+    "docs/testing/dependencies-2026-10.md": "82a138d0d2ed8dbb5b58c36ef39cbe56e5d828d36a22a14e116a955cb7f86666",
+    "docs/testing/evidence/go-1.27.4-pins.json": "d4cfa44644454df2ef14c073c5f80304a8aa9d2773ca5e53537b18d11f057e23",
+    "go/go.mod": "1412fa26ae969082964f3a4fcd01dc5192a41d089b54a909f99f08abb4e1ed95"
+  },
+  "independent_review": {
+    "decision": "APPROVE WITH CONDITIONS",
+    "checks": "Fresh Docker Hub index GETs and descriptor/config/archive hashing; parsed workflows equal baseline except GO_VERSION; 188 helper tests, four pin tests,17 policy checks and diff check passed",
+    "findings_fixed": [
+      "Restore README target table and put alpine digest in base-image table",
+      "Require exactly both builder evidence records before zip; verify each GOLANG_VERSION"
+    ],
+    "conditions": [
+      "Maintainer gate-change-reviewed acknowledgment",
+      "Normal owner review and hosted CI"
+    ],
+    "final_evidence_review": "PASS: independently recomputed all 13 frozen-file hashes and 24 execution-log hashes; both full JSON test counts and all 15 mutation scenarios match"
+  },
+  "hosted_checks": "Docker/buildx, Trivy, Syft and kind deferred to existing hosted CI; no local container tools installed or run",
+  "operations": "No other worktree, PR35 branch, game source/storage, Kubernetes manifest, live database, deployment or image publication changed"
+}
