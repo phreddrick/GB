@@ -1,0 +1,75 @@
+package game
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+)
+
+type factoryReproResponder struct {
+	recordingResponder
+	after func()
+}
+
+func (r *factoryReproResponder) Send(text string) error {
+	e := r.recordingResponder.Send(text)
+	if strings.Contains(text, "Factory activated") && r.after != nil {
+		r.after()
+	}
+	return e
+}
+
+// Desired atomic assertions on unmodified runtime baseline. Existing success
+// output is the actual boundary between PutPlanet and the final PutShip.
+func TestCR17CPreFixFactoryPartialWrite(t *testing.T) {
+	f := newFactoryFixture(t)
+	stages := map[string]factoryWorld{"before": f.snapshot(t)}
+	r := &factoryReproResponder{}
+	r.after = func() { stages["after-first-write"] = f.captureOnActor(t); f.store.SetWriteFence(true) }
+	if e := f.state.HandleCommand(ctxT(t, 10*time.Second), 1, 0, fmt.Sprintf("order #%d on", f.factory), r); e != nil {
+		t.Fatal(e)
+	}
+	f.store.SetWriteFence(false)
+	after := f.snapshot(t)
+	after.Output = r.text()
+	stages["after-failure"] = after
+	t.Logf("first write: resource actor/store=%d/%d, factory actor/store=%t/%t", stages["after-first-write"].ActorPlanet.Info[0].Resource, stages["after-first-write"].StoredPlanet.Info[0].Resource, stages["after-first-write"].ActorShip.On, stages["after-first-write"].StoredShip.On)
+	t.Logf("after failed ship write: resource actor/store=%d/%d factory actor/store=%t/%t success=%t", after.ActorPlanet.Info[0].Resource, after.StoredPlanet.Info[0].Resource, after.ActorShip.On, after.StoredShip.On, strings.Contains(r.text(), "Factory activated"))
+	if !reflect.DeepEqual(after.ActorPlanet, after.StoredPlanet) || !reflect.DeepEqual(after.ActorShip, after.StoredShip) {
+		t.Error("factory/planet actor-store disagreement after separate writes")
+	}
+	if !reflect.DeepEqual(after.StoredPlanet, stages["before"].StoredPlanet) || !reflect.DeepEqual(after.StoredShip, stages["before"].StoredShip) {
+		t.Error("failed command persisted a partial record set")
+	}
+	if strings.Contains(r.text(), "Factory activated") {
+		t.Error("success emitted before factory persistence")
+	}
+	for _, stage := range []string{"segment", "update", "restart"} {
+		var e error
+		switch stage {
+		case "segment":
+			e = f.state.TriggerSegment(ctxT(t, 10*time.Second))
+		case "update":
+			e = f.state.TriggerUpdate(ctxT(t, 10*time.Second))
+		case "restart":
+			f.restart(t)
+		}
+		if e != nil {
+			t.Fatal(e)
+		}
+		stages[stage] = f.snapshot(t)
+		x := stages[stage]
+		t.Logf("%s: resource=%d factory on=%t", stage, x.StoredPlanet.Info[0].Resource, x.StoredShip.On)
+	}
+	b, e := json.Marshal(stages)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile("/tmp/cr17c-pre-fix-records.json", b, 0600); e != nil {
+		t.Fatal(e)
+	}
+}

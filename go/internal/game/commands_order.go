@@ -30,6 +30,9 @@ import (
 //
 // Mirrors order() in order.c.
 func (s *State) cmdOrder(p, g int, args []string, sess net.Responder) {
+	if s.handleLandedFactoryOrder(p, g, args, sess) {
+		return
+	}
 	s.dispOrdersHeader(sess)
 
 	if len(args) == 0 {
@@ -664,21 +667,10 @@ func (s *State) activateFactory(p, g int, ship *model.Ship, sess net.Responder) 
 		sess.Send("You cannot activate the factory here.\n")
 		return fmt.Errorf("not landed")
 	} else {
-		planet, err := s.store.GetPlanet(ship.DestStar, ship.DestPNum)
-		if err != nil || planet == nil {
-			sess.Send("Planet not found.\n")
-			return fmt.Errorf("planet not found")
-		}
-		onCost := uint16(2 * int(ship.BuildCost))
-		if planet.Info[p-1].Resource < onCost {
-			sendf(sess, "You don't have %d resources on the planet to activate this factory.\n", onCost)
-			return fmt.Errorf("insufficient resources")
-		}
-		planet.Info[p-1].Resource -= onCost
-		if err := s.store.PutPlanet(planet); err != nil {
-			s.logError("PutPlanet", err)
-		}
-		sendf(sess, "Factory activated at a cost of %d resources.\n", onCost)
+		// Landed activation must enter through the complete staged command;
+		// never reintroduce the old independent planet writer here.
+		_ = sess.Send("Use one explicit ship number for landed factory activation.\n")
+		return fmt.Errorf("landed activation requires command staging")
 	}
 	return nil
 }

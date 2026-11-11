@@ -1,0 +1,217 @@
+{
+  "schema": 1,
+  "master_baseline": "1f43228833909212d7fd83da34c23f4d63cf61ee",
+  "prior_cr17c_head": "9b293005200555a7277833fd5ad50ccfedece857",
+  "branch": "feature/cr17c-command-staging",
+  "recorded_at_utc": "2026-11-11T05:46:27.975378+00:00",
+  "integration": {
+    "method": "Non-rewriting merge of origin/master; no conflicts",
+    "factory_code_and_tests_unchanged": true,
+    "source_sha256": {
+      "go/internal/db/factory.go": "fb12c66493f5eb91cb24d0297c5b0fce6b26a3a6c5bba17e57a9986087fac2df",
+      "go/internal/db/factory_test.go": "7e1850650827daa408b075015df06e1343259baa5247e29ea80462a06283ef15",
+      "go/internal/game/command_workspace.go": "5b5c7868763ef2b265b20c4e753a4ec803feef221ec0e462d41dac308ed3319a",
+      "go/internal/game/factory_command.go": "dc03a0ae29dbd9aa548e1cab89c622d303b495501384fc436e20094a7b82335a",
+      "go/internal/game/commands_order.go": "ffa3add72ea7c601f527bc5ceba56eb608d0b1b027ca30bff379559bad4aa866",
+      "go/internal/game/factory_staging_test.go": "0e542fb813dd34afac36b1ba0917b52b181a528854430ec9ea2efbdfb7807783",
+      "go/internal/game/factory_crash_test.go": "2ab72d6b3b9817dae7f29929af3d5ec6fa561845a2e83fe4f9ed891ec57364e1"
+    },
+    "security_files_exactly_equal_master": [
+      ".github/scripts/image-checks.sh",
+      ".github/scripts/test_go_toolchain.py",
+      ".github/workflows/ci.yml",
+      ".github/workflows/digest-update-pr.yml",
+      ".github/workflows/publish-images.yml",
+      "CLAUDE.md",
+      "Dockerfile",
+      "deploy/docker/Dockerfile",
+      "deploy/docker/README.md",
+      "docs/architecture/adr/0006-image-registry-and-digest-pinning.md",
+      "docs/testing/dependencies-2026-10.md",
+      "docs/testing/evidence/go-1.27.4-pins.json",
+      "docs/testing/evidence/go-1.27.4-validation.json",
+      "docs/testing/go-1.27.4-security.md",
+      "go/go.mod"
+    ],
+    "additional_scope": "Only CR17C revalidation documentation/evidence; original pre-fix and Go1.27.3 evidence retained"
+  },
+  "environment": {
+    "toolchain": "go1.27.4 linux/amd64",
+    "GOTOOLCHAIN": "local",
+    "GOCACHE": "/tmp/cr07a-cache",
+    "TMPDIR": "/tmp/GB-cr17c/test/ctool/obj/tmp"
+  },
+  "normal": {
+    "test_nodes": {
+      "pass": 3513,
+      "skip": 2
+    },
+    "top_level": {
+      "pass": 368,
+      "skip": 2
+    },
+    "packages": {
+      "skip": 6,
+      "pass": 20
+    },
+    "all_160_factory_cases_pass": true,
+    "sigkill_boundaries": [
+      "TestCR17CFactoryRealProcessCrash/factory.before",
+      "TestCR17CFactoryRealProcessCrash/factory.write:1",
+      "TestCR17CFactoryRealProcessCrash/factory.before-commit",
+      "TestCR17CFactoryRealProcessCrash/factory.after-commit"
+    ]
+  },
+  "long_race": {
+    "test_nodes": {
+      "pass": 3515
+    },
+    "top_level": {
+      "pass": 370
+    },
+    "packages": {
+      "skip": 6,
+      "pass": 20
+    },
+    "all_160_factory_cases_pass": true,
+    "sigkill_boundaries": [
+      "TestCR17CFactoryRealProcessCrash/factory.before",
+      "TestCR17CFactoryRealProcessCrash/factory.write:1",
+      "TestCR17CFactoryRealProcessCrash/factory.before-commit",
+      "TestCR17CFactoryRealProcessCrash/factory.after-commit"
+    ]
+  },
+  "checks": [
+    {
+      "command": "go version; go env GOTOOLCHAIN",
+      "result": "PASS",
+      "output_sha256": "81b06924fd7123ec22302782bdbd83b63c8b325dd96f287ca8ee875cbcf88a37"
+    },
+    {
+      "command": "go build ./...",
+      "result": "PASS",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "test -z \"$(gofmt -l go)\"",
+      "result": "PASS",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go vet ./...",
+      "result": "PASS",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go test -count=1 -json ./...",
+      "result": "PASS",
+      "output_sha256": "eefc6c98bd4848e9b790709666299503ab94c0d4534ecd9c91987d406a584ce7"
+    },
+    {
+      "command": "GB_LONG_TESTS=1 go test -count=1 -race -json ./...",
+      "result": "PASS",
+      "output_sha256": "c9cd4f59ba7a35af1f2c9663aa2283e052d85ec9744efe32baf704eee64a2416"
+    },
+    {
+      "command": "go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...",
+      "result": "PASS",
+      "output_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994"
+    },
+    {
+      "command": "go mod verify",
+      "result": "PASS",
+      "output_sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd"
+    },
+    {
+      "command": "go mod tidy -diff",
+      "result": "PASS",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "make -C test/ctool check",
+      "result": "PASS",
+      "output_sha256": "500163736c43fa6e412255ce2f9b0bf1887ea590e41691c19def28acd5352beb"
+    },
+    {
+      "command": "test/scripts/golden-mutations.sh",
+      "result": "PASS",
+      "output_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927"
+    },
+    {
+      "command": "test/scripts/lint-gate.sh /tmp/cr17c-go1274/lint.json",
+      "result": "PASS",
+      "output_sha256": "46951ef07298253d6b75ffb68f8d070c2a07aae77dfe29dbac5a1dff420a43f8"
+    },
+    {
+      "command": "test/scripts/inventory-check.sh",
+      "result": "PASS",
+      "output_sha256": "e0d8e2726b9293dc59420f211167af71098575b2b7e74021f0d10a2fdff54133"
+    },
+    {
+      "command": "test/scripts/gate-approval-selftest.sh",
+      "result": "PASS",
+      "output_sha256": "0793630382f69a970efd2f3edf88526ac84ceb8872a21698f7a010f41e5001fc"
+    },
+    {
+      "command": "test/scripts/lint-gate-selftest.sh",
+      "result": "PASS",
+      "output_sha256": "b2672116240c4b20ced6c532788aaff6af06507adef4b4852fdf5bc4f437f3df"
+    },
+    {
+      "command": "test/scripts/golden-mutations-selftest.sh",
+      "result": "PASS",
+      "output_sha256": "97c280045f4c80954a3ebf2f84dded376fa8e0bb927df473cb6f0c71880d6bd0"
+    },
+    {
+      "command": "PR_LABELS_JSON=[\"known-defect-added\"] test/scripts/growth-gate.sh origin/master (local simulation only)",
+      "result": "PASS",
+      "output_sha256": "2e9e93efffb2006670fc9c96d69425af153c19df7a82b70d478c19e4e8a2c7b4"
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts -p test_*.py -v",
+      "result": "PASS",
+      "output_sha256": "63cf2440a0b9b1244ca6969aff5521151dae4ac6c94b3a122708cee027e34e59"
+    },
+    {
+      "command": "python3 .github/scripts/workflow_policy_check.py",
+      "result": "PASS",
+      "output_sha256": "1015c29937e20b246a556a9fb77e9bd66a1835c17a882dd110bec18ab3c90eb2"
+    },
+    {
+      "command": "actionlint -no-color",
+      "result": "PASS",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "shellcheck -S warning .github/scripts/*.sh",
+      "result": "PASS",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "deploy/kustomize/tests/run.sh --require-published-image",
+      "result": "PASS",
+      "output_sha256": "19fa3d6ba26aa7639787c58036e8bd83fa4ee7582e86793fc867a212075cd909"
+    }
+  ],
+  "security": {
+    "reachable_vulnerabilities": 0,
+    "non_reachable_module_findings": 17,
+    "scanner": "v1.9.0 unchanged, no suppression"
+  },
+  "independent_review": {
+    "decision": "APPROVE WITH CONDITIONS",
+    "critical_race": "db1.825s/game11.174s, original factory/preimage/AP/governor/mixed-selector/private-copy and actual SIGKILL tests",
+    "websocket": "10 repeated race runs of PR34 shutdown/disconnect regressions,2.364s",
+    "log_sha256": {
+      "cr17c-independent-go1274-critical.log": "a0aab99b757958ff9f84d8b1244228af2b4f3185781c3e57be4205bc14200207",
+      "cr17c-independent-go1274-ws.log": "e571fd7c060a9d74a91e02185becfbe8efea9a78f3b74def232ab4564233762f"
+    },
+    "final_evidence_audit": "PASS: seven source hashes, fifteen security files, twenty-two execution-log hashes, two independent log hashes, five historical evidence artifacts, exact full-run counts and eight fresh SIGKILL case results independently verified; no blocking integration finding"
+  },
+  "required_maintainer_labels": [
+    "known-defect-added"
+  ],
+  "labels_applied_by_agent": [],
+  "operational_boundary": "All mutations in disposable local stores. No other worktrees, live game/database, Kubernetes, image publication, deployment or PR merge.",
+  "hosted_ci": "Rerun by synchronize push to existing PR35; result pending"
+}

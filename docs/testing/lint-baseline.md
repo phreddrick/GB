@@ -1,6 +1,14 @@
 # Static-analysis baseline (Phase 0, shrunk by Phase 1)
 
-**CR-17B update (2026-11-10 UTC): current total 1,010.** Replacing the old
+**CR-17C update (2026-11-11 UTC): current total 1,008.** The retired landed
+branch of `activateFactory` removes exactly two stale entries: its unchecked
+`Send("Planet not found.")` and the G115 `uint16(2 * BuildCost)` conversion.
+No allowance is added or moved; the remaining carrier branch is unchanged.
+The maintainer must apply `known-defect-added` under CLAUDE.md. A local simulated
+label or technical pure-reduction pass is not owner acknowledgment. Protected
+gate tooling is unchanged. Earlier totals below are historical provenance.
+
+**CR-17B update (2026-11-10 UTC): historical total 1,010.** Replacing the old
 `cmdDump` body removes exactly ten stale findings: eight unchecked `sess.Send`
 occurrences, one unchecked `fmt.Sscanf`, and one G115 planet-index conversion.
 No finding is added or moved. The new transaction/actor code and tests pass the

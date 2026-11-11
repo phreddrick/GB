@@ -1,0 +1,116 @@
+package game
+
+import (
+	"encoding/json"
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/phreddrick/GB/go/internal/model"
+)
+
+type factoryFixture struct {
+	*actorEnrollmentFixture
+	star, planet uint8
+	factory      uint32
+}
+
+func newFactoryFixture(t *testing.T) *factoryFixture {
+	t.Helper()
+	f := newEnrollmentActor(t)
+	a := enrollActor(t, f, actorEnrollmentRequest("operator")).Placement
+	x := &factoryFixture{f, a.Star, a.Planet, 77}
+	onEnrollmentActor(t, f, func() {
+		pl := f.state.planets[a.Star][a.Planet]
+		pl.Info[0].Resource = 100
+		for i := range pl.Sectors {
+			pl.Sectors[i].Resource = 0
+			pl.Sectors[i].Crystals = 0
+		}
+		sh := &model.Ship{}
+		f.state.getshipDefaults(sh, model.OtypeFactory, f.state.races[0])
+		sh.Number = 77
+		sh.Owner = 1
+		sh.Race = 1
+		sh.Governor = 0
+		sh.BuildCost = 7
+		sh.BuildType = uint16(model.StypeCargo)
+		sh.Alive = true
+		sh.Active = true
+		sh.On = false
+		sh.Notified = true
+		sh.Docked = true
+		sh.Popn = 1
+		sh.WhatOrbits = model.LevelPlan
+		sh.WhatDest = model.LevelPlan
+		sh.StOrbits = a.Star
+		sh.DestStar = a.Star
+		sh.PNumOrbits = a.Planet
+		sh.DestPNum = a.Planet
+		sh.LandX = a.CapitalX
+		sh.LandY = a.CapitalY
+		sh.XPos = f.state.stars[a.Star].XPos + pl.XPos
+		sh.YPos = f.state.stars[a.Star].YPos + pl.YPos
+		sh.NextShip = pl.Ships
+		pl.Ships = sh.Number
+		f.state.ships[sh.Number] = sh
+		if e := f.store.PutPlanet(pl); e != nil {
+			t.Error(e)
+		}
+		if e := f.store.PutShip(sh); e != nil {
+			t.Error(e)
+		}
+	})
+	return x
+}
+func factoryCopyShip(t *testing.T, p *model.Ship) *model.Ship {
+	t.Helper()
+	b, e := json.Marshal(p)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var q model.Ship
+	if e := json.Unmarshal(b, &q); e != nil {
+		t.Fatal(e)
+	}
+	return &q
+}
+
+type factoryWorld struct {
+	ActorPlanet, StoredPlanet *model.Planet
+	ActorShip, StoredShip     *model.Ship
+	Star                      *model.Star
+	Output                    string `json:"output,omitempty"`
+}
+
+func (f *factoryFixture) captureOnActor(t *testing.T) factoryWorld {
+	t.Helper()
+	pl, e := f.store.GetPlanet(f.star, f.planet)
+	if e != nil {
+		t.Error(e)
+	}
+	sh, e := f.store.GetShip(f.factory)
+	if e != nil {
+		t.Error(e)
+	}
+	star := *f.state.stars[f.star]
+	return factoryWorld{ActorPlanet: copyCommandPlanet(f.state.planets[f.star][f.planet]), StoredPlanet: pl, ActorShip: factoryCopyShip(t, f.state.ships[f.factory]), StoredShip: sh, Star: &star}
+}
+func (f *factoryFixture) snapshot(t *testing.T) factoryWorld {
+	t.Helper()
+	var out factoryWorld
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() { out = f.captureOnActor(t) })
+	return out
+}
+func (f *factoryFixture) command(t *testing.T, text string) string {
+	t.Helper()
+	r := &recordingResponder{}
+	if e := f.state.HandleCommand(ctxT(t, 10*time.Second), 1, 0, text, r); e != nil {
+		t.Fatal(e)
+	}
+	return r.text()
+}
+func (f *factoryFixture) activate(t *testing.T) string {
+	t.Helper()
+	return f.command(t, fmt.Sprintf("order #%d on", f.factory))
+}

@@ -442,7 +442,12 @@ commit transaction) assert this; the known-defect entry
 `persistence/non-atomic-turn-flush` records the pending acceptance.
 
 **Bounded command improvements (CR-17A/B):** route configuration and planet
-stockpile transfers use checked actor-derived single-planet proposals. A complete
+stockpile transfers use checked actor-derived single-planet proposals. Exact
+single-ID landed factory activation (`order #N on`) stages the full factory and
+planet resource debit, checks complete persisted preimages in one transaction
+and installs before emitting successful output. Multi/mixed landed-factory
+selectors are refused; carrier activation and other order/cargo paths remain
+legacy and do not gain this guarantee. Factory activation charges no AP. A complete
 `dump` now commits exploration changes and its one AP debit together, including
 all participating star/planet preimages. Unexpected participant disagreement
 (including earlier volatile AP changes) fails closed and halts; it is never
@@ -452,7 +457,7 @@ Transfer AP remains volatile until a normal commit; broader commands still have
 the limitations below. These source guarantees do not assert live deployment.
 
 **Not yet guaranteed:** player commands between turns still write per
-record (`PutShip`, `PutPlanet`, `PutRace` at about 70 sites) and three original
+record (`PutShip`, `PutPlanet`, `PutRace` at about 70 sites) and two original
 mutable planet paths still read separate store copies (CR-11, CR-17), so a command that
 fails or is interrupted between two of its own writes is not atomic, a
 command that changes memory without writing is persisted only by the next
