@@ -316,6 +316,20 @@ These are the findings that stop the server from being usable or deployable at a
   command staging, group commit, outbox or deduplication is claimed. See the
   [transaction design and acceptance](../testing/cr17b-coupled-record-transactions.md).
 
+
+  **CR-17C bounded implementation (2026-11-11 UTC; PR review pending).** Exact
+  single-ID landed factory activation uses a private typed workspace and a
+  separate closed factory/planet transaction, with complete star/orbit witnesses
+  checked inside it. Only confirmed commits install both records and release
+  bounded output. Full-width C activation cost replaces the old truncating
+  uint16 temporary; damaged factories and zero AP remain supported. Ambiguous
+  selectors cannot execute a prefix before reaching a landed factory. The old
+  landed writer is retired, but carrier activation, telescope aiming, cargo,
+  movement/construction and other direct saves remain open. Two original mutable
+  planet paths remain (doLoad and mkExplAimedAt). No group commit, command-ID
+  deduplication or durable outbox is implemented. CR-17/CR-11/CR-20 remain open.
+  See [staging scope, failure evidence and follow-up](../testing/cr17c-command-staging.md).
+
 - **CR-18 (persistence), High, VERIFIED (read).** `flushAll` is not atomic: one bbolt transaction per star, per planet and per race (`turn.go:508-530`), plus separate transactions for power, blocks and sdata (`:472-482`). A crash or SIGTERM during the flush leaves some planets at turn N+1 and others at turn N, with ships (written first in one batch) already at N+1. There is no turn-number stamp in the records to detect this.
 - **CR-21, High, VERIFIED (read).** Timing is not restored. `scheduleTimers` (`state.go:167-178`) sets the next update to now plus 30 minutes on every start; the comment says "In a real server, restore from GetMeta here". `persistTiming` writes `update_time` and `segment_time` that nothing reads. Every restart delays the update and resets the segment counter, and `numUpdates` restarts at 1 so the "DOING UPDATE n" announcements repeat.
 - **High, VERIFIED (read).** `handleVictory` is reached every update in Go (`turn.go:452`), guarded only by `cfg.Victory` (default false). In C it is never called from `do_turn`. With CR-12 making the threshold 0 for small universes, enabling `victory` would declare every race a winner after five updates.

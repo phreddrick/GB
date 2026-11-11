@@ -1,0 +1,18 @@
+Baseline: 51fd2b45658e28e580e6df70009984149f9bf561
+Command: GOCACHE=/tmp/cr07a-cache TMPDIR=/tmp/GB-cr17c/test/ctool/obj/tmp go -C go test ./internal/game -run ^TestCR17CPreFixFactoryPartialWrite$ -count=1 -v
+Expected exit: 1. Existing real success output is the PutPlanet/PutShip boundary; responder raises the existing write fence before final PutShip. No runtime instrumentation.
+
+=== RUN   TestCR17CPreFixFactoryPartialWrite
+    factory_reproduction_test.go:40: first write: resource actor/store=100/86, factory actor/store=false/false
+    factory_reproduction_test.go:41: after failed ship write: resource actor/store=100/86 factory actor/store=true/false success=true
+    factory_reproduction_test.go:43: factory/planet actor-store disagreement after separate writes
+    factory_reproduction_test.go:46: failed command persisted a partial record set
+    factory_reproduction_test.go:49: success emitted before factory persistence
+    factory_reproduction_test.go:66: segment: resource=100 factory on=false
+    factory_reproduction_test.go:66: update: resource=100 factory on=false
+    factory_reproduction_test.go:66: restart: resource=100 factory on=false
+--- FAIL: TestCR17CPreFixFactoryPartialWrite (0.14s)
+FAIL
+inventory validation for internal/game SKIPPED: -run filter active; run the full package tests to validate the inventory
+FAIL	github.com/phreddrick/GB/go/internal/game	0.145s
+FAIL

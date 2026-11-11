@@ -1,0 +1,389 @@
+{
+  "schema": 1,
+  "baseline": "51fd2b45658e28e580e6df70009984149f9bf561",
+  "branch": "feature/cr17c-command-staging",
+  "scope": "exact single-ID landed factory activation only; other CR-17 paths remain open",
+  "environment": {
+    "date_utc": "2026-11-11",
+    "date_local": "2026-11-10 America/Denver",
+    "go": "go1.27.3 linux/amd64",
+    "GOCACHE": "/tmp/cr07a-cache",
+    "TMPDIR": "/tmp/GB-cr17c/test/ctool/obj/tmp",
+    "stores": "disposable only"
+  },
+  "source_sha256": {
+    "go/internal/db/factory.go": "fb12c66493f5eb91cb24d0297c5b0fce6b26a3a6c5bba17e57a9986087fac2df",
+    "go/internal/db/factory_test.go": "7e1850650827daa408b075015df06e1343259baa5247e29ea80462a06283ef15",
+    "go/internal/game/command_workspace.go": "5b5c7868763ef2b265b20c4e753a4ec803feef221ec0e462d41dac308ed3319a",
+    "go/internal/game/factory_command.go": "dc03a0ae29dbd9aa548e1cab89c622d303b495501384fc436e20094a7b82335a",
+    "go/internal/game/commands_order.go": "ffa3add72ea7c601f527bc5ceba56eb608d0b1b027ca30bff379559bad4aa866",
+    "go/internal/game/factory_staging_test.go": "0e542fb813dd34afac36b1ba0917b52b181a528854430ec9ea2efbdfb7807783",
+    "go/internal/game/factory_crash_test.go": "2ab72d6b3b9817dae7f29929af3d5ec6fa561845a2e83fe4f9ed891ec57364e1"
+  },
+  "runs": {
+    "all": {
+      "command": "go test -count=1 -json ./...",
+      "exit_code": 0,
+      "output_sha256": "6d32eb30be381b8d585724e4ffd84b22af28dc8f37262955302d6d54a0041fdb",
+      "nodes": {
+        "pass": 3513,
+        "skip": 2
+      },
+      "top_level_tests": {
+        "pass": 368,
+        "skip": 2
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 20
+      },
+      "skips": [
+        {
+          "package": "github.com/phreddrick/GB/go/internal/net",
+          "test": "TestGB104LongCommandWithProductionTiming"
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/test/e2e",
+          "test": "TestGB104RealEngineLongTurnKeepsHealthyClient"
+        }
+      ],
+      "new_nodes": {
+        "pass": 160
+      },
+      "new_top_level_entries": 25
+    },
+    "race": {
+      "command": "GB_LONG_TESTS=1 go test -count=1 -race -json ./...",
+      "exit_code": 0,
+      "output_sha256": "f310a44051cf4201656baf73996231370bbb457c7a7fde38d3162e71f35869ff",
+      "nodes": {
+        "pass": 3515
+      },
+      "top_level_tests": {
+        "pass": 370
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 20
+      },
+      "skips": [],
+      "new_nodes": {
+        "pass": 160
+      },
+      "new_top_level_entries": 25
+    }
+  },
+  "checks": [
+    {
+      "command": "gofmt -l .",
+      "exit_code": 0,
+      "result": "empty",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "test/scripts/golden-mutations.sh",
+      "exit_code": 0,
+      "result": "all15expected outcomes",
+      "output_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927"
+    },
+    {
+      "command": "make -C test/ctool check",
+      "exit_code": 0,
+      "result": "fixtures reproduce exactly",
+      "output_sha256": "ed1e42e224b08be4b6cb253ec5cb2b26a37d52231873ca7cc7c933ce20ba83a9"
+    },
+    {
+      "command": "test/scripts/inventory-check.sh",
+      "exit_code": 0,
+      "result": "all tested entries reconciled; no allowance changes",
+      "output_sha256": "8600b6f4c5af363a1db9ad2f6249e3f0d8beb7d2b7ab6d3d3dece0e07c1296d7"
+    },
+    {
+      "command": "test/scripts/gate-approval-selftest.sh",
+      "exit_code": 0,
+      "result": "all scenarios as required",
+      "output_sha256": "0793630382f69a970efd2f3edf88526ac84ceb8872a21698f7a010f41e5001fc"
+    },
+    {
+      "command": "test/scripts/lint-gate-selftest.sh",
+      "exit_code": 0,
+      "result": "all scenarios as required",
+      "output_sha256": "9eb0898d4def80777479cc103408c5ed2411fc3f4af2389d40348fdf7c19c227"
+    },
+    {
+      "command": "test/scripts/golden-mutations-selftest.sh",
+      "exit_code": 0,
+      "result": "100iterations per case, all as required",
+      "output_sha256": "97c280045f4c80954a3ebf2f84dded376fa8e0bb927df473cb6f0c71880d6bd0"
+    },
+    {
+      "command": "test/scripts/lint-gate.sh /tmp/cr17c-lint.json",
+      "exit_code": 0,
+      "result": "1008baseline/report/matched;0new/0stale",
+      "output_sha256": "46951ef07298253d6b75ffb68f8d070c2a07aae77dfe29dbac5a1dff420a43f8"
+    },
+    {
+      "command": "deploy/kustomize/tests/run.sh --require-published-image",
+      "exit_code": 0,
+      "result": "143structural assertions,mutation/safety suites,21schema-valid resources",
+      "output_sha256": "d27c838d5c413bf3cb4b2e4351ff641db9be42d0f865be15fda1affb611bb70b"
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts -p test_*.py",
+      "exit_code": 0,
+      "result": "184tests pass",
+      "output_sha256": "02c525d0869a5f6414410061a4b209a89381e2fccc6eb09356267adfd5fe28c6"
+    },
+    {
+      "command": "python3 .github/scripts/workflow_policy_check.py",
+      "exit_code": 0,
+      "result": "17checks pass",
+      "output_sha256": "1015c29937e20b246a556a9fb77e9bd66a1835c17a882dd110bec18ab3c90eb2"
+    },
+    {
+      "command": "actionlint -no-color",
+      "exit_code": 0,
+      "result": "empty",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "shellcheck -S warning .github/scripts/*.sh",
+      "exit_code": 0,
+      "result": "empty",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...",
+      "exit_code": 0,
+      "result": "0reachable vulnerabilities;17non-reachable module findings",
+      "output_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994"
+    },
+    {
+      "command": "go mod verify",
+      "exit_code": 0,
+      "result": "all modules verified",
+      "output_sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd"
+    },
+    {
+      "command": "go mod tidy -diff",
+      "exit_code": 0,
+      "result": "empty",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "go build ./...",
+      "exit_code": 0
+    },
+    {
+      "command": "go vet ./...",
+      "exit_code": 0
+    },
+    {
+      "command": "PR_LABELS_JSON='[\"known-defect-added\"]' test/scripts/growth-gate.sh origin/master",
+      "exit_code": 0,
+      "result": "two pure removals, no protected tooling; local simulation is not owner acknowledgment",
+      "output_sha256": "2e9e93efffb2006670fc9c96d69425af153c19df7a82b70d478c19e4e8a2c7b4"
+    },
+    {
+      "command": "git diff --check && git diff --cached --check",
+      "exit_code": 0
+    }
+  ],
+  "new_test_cases": [
+    "internal/db:TestFactoryActivationAtomicAndReopen",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.before/panic=false",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.before/panic=true",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.validated/panic=false",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.validated/panic=true",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.write:1/panic=false",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.write:1/panic=true",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.write:2/panic=false",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.write:2/panic=true",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.before-commit/panic=false",
+    "internal/db:TestFactoryActivationFailureAtomicity/factory.before-commit/panic=true",
+    "internal/db:TestFactoryActivationFailureAtomicity",
+    "internal/db:TestFactoryActivationCommittedAndUncertain/factory.commit-error/panic=false/readFail=false",
+    "internal/db:TestFactoryActivationCommittedAndUncertain/factory.commit-error/panic=false/readFail=true",
+    "internal/db:TestFactoryActivationCommittedAndUncertain/factory.commit-error/panic=true/readFail=false",
+    "internal/db:TestFactoryActivationCommittedAndUncertain/factory.commit-error/panic=true/readFail=true",
+    "internal/db:TestFactoryActivationCommittedAndUncertain/factory.after-commit/panic=false/readFail=false",
+    "internal/db:TestFactoryActivationCommittedAndUncertain/factory.after-commit/panic=false/readFail=true",
+    "internal/db:TestFactoryActivationCommittedAndUncertain/factory.after-commit/panic=true/readFail=false",
+    "internal/db:TestFactoryActivationCommittedAndUncertain/factory.after-commit/panic=true/readFail=true",
+    "internal/db:TestFactoryActivationCommittedAndUncertain",
+    "internal/db:TestFactoryActivationInvalidFields/governor_authority",
+    "internal/db:TestFactoryActivationInvalidFields/destination",
+    "internal/db:TestFactoryActivationInvalidFields/nonfinite",
+    "internal/db:TestFactoryActivationInvalidFields/nil_factory",
+    "internal/db:TestFactoryActivationInvalidFields/truncated_orbit",
+    "internal/db:TestFactoryActivationInvalidFields/wrong_notified",
+    "internal/db:TestFactoryActivationInvalidFields/nested_alias",
+    "internal/db:TestFactoryActivationInvalidFields/extra_orbit",
+    "internal/db:TestFactoryActivationInvalidFields/owner",
+    "internal/db:TestFactoryActivationInvalidFields/not_landed",
+    "internal/db:TestFactoryActivationInvalidFields/planet_outside_star",
+    "internal/db:TestFactoryActivationInvalidFields/wrong_cost",
+    "internal/db:TestFactoryActivationInvalidFields/governor",
+    "internal/db:TestFactoryActivationInvalidFields/already_on",
+    "internal/db:TestFactoryActivationInvalidFields/no_crew",
+    "internal/db:TestFactoryActivationInvalidFields/coordinates",
+    "internal/db:TestFactoryActivationInvalidFields/unsupported_cargo",
+    "internal/db:TestFactoryActivationInvalidFields/unsupported_population",
+    "internal/db:TestFactoryActivationInvalidFields/nil_planet",
+    "internal/db:TestFactoryActivationInvalidFields/not_active",
+    "internal/db:TestFactoryActivationInvalidFields/unsupported_orbit",
+    "internal/db:TestFactoryActivationInvalidFields/missing_orbit",
+    "internal/db:TestFactoryActivationInvalidFields/unsupported_carrier",
+    "internal/db:TestFactoryActivationInvalidFields/geometry",
+    "internal/db:TestFactoryActivationInvalidFields/unsupported_sectors",
+    "internal/db:TestFactoryActivationInvalidFields/player",
+    "internal/db:TestFactoryActivationInvalidFields/nil_proposed",
+    "internal/db:TestFactoryActivationInvalidFields/nil_star",
+    "internal/db:TestFactoryActivationInvalidFields/dead",
+    "internal/db:TestFactoryActivationInvalidFields",
+    "internal/db:TestFactoryActivationStaleAndFinalPreconditions/planet",
+    "internal/db:TestFactoryActivationStaleAndFinalPreconditions/factory",
+    "internal/db:TestFactoryActivationStaleAndFinalPreconditions/star_AP",
+    "internal/db:TestFactoryActivationStaleAndFinalPreconditions/orbit_witness",
+    "internal/db:TestFactoryActivationStaleAndFinalPreconditions/missing_factory",
+    "internal/db:TestFactoryActivationStaleAndFinalPreconditions/missing_planet",
+    "internal/db:TestFactoryActivationStaleAndFinalPreconditions/noncanonical",
+    "internal/db:TestFactoryActivationStaleAndFinalPreconditions/after_preparation",
+    "internal/db:TestFactoryActivationStaleAndFinalPreconditions",
+    "internal/db:TestFactoryActivationCWidthCostAndNoAP/0",
+    "internal/db:TestFactoryActivationCWidthCostAndNoAP/7",
+    "internal/db:TestFactoryActivationCWidthCostAndNoAP/32767",
+    "internal/db:TestFactoryActivationCWidthCostAndNoAP/32768",
+    "internal/db:TestFactoryActivationCWidthCostAndNoAP/65535",
+    "internal/db:TestFactoryActivationCWidthCostAndNoAP",
+    "internal/db:TestFactoryActivationFenceAndConcurrentConflict/late=false",
+    "internal/db:TestFactoryActivationFenceAndConcurrentConflict/late=true",
+    "internal/db:TestFactoryActivationFenceAndConcurrentConflict/same_handle_distinct_adapters",
+    "internal/db:TestFactoryActivationFenceAndConcurrentConflict",
+    "internal/game:TestCR17CFactoryCrashChild",
+    "internal/game:TestCR17CFactoryRealProcessCrash/factory.before",
+    "internal/game:TestCR17CFactoryRealProcessCrash/factory.write:1",
+    "internal/game:TestCR17CFactoryRealProcessCrash/factory.before-commit",
+    "internal/game:TestCR17CFactoryRealProcessCrash/factory.after-commit",
+    "internal/game:TestCR17CFactoryRealProcessCrash",
+    "internal/game:TestCR17CFactoryCompleteStateAndBoundaries",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.before/panic=false",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.before/panic=true",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.validated/panic=false",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.validated/panic=true",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.write:1/panic=false",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.write:1/panic=true",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.write:2/panic=false",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.write:2/panic=true",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.before-commit/panic=false",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.before-commit/panic=true",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.commit-error/panic=false",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.commit-error/panic=true",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.after-commit/panic=false",
+    "internal/game:TestCR17CFactoryWriteFailures/factory.after-commit/panic=true",
+    "internal/game:TestCR17CFactoryWriteFailures/fence/panic=false",
+    "internal/game:TestCR17CFactoryWriteFailures/fence/panic=true",
+    "internal/game:TestCR17CFactoryWriteFailures",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/order_#77_on_extra",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/order_*_on",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/order_F_on",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/order_#4294967373_on",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/order_4294967373_on",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/order_#18446744073709551616_on",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/order_#77junk_on",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/order_#_on",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/order_#0_on",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/insufficient_resources",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/already_on",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/inactive",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/no_crew",
+    "internal/game:TestCR17CFactoryValidationAndSelectors/unauthorized_governor",
+    "internal/game:TestCR17CFactoryValidationAndSelectors",
+    "internal/game:TestCR17CFactoryOriginalCCostAndRules/0",
+    "internal/game:TestCR17CFactoryOriginalCCostAndRules/7",
+    "internal/game:TestCR17CFactoryOriginalCCostAndRules/32767",
+    "internal/game:TestCR17CFactoryOriginalCCostAndRules/32768",
+    "internal/game:TestCR17CFactoryOriginalCCostAndRules/65535",
+    "internal/game:TestCR17CFactoryOriginalCCostAndRules",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/legacy_load",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/stored_planet",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/stored_factory",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/stored_star_AP",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/stored_witness",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/after_proposal",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/actor_chain_cycle",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/actor_missing_planet",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/actor_landing_mismatch",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity/factory_absent_from_chain",
+    "internal/game:TestCR17CFactoryStalePreimagesAndIntegrity",
+    "internal/game:TestCR17CWorkspacePrivateCopiesAndBounds",
+    "internal/game:TestCR17CFactoryReadbackAndInstallationFailures/readback_unavailable",
+    "internal/game:TestCR17CFactoryReadbackAndInstallationFailures/install_panic",
+    "internal/game:TestCR17CFactoryReadbackAndInstallationFailures/witness_identity_replaced",
+    "internal/game:TestCR17CFactoryReadbackAndInstallationFailures",
+    "internal/game:TestCR17CFactoryResponseFailureAfterCommit/false",
+    "internal/game:TestCR17CFactoryResponseFailureAfterCommit/true",
+    "internal/game:TestCR17CFactoryResponseFailureAfterCommit",
+    "internal/game:TestCR17CFactoryEnrollmentAndModeCompatibility/enrollment",
+    "internal/game:TestCR17CFactoryEnrollmentAndModeCompatibility/QUIESCED",
+    "internal/game:TestCR17CFactoryEnrollmentAndModeCompatibility/HALTED",
+    "internal/game:TestCR17CFactoryEnrollmentAndModeCompatibility",
+    "internal/game:TestCR17CFactoryOutputAndPrivateStateWaitForCommit",
+    "internal/game:TestCR17CFactoryAdmittedCommandAndFollowingActions/second_activation",
+    "internal/game:TestCR17CFactoryAdmittedCommandAndFollowingActions/quiesce",
+    "internal/game:TestCR17CFactoryAdmittedCommandAndFollowingActions/shutdown",
+    "internal/game:TestCR17CFactoryAdmittedCommandAndFollowingActions/started_cancellation",
+    "internal/game:TestCR17CFactoryAdmittedCommandAndFollowingActions",
+    "internal/game:TestCR17CFactoryQueuedBehindTurnAndCanceled",
+    "internal/game:TestCR17CFactoryInternalCompletionClasses/validation",
+    "internal/game:TestCR17CFactoryInternalCompletionClasses/abort",
+    "internal/game:TestCR17CFactoryInternalCompletionClasses/commit",
+    "internal/game:TestCR17CFactoryInternalCompletionClasses/report_error",
+    "internal/game:TestCR17CFactoryInternalCompletionClasses/uncertain",
+    "internal/game:TestCR17CFactoryInternalCompletionClasses/rejected",
+    "internal/game:TestCR17CFactoryInternalCompletionClasses",
+    "internal/game:TestCR17CFactoryBoundedEffectsAndLegacyBypass/bounded_rendering",
+    "internal/game:TestCR17CFactoryBoundedEffectsAndLegacyBypass/old_landed_helper_cannot_write",
+    "internal/game:TestCR17CFactoryBoundedEffectsAndLegacyBypass/cycle_selector_terminates",
+    "internal/game:TestCR17CFactoryBoundedEffectsAndLegacyBypass",
+    "internal/game:TestCR17CFactoryAuthorizedGovernorAndMixedPrefix/authorized_governor",
+    "internal/game:TestCR17CFactoryAuthorizedGovernorAndMixedPrefix/nonfactory_prefix_cannot_execute",
+    "internal/game:TestCR17CFactoryAuthorizedGovernorAndMixedPrefix",
+    "internal/game:TestCR17CFactoryRetainsPendingAPAdmission"
+  ],
+  "pre_fix": {
+    "expected_exit_code": 1,
+    "runtime_instrumentation": false,
+    "boundary": "actual legacy activation success between PutPlanet and final saveShip",
+    "preserved_artifacts": {
+      "cr17c-pre-fix-fixture.go.txt": "47686fad264ce6fb89ca0a87619f7c856a4a45530c9a2ffd9ee545abc835b6dd",
+      "cr17c-pre-fix-records.json.gz": "a987cd501d596e30d6027a7dd0a7c218eca44415f3fe693e0a12cb4cd83be6c9",
+      "cr17c-pre-fix-reproducer.go.txt": "e5970c4142a48b8289ec9fe94f3bc5a3b670b58620a97528321d40a8d1726ef9",
+      "cr17c-pre-fix.txt": "f72ac3d37f37efe1b595578b3017fbf5bf341a04bd693c7d7ca17e4ba142638c"
+    },
+    "independent_expected_failure_output_sha256": "4f00cd108f82afd06ac30cdc78b4c12880f0fa26e7665ba14bf81556681f1cd1"
+  },
+  "independent_review": {
+    "decision": "APPROVE WITH CONDITIONS after final source, tests and evidence-ledger review; no blocking defect in landed slice",
+    "reviewed_areas": 14,
+    "focused_race_output_sha256": "75458feb7039414e85164a8c293f71342b171646efd6c1edde1827d9b723091d",
+    "focused_db_seconds": 2.938,
+    "focused_game_seconds": 40.316,
+    "critical_race_output_sha256": "801cd76005ca0112941bb7db5c10d1f32aa0b57b9768023f76276e80e0dcbf15",
+    "critical_db_seconds": 1.506,
+    "critical_game_seconds": 7.651,
+    "vet_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "conditions": [
+      "maintainer-applied known-defect-added",
+      "normal owner review",
+      "green hosted CI"
+    ]
+  },
+  "data_format_change": false,
+  "new_public_interface": false,
+  "required_labels": [
+    "known-defect-added"
+  ],
+  "labels_applied_by_agent": [],
+  "hosted_ci": "not yet submitted; container/scanning/kind remain hosted work"
+}
