@@ -7,7 +7,7 @@
 #
 # <images-dir> holds gb-server.oci.tar, gb-server.docker.tar, gbctl.oci.tar and
 # gbctl.docker.tar as written by buildx (type=oci and type=docker exporters of
-# the same build). Environment: EXPECTED_GO_VERSION (e.g. 1.27.3),
+# the same build). Environment: EXPECTED_GO_VERSION (e.g. 1.27.4),
 # SOURCE_DATE_EPOCH, GITHUB_SHA, GITHUB_SERVER_URL, GITHUB_REPOSITORY,
 # GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT (all set by the workflow).
 #

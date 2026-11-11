@@ -64,10 +64,10 @@ permissions:
 env:
   # The reviewed, patched toolchain used for build, tests, race tests and the
   # vulnerability scan. go.mod keeps `go 1.25.0` as the minimum language
-  # version and `toolchain go1.27.3` as the default toolchain; GOTOOLCHAIN=local
+  # version and `toolchain go1.27.4` as the default toolchain; GOTOOLCHAIN=local
   # forbids the Go command from switching toolchains silently in CI, so the
   # scanned standard library is the one the binaries are built with.
-  GO_VERSION: "1.27.3"
+  GO_VERSION: "1.27.4"
   GOTOOLCHAIN: local
   # Pinned versions of the tools that are installed from the Go module proxy
   # (checksums verified against sum.golang.org by the go command) rather than

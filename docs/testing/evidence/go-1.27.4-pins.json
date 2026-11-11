@@ -1,0 +1,31 @@
+{
+  "retrieved_at_utc": "2026-11-11T04:28:18.015266+00:00",
+  "registry": "https://registry-1.docker.io/v2/library/golang",
+  "go_download": {
+    "filename": "go1.27.4.linux-amd64.tar.gz",
+    "os": "linux",
+    "arch": "amd64",
+    "version": "go1.27.4",
+    "sha256": "7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840",
+    "size": 70680823,
+    "kind": "archive"
+  },
+  "images": [
+    {
+      "image": "golang:1.27.4-bookworm",
+      "index_digest": "sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea",
+      "linux_amd64_manifest_digest": "sha256:fb7cceb528b47141eccd9b60bf3cbd27d5ef5f8cf5b7d338bec866da495b50dc",
+      "config_digest": "sha256:a814d7b046f62897ef650fba00fe93031c8c94953f500d4594045ccffcc20f89",
+      "golang_version": "1.27.4",
+      "verification": "HTTPS registry response Docker-Content-Digest equals SHA-256 of exact manifest bytes; amd64 descriptor and config sizes/hashes match; config GOLANG_VERSION verified"
+    },
+    {
+      "image": "golang:1.27.4-alpine",
+      "index_digest": "sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf",
+      "linux_amd64_manifest_digest": "sha256:ea30e25680a5470bac02b08bb0e0a735fb75bd0ab7d431b9b95ee0abef362586",
+      "config_digest": "sha256:3f9f7b68d2300deb4acba48650f28dec9098ead84cd167a56c0e2bf361f24592",
+      "golang_version": "1.27.4",
+      "verification": "HTTPS registry response Docker-Content-Digest equals SHA-256 of exact manifest bytes; amd64 descriptor and config sizes/hashes match; config GOLANG_VERSION verified"
+    }
+  ]
+}

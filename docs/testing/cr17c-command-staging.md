@@ -427,3 +427,58 @@ mine-prefix test and explicit principal/epoch binding in the future dedup design
 address review suggestions. Final evidence-ledger review passed: all source, execution and artifact hashes
 and counts match. No blocking defect remains in the migrated slice. Conditions
 are maintainer acknowledgment, normal owner review and green hosted CI.
+
+## Go 1.27.4 integration revalidation
+
+PR #36's security update was merged into this existing feature branch from
+master `1f43228833909212d7fd83da34c23f4d63cf61ee`, without conflicts or rewriting
+`9b293005200555a7277833fd5ad50ccfedece857`. The seven factory Go files retain
+exactly their independently reviewed hashes. All fifteen security-update files
+match current master byte-for-byte; they are not new changes in PR #35.
+The only additions during this refresh are this section and its
+[fresh execution ledger](evidence/cr17c-go1274-validation.json). The original
+pre-fix proof and Go 1.27.3 execution record above are retained as historical
+measurements, not substituted for the new runs.
+
+Fresh execution on 2026-11-11 UTC used the verified temporary Go 1.27.4 binary,
+`GOTOOLCHAIN=local`, the existing private build cache and this worktree's ignored
+fixture TMPDIR. The system Go installation and every other worktree, including
+the shared Claude checkout and retained audit branch, were left unchanged.
+
+| Check | Actual result |
+| --- | --- |
+| Build / gofmt / vet | PASS |
+| Uncached normal full Go suite | 368 top-level passes / 3,513 passing nodes; two opt-in long tests skipped |
+| `GB_LONG_TESTS=1` uncached full race suite | 370 top-level passes / 3,515 passing nodes; zero test skips/failures |
+| Factory coverage | All 160 cases / 25 top-level entries pass in both full runs |
+| Real SIGKILL / restart | All four phases pass in both runs: before transaction, after first Put, after both Puts before commit, after confirmed commit before reply |
+| Strict govulncheck v1.9.0 | PASS, zero reachable vulnerabilities, 17 non-reachable module findings; no suppression |
+| C fixtures / golden mutations / inventory | PASS; exact C reproduction, all 15 scenarios, all tested entries reconciled |
+| Lint / growth | PASS; 1,008 matched, zero new/stale; exactly the original two removals, no protected tooling delta; local label simulation only |
+| Gate self-tests | PASS; approval, lint and mutation helpers |
+| Workflow helper tests / policy | PASS; 188 tests, 17 policy checks; inherited Go pin regressions retained |
+| actionlint / CI ShellCheck / offline manifests | PASS; unchanged warning-severity policy, 21 valid resources |
+| Modules / diff checks | PASS; verified, tidy has no drift, working and staged diffs clean |
+
+These fresh results supersede the Go 1.27.3 scanner limitation seen in hosted CI.
+The actual actor/transaction tests still prove complete ship/planet persistence,
+in-transaction star/orbit preimages, no private-proposal leakage, bounded output
+after commit, confirmed-abort versus committed-reporting-error versus uncertainty,
+HALTED/no stale shutdown flush, and correct turn/restart installation. No allocator
+or orbital chain mutation was introduced. All full-suite CR-07, CR-17A/B, CR-18,
+CR-43 and PR #34 transport regressions pass; ENROLLMENT_PENDING_TURN remains intact.
+No broader command durability, automatic reconciliation or exactly-once retry
+claim has been added.
+
+Independent integration review found no blocking issue. It verified source and
+security-file identity, repeated critical race-enabled factory/SIGKILL tests
+(db 1.825s, game 11.174s), and ran both WebSocket shutdown/disconnect regressions
+ten times under the race detector (2.364s). Final full-run counts, source and
+execution-log hashes were checked against the fresh ledger.
+
+Verdict remains **PASS WITH CONDITIONS**: normal owner review, maintainer-applied
+`known-defect-added` for the same two removed lint entries, and green hosted CI.
+No new `gate-change-reviewed` acknowledgment is needed relative to patched master.
+The implementation agent applied no labels. Docker/buildx, Trivy, Syft and kind
+remain hosted-CI checks; no live game, database, Kubernetes, image publication,
+deployment or PR merge operation is part of this refresh.

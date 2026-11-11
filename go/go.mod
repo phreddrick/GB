@@ -2,7 +2,7 @@ module github.com/phreddrick/GB/go
 
 go 1.25.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1

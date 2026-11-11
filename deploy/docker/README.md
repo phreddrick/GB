@@ -16,18 +16,18 @@ docker build -f deploy/docker/Dockerfile --target server -t gb-server:dev go
 docker build -f deploy/docker/Dockerfile --target gbctl  -t gbctl:dev     go
 ```
 
-The root `Dockerfile` (alpine runtime, root user, `makeuniv`/`racegen`/`gb-server`) is unchanged and still what CI's `docker` job builds; it is superseded by this file for deployment and will be reduced to a pointer when the CI job is retargeted.
+The root `Dockerfile` (alpine runtime, root user, `makeuniv`/`racegen`/`gb-server`) remains legacy and is still what CI's `docker` job builds; it is superseded by this file for deployment and will be reduced to a pointer when the CI job is retargeted.
 
 ## Pinned base images
 
-Digests are the **image index** digests (multi-platform manifest lists) as reported by the registries on 2026-10-30, so they match what `docker pull <ref>@<digest>` resolves on any platform. They were read, not invented:
+Digests are the **image index** digests (multi-platform manifest lists) as reported by the registries (Go builders refreshed 2026-11-11 UTC; distroless unchanged from 2026-10-30), so they match what `docker pull <ref>@<digest>` resolves on any platform. They were read, not invented:
 
 ```sh
 # Docker Hub (anonymous pull token)
 TOKEN=$(curl -fsS 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/golang:pull' | jq -r .token)
 curl -fsSI -H "Authorization: Bearer $TOKEN" \
   -H 'Accept: application/vnd.oci.image.index.v1+json' \
-  https://registry-1.docker.io/v2/library/golang/manifests/1.27.3-bookworm | grep -i docker-content-digest
+  https://registry-1.docker.io/v2/library/golang/manifests/1.27.4-bookworm | grep -i docker-content-digest
 # gcr.io (anonymous)
 curl -fsSI -H 'Accept: application/vnd.oci.image.index.v1+json' \
   https://gcr.io/v2/distroless/static-debian12/manifests/nonroot | grep -i docker-content-digest
@@ -35,8 +35,17 @@ curl -fsSI -H 'Accept: application/vnd.oci.image.index.v1+json' \
 
 | Image | Index digest | linux/amd64 manifest digest (informational) |
 |---|---|---|
-| `golang:1.27.3-bookworm` | `sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9` | `sha256:e482b31b5d30c31f9e495f4b8cbdf41429b2d74955dfbcd9c0a904483d738390` |
+| `golang:1.27.4-bookworm` | `sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea` | `sha256:fb7cceb528b47141eccd9b60bf3cbd27d5ef5f8cf5b7d338bec866da495b50dc` |
+| `golang:1.27.4-alpine` (legacy root Dockerfile) | `sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf` | `sha256:ea30e25680a5470bac02b08bb0e0a735fb75bd0ab7d431b9b95ee0abef362586` |
 | `gcr.io/distroless/static-debian12:nonroot` | `sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab` | `sha256:52dcfbabb7457ea47c82f6e13af8c8a4a1d9f7b0145142b3ecab20f2b888411d` |
+
+Both Go indexes were fetched with GET and re-hashed to match the registry's
+`Docker-Content-Digest`; their amd64 manifest/config descriptor hashes and sizes
+were checked, including `GOLANG_VERSION=1.27.4` in each config. Repeat the
+registry request for `1.27.4-alpine` for the legacy builder. Full verified pins
+and the official local toolchain checksum are in
+[`go-1.27.4-pins.json`](../../docs/testing/evidence/go-1.27.4-pins.json).
+Image builds and runtime identity checks remain hosted CI work.
 
 The distroless amd64 image config (fetched the same way) declares `User: 65532`, `WorkingDir: /home/nonroot`, `SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt` and no entrypoint. Distroless `nonroot` tags move; the digest does not. Bumps are a reviewed commit that updates both the digest and this table.
 

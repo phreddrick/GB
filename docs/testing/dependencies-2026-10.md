@@ -38,6 +38,12 @@ After the change below: **0 reachable vulnerabilities**; the same 17 unreachable
 
 ## Go toolchain: minimum version versus build toolchain
 
+Historical Phase 0 pins and results below were recorded on 2026-10-28.
+The current toolchain is **Go 1.27.4**; see the
+[security maintenance record](go-1.27.4-security.md) for current pins, registry
+verification and fresh scan evidence. Historical scan results do not establish
+the current vulnerability status.
+
 Two different things are pinned, deliberately:
 
 | Setting | Value | Meaning |

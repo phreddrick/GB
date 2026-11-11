@@ -9,11 +9,11 @@
 # The build context is the Go module directory `go/` (the tracked module,
 # nothing from source/ or docs/), filtered further by go/.dockerignore.
 #
-# Pinned bases (image INDEX digests reported by the registries themselves on
-# 2026-10-30, Docker-Content-Digest of GET /v2/<repo>/manifests/<tag> with
-# the OCI index media type; see deploy/docker/README.md for the exact
+# Pinned bases (image INDEX digests reported by the registries themselves):
+# Go builder: 2026-11-11; runtime: 2026-10-30. Docker-Content-Digest of
+# GET /v2/<repo>/manifests/<tag> with the OCI index media type; see deploy/docker/README.md for the exact
 # commands and the per-platform manifest digests):
-#   golang:1.27.3-bookworm                sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9
+#   golang:1.27.4-bookworm                sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea
 #   gcr.io/distroless/static-debian12:nonroot  sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 #
 # NOT BUILT OR RUN ANYWHERE YET: no container runtime exists on the
@@ -21,17 +21,17 @@
 # Actions job added in the next stage. Everything below is static.
 
 # ---------------------------------------------------------------- builder --
-FROM golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS builder
+FROM golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS builder
 
 # The reviewed, patched toolchain CI uses (go.mod: go 1.25.0, toolchain
-# go1.27.3). GOTOOLCHAIN=local forbids silent toolchain switching; the RUN
-# assertion fails the build if the base image is not go1.27.3.
+# go1.27.4). GOTOOLCHAIN=local forbids silent toolchain switching; the RUN
+# assertion fails the build if the base image is not go1.27.4.
 ENV GOTOOLCHAIN=local \
     GOFLAGS=-mod=readonly \
     CGO_ENABLED=0 \
     GOOS=linux \
     GOARCH=amd64
-RUN go version && (go version | grep -q 'go1.27.3 ' || { echo "builder toolchain is not go1.27.3" >&2; exit 1; })
+RUN go version && (go version | grep -q 'go1.27.4 ' || { echo "builder toolchain is not go1.27.4" >&2; exit 1; })
 
 WORKDIR /src
 

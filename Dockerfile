@@ -8,14 +8,14 @@
 # replaced by a pointer when the CI job is retargeted in the next stage.
 
 # Stage 1: Build all Go binaries.
-# Builder pinned to the same patched Go toolchain CI uses (1.27.3). The digest
+# Builder pinned to the same patched Go toolchain CI uses (1.27.4). The digest
 # is the multi-architecture index digest reported by Docker Hub's registry
-# (HEAD /v2/library/golang/manifests/1.27.3-alpine, Docker-Content-Digest,
-# 2026-10-28). GOTOOLCHAIN=local forbids the Go command from switching
-# toolchains; the RUN assertion fails the build if the image is not go1.27.3.
-FROM golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS builder
+# (GET /v2/library/golang/manifests/1.27.4-alpine, Docker-Content-Digest,
+# 2026-11-11). GOTOOLCHAIN=local forbids the Go command from switching
+# toolchains; the RUN assertion fails the build if the image is not go1.27.4.
+FROM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS builder
 ENV GOTOOLCHAIN=local
-RUN go version && (go version | grep -q 'go1.27.3 ' || { echo "builder toolchain is not go1.27.3" >&2; exit 1; })
+RUN go version && (go version | grep -q 'go1.27.4 ' || { echo "builder toolchain is not go1.27.4" >&2; exit 1; })
 WORKDIR /src
 COPY . .
 
