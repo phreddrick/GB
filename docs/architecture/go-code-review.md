@@ -539,3 +539,20 @@ allowed. See [scope, C differences, original-failure and crash evidence](../test
 Other commodities, stockpile-transfer volatile AP, navigation, construction and
 command-ID/outbox work remain deferred. CR-17/CR-11/CR-13/CR-20 remain OPEN; prior
 implementation entries above describe their historical bounded scopes.
+
+
+**CR-17C #41A noncombat population/troops:** explicit single-ID `load/unload
+#N c|m [amount]` stages selected ship plus partner ship or landing-sector planet.
+Population, mass, embedded sector ownership and matching planet/per-player
+accounting commit in one checked transaction before actor installation and
+buffered success. C shared crew capacity, signed/default order, zero AP and the
+approved containing-carrier mass treatment are retained; nonzero cross-owner
+ship transfers remain forbidden. An explicit owner decision corrects the two C
+empty-sector counter bugs by charging counts/mobilization only on actual
+ownership transitions. Hostile-sector c/m and targeted transporter combinations
+fail closed before the legacy effects; #41B/#51 and #42 remain deferred.
+Fresh source verification narrows CR-19: ship-unload assault already assigns
+captured Owner, while ground movement still lacks C's defender-elimination
+ownership assignment. No combat code is fixed or declared complete here.
+See [implementation, C inventory, pre-fix records and crash evidence](../testing/cr17c-noncombat-population.md).
+Issues #38/#41/#51 and CR-17/CR-11/CR-13/CR-20 remain open.
