@@ -54,6 +54,9 @@ func (s *State) cmdUnload(p, g int, args []string, sess net.Responder) {
 // mode=false → load (C: mode=0); mode=true → unload (C: mode=1).
 // Mirrors load() in load.c.
 func (s *State) doLoad(p, g int, args []string, sess net.Responder, unloadMode bool) {
+	if s.handleCargo(p, g, args, sess, unloadMode) {
+		return
+	}
 	if len(args) < 2 {
 		sess.Send("Load what?\n")
 		return

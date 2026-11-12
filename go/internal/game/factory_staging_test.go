@@ -414,14 +414,15 @@ func TestCR17CFactoryOriginalCCostAndRules(t *testing.T) {
 }
 
 func TestCR17CFactoryStalePreimagesAndIntegrity(t *testing.T) {
-	for _, kind := range []string{"legacy load", "stored planet", "stored factory", "stored star AP", "stored witness", "after proposal", "actor chain cycle", "actor missing planet", "actor landing mismatch", "factory absent from chain"} {
+	for _, kind := range []string{"legacy fuel load", "stored planet", "stored factory", "stored star AP", "stored witness", "after proposal", "actor chain cycle", "actor missing planet", "actor landing mismatch", "factory absent from chain"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFactoryFixture(t)
 			switch kind {
-			case "legacy load":
-				out := f.command(t, fmt.Sprintf("load #%d r 1", f.state.races[0].GovShip))
+			case "legacy fuel load":
+				prepareLegacyFuelLoad(t, f.actorEnrollmentFixture, f.star, f.planet, f.state.races[0].GovShip, 100)
+				out := f.command(t, fmt.Sprintf("load #%d f 1", f.state.races[0].GovShip))
 				if !strings.Contains(out, "transferred") {
-					t.Fatal("legacy load not exercised")
+					t.Fatal("legacy fuel load not exercised")
 				}
 			case "stored planet":
 				p, e := f.store.GetPlanet(f.star, f.planet)

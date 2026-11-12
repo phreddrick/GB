@@ -487,7 +487,10 @@ func (s *State) savePlanet(planet *model.Planet) {
 
 // saveShip persists a ship back to the DB.
 func (s *State) saveShip(ship *model.Ship) {
-	_ = s.store.PutShip(ship)
+	err := s.store.PutShip(ship)
+	if err == nil && s.testHooks != nil && s.testHooks.afterLegacyShipWrite != nil {
+		s.testHooks.afterLegacyShipWrite(ship.Number)
+	}
 }
 
 // saveStar persists a star back to the DB.

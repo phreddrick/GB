@@ -1,0 +1,759 @@
+{
+  "baseline": "5c3c8912330f77fbc81781069cff39cbb3014321",
+  "toolchain": "go1.27.4",
+  "GOTOOLCHAIN": "local",
+  "environment": "Linux amd64; disposable bbolt and subprocess fixtures only",
+  "source_files_sha256": {
+    "go/internal/commandrules/cargo.go": "f08dd752131afbf419a4407943db59eea03a0d416cc789bbf250d95d85cfa5ca",
+    "go/internal/commandrules/cargo_test.go": "baf67ee5ccb69b7a5c7276f8bb5adb8128cef8b64261a968b0c9cd49e71df54c",
+    "go/internal/db/cargo.go": "57d383e5eb9efe40312ff0b1717f98cef5865900234517e7186274ad105e9c46",
+    "go/internal/db/cargo_test.go": "70a7a5dbf433877258399a313d766ac88c72d8f4a556251c49b6836f433682f1",
+    "go/internal/game/cargo_command.go": "23198a7b0f0b6386544e86b027a76368739fb8e5656a8608fda891334125d004",
+    "go/internal/game/cargo_crash_test.go": "d5515ec4f7cda744ec633aff9201eba037dcc4465d0d83871984943514ee038f",
+    "go/internal/game/cargo_staging_test.go": "7873d6c8535d386768036602e6aea772dbbe15c2acb87456afc21769fef2b8bf",
+    "go/internal/game/cargo_test.go": "2d10373a6a69a38d0508372cb562de3390989d4b32bcb2ffe455491e8c5a6a16",
+    "go/internal/game/command_records_test.go": "5a33da2c98c7b2547b050342236aaac25fa8d0c30ca983d6f105840471717c88",
+    "go/internal/game/commands_load.go": "e2ea13d4387d8f17d147ddd4c4339251dcfe8ab56a02e993818d97441450a2b4",
+    "go/internal/game/factory_staging_test.go": "e6a530546c8d14ac99f99705fb4dfb9d525cbd7dd0386bce437dcfbb60b7c7f0",
+    "go/internal/game/habitat_staging_test.go": "df2658ab33d66b95cbb529f31e4774751a5fa759290272233558ac19741ad4c6",
+    "go/internal/game/helpers.go": "9208568b3f997e6e8275302e904a14d58151828cca93fdfeb05e7c2582238ad5",
+    "go/internal/game/lifecycle.go": "c546bd7a09c270b37fef54268600a59fdeb0754bd35b9ffb685a76e5a386579d",
+    "go/internal/game/planet_ownership_test.go": "b140e02cab2d227052b67149dddca03e53f2b0d6dcb955b59837388856850eaa"
+  },
+  "pre_fix_artifacts_sha256": {
+    "cr17c-cargo-pre-fix-hook.patch.gz": "0caa2b077b54f76e41744afc3b69038271fd0e86905ca64a0479b98a8e37fc79",
+    "cr17c-cargo-pre-fix.txt": "f4a328c334503b949c66b966ed0868c81710cc422e27c3886dc9b7be1cab6a50",
+    "cr17c-cargo-pre-fix-fixture.go.txt": "af6c0fb9eccbf946f720064a1e19aaa66899d25f01eb298cf71c433b77a9df29",
+    "cr17c-cargo-pre-fix-records.json.gz": "9015e13f5d025d9d7bf6fe20b191f4754d69b30ca8c632ee442bc6a5291b1455",
+    "cr17c-cargo-pre-fix-records.json (uncompressed)": "fc2616fbef1da79819b026d248082700d2018e4a8192d6802174c3a6585e9ce4",
+    "cr17c-cargo-pre-fix-hook.patch (uncompressed)": "ce1929d5983819c5244c5a436be09e17b6c083325f51246be549b25431ef8c27"
+  },
+  "checks": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game",
+        "-run",
+        "Cargo|TestCR17ALegacyFuel|TestCR17BDumpStale|TestCR17CFactoryStale|TestCR17CHabitatStale"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 12.01,
+      "exit_code": 0,
+      "check": "focused-final-normal",
+      "started_utc": "2026-11-12T04:30:11.595837+00:00",
+      "out_sha256": "87dd37444108452c7e10483cd857a5c778bc0790876e60d92c08d1952f8570e0",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_nodes": {
+        "pass": 337
+      },
+      "top_level_tests": {
+        "pass": 23
+      },
+      "packages": {
+        "pass": 3
+      },
+      "failed_tests": [],
+      "skipped_tests": [],
+      "cargo_nodes": {
+        "pass": 297
+      },
+      "cargo_sigkill_leaves": 12
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 87.523,
+      "exit_code": 0,
+      "check": "normal",
+      "started_utc": "2026-11-12T04:33:13.055411+00:00",
+      "out_sha256": "3d8fb1fe3cccc154a09bcc09965e0a02bff24dbc879a567c6939ddd5aeef6f6c",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_nodes": {
+        "pass": 4248,
+        "skip": 2
+      },
+      "top_level_tests": {
+        "pass": 438,
+        "skip": 2
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 21
+      },
+      "failed_tests": [],
+      "skipped_tests": [
+        "TestGB104LongCommandWithProductionTiming",
+        "TestGB104RealEngineLongTurnKeepsHealthyClient"
+      ],
+      "cargo_nodes": {
+        "pass": 297
+      },
+      "cargo_sigkill_leaves": 12
+    },
+    {
+      "command": [
+        "env",
+        "GB_LONG_TESTS=1",
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 574.098,
+      "exit_code": 1,
+      "check": "long-race",
+      "started_utc": "2026-11-12T04:33:13.279987+00:00",
+      "out_sha256": "39c6d93e09ce3f62a896abd13982413c17700fde7cd05df31bfd7d294cd19b60",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_nodes": {
+        "pass": 4248,
+        "fail": 2
+      },
+      "top_level_tests": {
+        "pass": 439,
+        "fail": 1
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 20,
+        "fail": 1
+      },
+      "failed_tests": [
+        "TestPrivateEnrollmentTimeoutAndUncertainty/after-commit",
+        "TestPrivateEnrollmentTimeoutAndUncertainty"
+      ],
+      "skipped_tests": [],
+      "cargo_nodes": {
+        "pass": 297
+      },
+      "cargo_sigkill_leaves": 12
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=3",
+        "-race",
+        "-json",
+        "./internal/admin",
+        "-run",
+        "^TestPrivateEnrollmentTimeoutAndUncertainty$"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 23.114,
+      "exit_code": 0,
+      "check": "admin-timeout-race",
+      "started_utc": "2026-11-12T04:37:07.329238+00:00",
+      "out_sha256": "5ceebfe8078df85cabadcf0060643716a095ed93e283e48448773cdcb41f2723",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_nodes": {
+        "pass": 15
+      },
+      "top_level_tests": {
+        "pass": 3
+      },
+      "packages": {
+        "pass": 1
+      },
+      "failed_tests": [],
+      "skipped_tests": [],
+      "cargo_nodes": {},
+      "cargo_sigkill_leaves": 0
+    },
+    {
+      "command": [
+        "env",
+        "GB_LONG_TESTS=1",
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-p=1",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 760.843,
+      "exit_code": 0,
+      "check": "long-race-serial-packages",
+      "started_utc": "2026-11-12T04:42:47.790317+00:00",
+      "out_sha256": "ecdb987b1d7e9b28e5d9a11e3d92d77d78397fd1c6e1844ae22c4bb92a108792",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_nodes": {
+        "pass": 4250
+      },
+      "top_level_tests": {
+        "pass": 440
+      },
+      "packages": {
+        "skip": 6,
+        "pass": 21
+      },
+      "failed_tests": [],
+      "skipped_tests": [],
+      "cargo_nodes": {
+        "pass": 297
+      },
+      "cargo_sigkill_leaves": 12
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/inventory-check.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 88.618,
+      "exit_code": 0,
+      "check": "inventory",
+      "started_utc": "2026-11-12T04:33:13.080922+00:00",
+      "out_sha256": "d4d602c1dc86aa575b529ccdd93545bea83af0db2796e81305c0c84f799e2664",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/golden-mutations.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 713.901,
+      "exit_code": 0,
+      "check": "mutations",
+      "started_utc": "2026-11-12T04:33:13.396316+00:00",
+      "out_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/lint-gate.sh",
+        "/tmp/cr17c-cargo-evidence/lint-current.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 13.052,
+      "exit_code": 0,
+      "check": "lint",
+      "started_utc": "2026-11-12T04:33:36.970008+00:00",
+      "out_sha256": "92940dbb367d0b1841928c26cbebcb51fd04a62ec248116fea63f02895148b58",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "run",
+        "golang.org/x/vuln/cmd/govulncheck@v1.9.0",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 5.011,
+      "exit_code": 0,
+      "check": "govuln",
+      "started_utc": "2026-11-12T04:33:36.891688+00:00",
+      "out_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "deploy/kustomize/tests/run.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 37.703,
+      "exit_code": 0,
+      "check": "manifests",
+      "started_utc": "2026-11-12T04:33:37.381977+00:00",
+      "out_sha256": "57f4110056c60029e6eb8c23109f4f8d88bb70b9b31171745886f01e682545f2",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".github/scripts",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 33.598,
+      "exit_code": 0,
+      "check": "workflow",
+      "started_utc": "2026-11-12T04:33:36.579040+00:00",
+      "out_sha256": "1015c29937e20b246a556a9fb77e9bd66a1835c17a882dd110bec18ab3c90eb2",
+      "err_sha256": "c627ae979014c63fe41dac260689cdf2de533c706bdb7e4046641ba5ca6634ff"
+    },
+    {
+      "command": [
+        "go",
+        "build",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 1.337,
+      "exit_code": 0,
+      "check": "build",
+      "started_utc": "2026-11-12T04:34:02.059365+00:00",
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "test -z \"$(gofmt -l .)\""
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.219,
+      "exit_code": 0,
+      "check": "format",
+      "started_utc": "2026-11-12T04:34:03.444944+00:00",
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 1.527,
+      "exit_code": 0,
+      "check": "vet",
+      "started_utc": "2026-11-12T04:34:03.721438+00:00",
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "mod",
+        "verify"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.416,
+      "exit_code": 0,
+      "check": "module-verify",
+      "started_utc": "2026-11-12T04:34:05.305081+00:00",
+      "out_sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "mod",
+        "tidy",
+        "-diff"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.065,
+      "exit_code": 0,
+      "check": "module-tidy",
+      "started_utc": "2026-11-12T04:34:05.774760+00:00",
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "make",
+        "-C",
+        "test/ctool",
+        "check"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 1.931,
+      "exit_code": 0,
+      "check": "c-fixtures",
+      "started_utc": "2026-11-12T04:34:05.893212+00:00",
+      "out_sha256": "bfbcf7f8382963331b2ed70c08e3e3726ca94b183de29ed5b3f7cf9591ce95b1",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "actionlint",
+        "-no-color"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.218,
+      "exit_code": 0,
+      "check": "actionlint",
+      "started_utc": "2026-11-12T04:34:07.891849+00:00",
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "shellcheck -S warning .github/scripts/*.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 3.118,
+      "exit_code": 0,
+      "check": "shellcheck",
+      "started_utc": "2026-11-12T04:34:08.178565+00:00",
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "python3",
+        ".github/scripts/workflow_policy_check.py"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.167,
+      "exit_code": 0,
+      "check": "workflow-policy",
+      "started_utc": "2026-11-12T04:34:11.345941+00:00",
+      "out_sha256": "1015c29937e20b246a556a9fb77e9bd66a1835c17a882dd110bec18ab3c90eb2",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/golden-mutations-selftest.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 133.571,
+      "exit_code": 0,
+      "check": "golden-mutations-selftest",
+      "started_utc": "2026-11-12T04:34:05.575510+00:00",
+      "out_sha256": "97c280045f4c80954a3ebf2f84dded376fa8e0bb927df473cb6f0c71880d6bd0",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/lint-gate-selftest.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 28.005,
+      "exit_code": 0,
+      "check": "lint-gate-selftest",
+      "started_utc": "2026-11-12T04:36:19.182431+00:00",
+      "out_sha256": "e321014e06fa25c1deb598aab46eded8060b2e93f24d8e124882f8a783eb3fa4",
+      "err_sha256": "73b6fe4771e24b214f3f9a8578a04b5f0a9d153d230a6c56fe9bdb7ccf362238"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/gate-approval-selftest.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 5.025,
+      "exit_code": 0,
+      "check": "gate-approval-selftest",
+      "started_utc": "2026-11-12T04:36:47.219268+00:00",
+      "out_sha256": "0793630382f69a970efd2f3edf88526ac84ceb8872a21698f7a010f41e5001fc",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/growth-gate.sh",
+        "5c3c8912330f77fbc81781069cff39cbb3014321"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.516,
+      "exit_code": 0,
+      "check": "growth",
+      "started_utc": "2026-11-12T04:34:11.568269+00:00",
+      "out_sha256": "3829278a9d0341937473b7b20921b323120d9cea826b6013ab520dbeaa902238",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/growth-gate.sh",
+        "5c3c8912330f77fbc81781069cff39cbb3014321"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.315,
+      "exit_code": 0,
+      "check": "growth-final",
+      "started_utc": "2026-11-12T04:57:34.598916+00:00",
+      "out_sha256": "3829278a9d0341937473b7b20921b323120d9cea826b6013ab520dbeaa902238",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.017,
+      "exit_code": 0,
+      "check": "diff-check",
+      "started_utc": "2026-11-12T04:34:12.139297+00:00",
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.008,
+      "exit_code": 2,
+      "check": "staged-whitespace-before",
+      "started_utc": "2026-11-12T04:46:15.096551+00:00",
+      "out_sha256": "dfeaf32ad444501fb736d2e8a19b9521c65d0d45ba00418538d72fc4fec1d822",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.008,
+      "exit_code": 0,
+      "check": "staged-diff-final",
+      "started_utc": "2026-11-12T04:57:34.946748+00:00",
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "version"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.008,
+      "exit_code": 0,
+      "check": "toolchain-version",
+      "started_utc": "2026-11-12T04:43:54.790138+00:00",
+      "out_sha256": "a29205bd83967c2f70e6768fae009600038d6056499fa289de9d5f9b79beaef4",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "env",
+        "GOTOOLCHAIN"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 0.008,
+      "exit_code": 0,
+      "check": "toolchain-mode",
+      "started_utc": "2026-11-12T04:43:54.834298+00:00",
+      "out_sha256": "efb83f2a277e9f49b38efd505f5cbb93885e721b6bd16b788937c9396174c006",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "-overlay=/tmp/cr17c-cargo-evidence/reintroduced-overlay.json",
+        "./internal/game",
+        "-run",
+        "^TestCargoAtomicTransfer$"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 5.944,
+      "exit_code": 1,
+      "check": "original-defect-reintroduced",
+      "started_utc": "2026-11-12T04:34:07.171486+00:00",
+      "out_sha256": "0918aa5e2a0c4474345d3564cdfd0f9e3e81413a4df22e3c2fb259086fd7a224",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_nodes": {
+        "fail": 13
+      },
+      "top_level_tests": {
+        "fail": 1
+      },
+      "packages": {
+        "fail": 1
+      },
+      "failed_tests": [
+        "TestCargoAtomicTransfer/ships=false/r/load",
+        "TestCargoAtomicTransfer/ships=false/r/unload",
+        "TestCargoAtomicTransfer/ships=false/x/load",
+        "TestCargoAtomicTransfer/ships=false/x/unload",
+        "TestCargoAtomicTransfer/ships=false/&/load",
+        "TestCargoAtomicTransfer/ships=false/&/unload",
+        "TestCargoAtomicTransfer/ships=true/r/load",
+        "TestCargoAtomicTransfer/ships=true/r/unload",
+        "TestCargoAtomicTransfer/ships=true/x/load",
+        "TestCargoAtomicTransfer/ships=true/x/unload",
+        "TestCargoAtomicTransfer/ships=true/&/load",
+        "TestCargoAtomicTransfer/ships=true/&/unload",
+        "TestCargoAtomicTransfer"
+      ],
+      "skipped_tests": [],
+      "cargo_nodes": {
+        "fail": 13
+      },
+      "cargo_sigkill_leaves": 0
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-overlay=/tmp/cr17c-cargo-evidence/owner-overlay.json",
+        "-json",
+        "./internal/db",
+        "-run",
+        "^TestCargoStoreCoherentAuthorityAndCrystalContracts$/^foreign_selected$"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 1.619,
+      "exit_code": 1,
+      "check": "owner-guard-counterexample",
+      "started_utc": "2026-11-12T04:26:14.300722+00:00",
+      "out_sha256": "7acd9839a12bc136f0ad9aa57fce4aaf76db365294ee15fbc7a1a7b53b3ab69b",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-overlay=/tmp/cr17c-cargo-evidence/governor-overlay.json",
+        "-json",
+        "./internal/db",
+        "-run",
+        "^TestCargoStoreCoherentAuthorityAndCrystalContracts$/^wrong_selected_governor$"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 1.619,
+      "exit_code": 1,
+      "check": "governor-guard-counterexample",
+      "started_utc": "2026-11-12T04:26:15.949476+00:00",
+      "out_sha256": "00037125e92f7f63211c1c116d2a4bc94837f2ca1e2debfe6ef4123f52ddb98d",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./internal/game",
+        "-run",
+        "^TestCargoForeignOwnershipAndUniverse$/^star$"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 2.076,
+      "exit_code": 1,
+      "check": "star-peer-before",
+      "started_utc": "2026-11-12T04:28:59.357594+00:00",
+      "out_sha256": "5b8c683028b38a1f617754539878c6589300e344524096e8dce2eba61acbba74",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./internal/game",
+        "-run",
+        "^TestCargoForeignOwnershipAndUniverse$/^star$"
+      ],
+      "cwd": "/tmp/GB-cr17c-cargo/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "elapsed_seconds": 2.444,
+      "exit_code": 0,
+      "check": "star-peer-after",
+      "started_utc": "2026-11-12T04:29:18.634489+00:00",
+      "out_sha256": "3ce4aaedb97ce733c415415caafe577ab774e5956e83d751178b35a9ee5536ce",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "interpretation": "Counterexample checks intentionally exit1. The staged-whitespace-before exit2 was corrected by lossless artifact compression; final staged checks pass. Initial parallel long race timeout is preserved; repeated admin and complete serial-package long race results are separate executions. Raw private logs are not committed because full-suite transport fixtures can contain disposable authentication data. SHA-256 does not substitute for test assertions."
+}

@@ -524,3 +524,18 @@ behavior: activation and restart-before-turn preserve both owners; later Go
 `doShip` may synchronize the containing habitat's Owner/Governor from its child.
 C runs an earlier `doown` prepass that Go still omits. This follow-up changes no
 turn code and does not claim cross-owner whole-turn C parity or close CR-13.
+
+
+**CR-17C noncombat cargo follow-up (issue #40):** exact single-ID resource and
+crystal (`x`/`&`) load/unload now stages selected ship plus one planet stockpile
+or partner ship, validates complete caller/location/orbit preimages inside one
+bbolt transaction, then installs stable actor objects and releases bounded output.
+Original-C zero AP and Go's intended containing-carrier aggregate-mass exemption
+are explicit owner decisions. C crystal capacity127, selected-governor authority
+and reciprocal docking identity are restored; foreign resource gifts remain
+permitted while foreign taking/nonzero crystal transfers are restricted. No
+wrapping, transporter side effects or legacy fallback for eligible selectors is
+allowed. See [scope, C differences, original-failure and crash evidence](../testing/cr17c-noncombat-cargo.md).
+Other commodities, stockpile-transfer volatile AP, navigation, construction and
+command-ID/outbox work remain deferred. CR-17/CR-11/CR-13/CR-20 remain OPEN; prior
+implementation entries above describe their historical bounded scopes.

@@ -716,14 +716,15 @@ func TestCR17CHabitatNestedCarrierAndLocations(t *testing.T) {
 }
 
 func TestCR17CHabitatStalePreimagesAndIntegrity(t *testing.T) {
-	for _, kind := range []string{"legacy load", "stored carrier", "stored factory", "stored docked witness", "stored planet", "stored star AP", "stored race", "after proposal", "actor carrier chain cycle", "actor planet chain cycle", "actor missing carrier", "actor dead carrier", "actor missing planet", "actor carrier location mismatch", "actor destination mismatch", "factory absent from carrier chain", "carrier absent from planet chain", "witness pointer replaced"} {
+	for _, kind := range []string{"legacy fuel load", "stored carrier", "stored factory", "stored docked witness", "stored planet", "stored star AP", "stored race", "after proposal", "actor carrier chain cycle", "actor planet chain cycle", "actor missing carrier", "actor dead carrier", "actor missing planet", "actor carrier location mismatch", "actor destination mismatch", "factory absent from carrier chain", "carrier absent from planet chain", "witness pointer replaced"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newHabitatFixture(t)
 			switch kind {
-			case "legacy load":
-				out := f.command(t, fmt.Sprintf("load #%d r 1", f.state.races[0].GovShip))
+			case "legacy fuel load":
+				prepareLegacyFuelLoad(t, f.actorEnrollmentFixture, f.star, f.planet, f.state.races[0].GovShip, 100)
+				out := f.command(t, fmt.Sprintf("load #%d f 1", f.state.races[0].GovShip))
 				if !strings.Contains(out, "transferred") {
-					t.Fatal("legacy load not exercised")
+					t.Fatal("legacy fuel load not exercised")
 				}
 			case "stored carrier":
 				sh, e := f.store.GetShip(f.carrier)

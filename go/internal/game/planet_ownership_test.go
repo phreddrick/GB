@@ -19,23 +19,24 @@ type planetCommandFixture struct {
 	ship         uint32
 }
 
-func TestCR17ALegacyLoadCannotBeOverwrittenByPlanetEdit(t *testing.T) {
+func TestCR17ALegacyFuelLoadCannotBeOverwrittenByPlanetEdit(t *testing.T) {
 	for _, edit := range []string{"route 1 activate", "transfer 2 r 7"} {
 		t.Run(strings.Fields(edit)[0], func(t *testing.T) {
 			f := newPlanetCommandFixture(t)
+			prepareLegacyFuelLoad(t, f.actorEnrollmentFixture, f.star, f.planet, f.ship, 500)
 			before := f.actorPlanet(t)
-			out := f.command(t, fmt.Sprintf("load #%d r 7", f.ship))
-			if !strings.Contains(out, "7 resources transferred") || before.Info[0].Resource != 1000 || f.storedPlanet(t).Info[0].Resource != 993 || f.actorPlanet(t).Info[0].Resource != 1000 {
-				t.Fatal("deferred legacy load did not reach the stale-copy boundary")
+			out := f.command(t, fmt.Sprintf("load #%d f 7", f.ship))
+			if !strings.Contains(out, "7 fuel transferred") || before.Info[0].Fuel != 500 || f.storedPlanet(t).Info[0].Fuel != 493 || f.actorPlanet(t).Info[0].Fuel != 500 {
+				t.Fatal("deferred legacy fuel load did not reach the stale-copy boundary")
 			}
 			ship, e := f.store.GetShip(f.ship)
-			if e != nil || ship.Resource != 7 {
+			if e != nil || ship.Fuel != 7 {
 				t.Fatal("load cargo was not persisted", e)
 			}
 			actorBefore, diskBefore := actorEnrollmentSnapshot(t, f.actorEnrollmentFixture), enrollmentDBSnapshot(t, f.actorEnrollmentFixture)
 			out = f.command(t, edit)
 			if f.state.Mode() != ModeHalted || strings.Contains(out, "Set.") || strings.Contains(out, "transferred") || !strings.Contains(out, "operator review") {
-				t.Fatal("new edit overwrote an uncorrected legacy load or falsely succeeded")
+				t.Fatal("new edit overwrote an uncorrected legacy fuel load or falsely succeeded")
 			}
 			if actorEnrollmentSnapshot(t, f.actorEnrollmentFixture) != actorBefore || enrollmentDBSnapshot(t, f.actorEnrollmentFixture) != diskBefore {
 				t.Fatal("preimage refusal changed actor/store/allocator/placement")
@@ -44,7 +45,7 @@ func TestCR17ALegacyLoadCannotBeOverwrittenByPlanetEdit(t *testing.T) {
 				t.Fatal("halted state was flushed", e)
 			}
 			if enrollmentDBSnapshot(t, f.actorEnrollmentFixture) != diskBefore {
-				t.Fatal("shutdown erased the stored legacy load")
+				t.Fatal("shutdown erased the stored legacy fuel load")
 			}
 		})
 	}
