@@ -423,23 +423,27 @@ func TestCR17BDumpInvalidAndModeRefusal(t *testing.T) {
 }
 
 func TestCR17BDumpStaleAndMissingActorState(t *testing.T) {
-	for _, kind := range []string{"legacy load", "store star AP", "store unchanged planet", "missing actor planet", "actor planet identity", "actor identity"} {
+	for _, kind := range []string{"legacy fuel load", "store star AP", "store unchanged planet", "missing actor planet", "actor planet identity", "actor identity"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newDumpFixture(t)
 			switch kind {
-			case "legacy load":
+			case "legacy fuel load":
 				var ship uint32
 				onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
 					r := f.state.races[0]
 					ship = r.GovShip
 					p := f.state.planets[f.home][0]
-					p.Info[0].Resource = 100
+					p.Info[0].Fuel = 100
+					f.state.ships[ship].MaxFuel = 100
+					if e := f.store.PutShip(f.state.ships[ship]); e != nil {
+						t.Error(e)
+					}
 					if e := f.store.PutPlanet(p); e != nil {
 						t.Error(e)
 					}
 				})
-				if out := f.command(t, fmt.Sprintf("load #%d r 7", ship)); !strings.Contains(out, "transferred") {
-					t.Fatal("legacy load boundary not exercised")
+				if out := f.command(t, fmt.Sprintf("load #%d f 7", ship)); !strings.Contains(out, "transferred") {
+					t.Fatal("legacy fuel load boundary not exercised")
 				}
 			case "store star AP":
 				st, e := f.store.GetStar(f.home)

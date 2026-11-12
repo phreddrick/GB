@@ -1,0 +1,17 @@
+Baseline 5c3c8912330f77fbc81781069cff39cbb3014321; actual actor dispatch; expected exit1.
+Only reproduction instrumentation: private afterLegacyShipWrite hook after real successful PutShip; never production configured.
+Planet fence raised by transfer-output responder after PutPlanet, before source save. Ship peer fence raised after real partner save, before source save.
+All twelve desired atomicity cases fail before migration. Complete sanitized records include before, first-write, after-command, segment, update, restart.
+case | first stored selected/other resource or crystals | after stored selected/other | actor/star AP after command / stored AP
+false-&-load | 1/19 | 1/19 | 4/5
+false-&-unload | 1/21 | 1/21 | 4/5
+false-r-load | 10/99 | 10/99 | 4/5
+false-r-unload | 10/101 | 10/101 | 4/5
+false-x-load | 1/19 | 1/19 | 4/5
+false-x-unload | 1/21 | 1/21 | 4/5
+true-&-load | 1/9 | 1/9 | 4/5
+true-&-unload | 1/11 | 1/11 | 4/5
+true-r-load | 10/29 | 10/29 | 4/5
+true-r-unload | 10/31 | 10/31 | 4/5
+true-x-load | 1/9 | 1/9 | 4/5
+true-x-unload | 1/11 | 1/11 | 4/5
