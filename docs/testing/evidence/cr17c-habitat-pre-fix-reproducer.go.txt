@@ -1,0 +1,80 @@
+package game
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+)
+
+type habitatReproResponder struct {
+	recordingResponder
+	after func()
+}
+
+func (r *habitatReproResponder) Send(text string) error {
+	e := r.recordingResponder.Send(text)
+	if strings.Contains(text, "Factory activated") && r.after != nil {
+		r.after()
+	}
+	return e
+}
+
+// Desired atomic assertions on the unmodified runtime baseline. The legacy
+// habitat branch saves the carrier, prints the success text, and only then
+// returns to giveOrders, which sets On/Notified and saves the factory. The
+// existing success output is therefore the real boundary between the two
+// writes; the responder raises the existing CR-18 write fence there so the
+// second write fails. No runtime instrumentation is added.
+func TestCR17CPreFixHabitatPartialWrite(t *testing.T) {
+	f := newHabitatFixture(t)
+	stages := map[string]habitatWorld{"before": f.snapshot(t)}
+	r := &habitatReproResponder{}
+	r.after = func() { stages["after-carrier-write"] = f.captureOnActor(t); f.store.SetWriteFence(true) }
+	if e := f.state.HandleCommand(ctxT(t, 10*time.Second), 1, 0, fmt.Sprintf("order #%d on", f.factory), r); e != nil {
+		t.Fatal(e)
+	}
+	f.store.SetWriteFence(false)
+	after := f.snapshot(t)
+	after.Output = r.text()
+	stages["after-failure"] = after
+	mid := stages["after-carrier-write"]
+	t.Logf("after carrier write: carrier resource/hanger actor=%d/%d store=%d/%d; factory on/size actor=%t/%d store=%t/%d", mid.ActorCarrier.Resource, mid.ActorCarrier.Hanger, mid.StoredCarrier.Resource, mid.StoredCarrier.Hanger, mid.ActorFactory.On, mid.ActorFactory.Size, mid.StoredFactory.On, mid.StoredFactory.Size)
+	t.Logf("after failed factory write: carrier resource/hanger actor=%d/%d store=%d/%d; factory on/size actor=%t/%d store=%t/%d; success=%t", after.ActorCarrier.Resource, after.ActorCarrier.Hanger, after.StoredCarrier.Resource, after.StoredCarrier.Hanger, after.ActorFactory.On, after.ActorFactory.Size, after.StoredFactory.On, after.StoredFactory.Size, strings.Contains(r.text(), "Factory activated"))
+	if !reflect.DeepEqual(after.ActorFactory, after.StoredFactory) || !reflect.DeepEqual(after.ActorCarrier, after.StoredCarrier) {
+		t.Error("factory/carrier actor-store disagreement after separate writes")
+	}
+	if !reflect.DeepEqual(after.StoredCarrier, stages["before"].StoredCarrier) || !reflect.DeepEqual(after.StoredFactory, stages["before"].StoredFactory) {
+		t.Error("failed command persisted a partial record set (carrier debited, factory not activated)")
+	}
+	if strings.Contains(r.text(), "Factory activated") {
+		t.Error("success emitted before factory persistence")
+	}
+	for _, stage := range []string{"segment", "update", "restart"} {
+		var e error
+		switch stage {
+		case "segment":
+			e = f.state.TriggerSegment(ctxT(t, 10*time.Second))
+		case "update":
+			e = f.state.TriggerUpdate(ctxT(t, 10*time.Second))
+		case "restart":
+			f.restart(t)
+		}
+		if e != nil {
+			t.Fatal(e)
+		}
+		stages[stage] = f.snapshot(t)
+		x := stages[stage]
+		t.Logf("%s: carrier resource=%d hanger=%d; factory on=%t size=%d", stage, x.StoredCarrier.Resource, x.StoredCarrier.Hanger, x.StoredFactory.On, x.StoredFactory.Size)
+	}
+	b, e := json.Marshal(stages)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile(os.Getenv("CR17C_HABITAT_PREFIX_OUT"), b, 0o600); e != nil {
+		t.Fatal(e)
+	}
+}

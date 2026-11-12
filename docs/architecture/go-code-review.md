@@ -496,3 +496,22 @@ preserved for this persistence-only migration. See
 failure/crash evidence, validation and review. CR-17, CR-11 and CR-20 remain open;
 carrier activation, cargo, other aim users and broader staging/dedup/outbox work
 are not declared fixed.
+
+**CR-17C habitat factory follow-up:** explicit-ID `order #N on` for a factory
+docked aboard a habitat now stages the complete invocation: factory On/Notified/Size
+and carrier Resource/Hanger are two checked writes in one transaction, with the race,
+universe root, the carrier's docked chain, the carrier's own location chain and its
+root star/planet as read-only witnesses; actor objects install and bounded output is
+released only after confirmed persistence. The hanger expression uses signed 64-bit
+intermediates as C's int promotion does (an over-full habitat is refused with C's
+number, no uint16 underflow), the cost is a full-width unsigned value, a stored hanger
+smaller than the docked factory is refused instead of wrapped, carrier mass is left
+unchanged and no AP is charged, all as in `source/order.c:519-551`; the operation
+additionally requires the habitat to belong to the activating player. The legacy
+carrier writer is retired. Turn-time recomputation of every ship's size (doship.c:110)
+is unchanged. See [`cr17c-habitat-factory-activation.md`](../testing/cr17c-habitat-factory-activation.md)
+for the pre-fix evidence, fault matrix, six SIGKILL scenarios, validation and review.
+CR-17, CR-11 and CR-20 remain open; cargo, movement/navigation, construction and the
+remaining direct saves are not staged, and Go's `land` onto a ship still does not set
+the carrier linkage fields that C's `insert_sh_ship` sets (a separate, pre-existing
+finding, not changed here).

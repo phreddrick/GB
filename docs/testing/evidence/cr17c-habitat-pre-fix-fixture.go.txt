@@ -1,0 +1,133 @@
+package game
+
+import (
+	"encoding/json"
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/phreddrick/GB/go/internal/model"
+)
+
+// habitatFixture places one factory docked aboard one habitat that orbits the
+// enrolled race's home planet. Numbers are chosen so that the legacy and the
+// staged arithmetic are easy to check by hand: factory Size 2 (ship_size of a
+// default factory: 1 + 0.01*20 crew + 0.02*50 cargo = 2.2 -> 2), BuildCost 7
+// (activation cost 4*7 = 28), habitat MaxHanger 10 with Hanger 2.
+type habitatFixture struct {
+	*actorEnrollmentFixture
+	star, planet     uint8
+	carrier, factory uint32
+}
+
+func newHabitatFixture(t *testing.T) *habitatFixture {
+	t.Helper()
+	f := newEnrollmentActor(t)
+	a := enrollActor(t, f, actorEnrollmentRequest("operator")).Placement
+	x := &habitatFixture{f, a.Star, a.Planet, 70, 77}
+	onEnrollmentActor(t, f, func() {
+		pl := f.state.planets[a.Star][a.Planet]
+		race := f.state.races[0]
+		carrier := &model.Ship{}
+		f.state.getshipDefaults(carrier, model.StypeHabitat, race)
+		carrier.Number = x.carrier
+		carrier.Owner = 1
+		carrier.Race = 1
+		carrier.Governor = 0
+		carrier.Alive = true
+		carrier.Active = true
+		carrier.Popn = 1
+		carrier.Resource = 100
+		carrier.Notified = true
+		carrier.WhatOrbits = model.LevelPlan
+		carrier.WhatDest = model.LevelPlan
+		carrier.StOrbits = a.Star
+		carrier.PNumOrbits = a.Planet
+		carrier.DestStar = a.Star
+		carrier.DestPNum = a.Planet
+		carrier.XPos = f.state.stars[a.Star].XPos + pl.XPos
+		carrier.YPos = f.state.stars[a.Star].YPos + pl.YPos
+		carrier.NextShip = pl.Ships
+		pl.Ships = carrier.Number
+		fac := &model.Ship{}
+		f.state.getshipDefaults(fac, model.OtypeFactory, race)
+		fac.Number = x.factory
+		fac.Owner = 1
+		fac.Race = 1
+		fac.Governor = 0
+		fac.BuildCost = 7
+		fac.BuildType = uint16(model.StypeCargo)
+		fac.Alive = true
+		fac.Active = true
+		fac.On = false
+		fac.Notified = true
+		fac.Docked = true
+		fac.Popn = 1
+		fac.WhatOrbits = model.LevelShip
+		fac.WhatDest = model.LevelShip
+		fac.DestShipNo = carrier.Number
+		fac.StOrbits = a.Star
+		fac.PNumOrbits = a.Planet
+		fac.XPos = carrier.XPos
+		fac.YPos = carrier.YPos
+		fac.NextShip = carrier.Ships
+		carrier.Ships = fac.Number
+		carrier.Hanger = fac.Size
+		f.state.ships[carrier.Number] = carrier
+		f.state.ships[fac.Number] = fac
+		for _, sh := range []*model.Ship{carrier, fac} {
+			if e := f.store.PutShip(sh); e != nil {
+				t.Error(e)
+			}
+		}
+		if e := f.store.PutPlanet(pl); e != nil {
+			t.Error(e)
+		}
+	})
+	return x
+}
+
+type habitatWorld struct {
+	ActorFactory, StoredFactory *model.Ship
+	ActorCarrier, StoredCarrier *model.Ship
+	Output                      string `json:"output,omitempty"`
+}
+
+func (f *habitatFixture) captureOnActor(t *testing.T) habitatWorld {
+	t.Helper()
+	fac, e := f.store.GetShip(f.factory)
+	if e != nil {
+		t.Error(e)
+	}
+	car, e := f.store.GetShip(f.carrier)
+	if e != nil {
+		t.Error(e)
+	}
+	return habitatWorld{ActorFactory: factoryCopyShip(t, f.state.ships[f.factory]), StoredFactory: fac, ActorCarrier: factoryCopyShip(t, f.state.ships[f.carrier]), StoredCarrier: car}
+}
+func (f *habitatFixture) snapshot(t *testing.T) habitatWorld {
+	t.Helper()
+	var out habitatWorld
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() { out = f.captureOnActor(t) })
+	return out
+}
+func (f *habitatFixture) command(t *testing.T, text string) string {
+	t.Helper()
+	r := &recordingResponder{}
+	if e := f.state.HandleCommand(ctxT(t, 10*time.Second), 1, 0, text, r); e != nil {
+		t.Fatal(e)
+	}
+	return r.text()
+}
+func (f *habitatFixture) activate(t *testing.T) string {
+	t.Helper()
+	return f.command(t, fmt.Sprintf("order #%d on", f.factory))
+}
+func habitatJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, e := json.Marshal(v)
+	if e != nil {
+		t.Fatal(e)
+	}
+	return string(b)
+}

@@ -33,7 +33,7 @@ func (s *State) cmdOrder(p, g int, args []string, sess net.Responder) {
 	if s.handleTelescopeOrder(p, g, args, sess) {
 		return
 	}
-	if s.handleLandedFactoryOrder(p, g, args, sess) {
+	if s.handleFactoryOrder(p, g, args, sess) {
 		return
 	}
 	s.dispOrdersHeader(sess)
@@ -633,51 +633,25 @@ func (s *State) giveOrders(p, g int, args []string, ship *model.Ship, sess net.R
 	s.saveShip(ship)
 }
 
-// activateFactory handles the resource cost of bringing a factory online.
+// activateFactory is a non-writing refusal: every factory activation path
+// (landed and habitat) runs through the staged command operations.
 // Returns non-nil error if activation fails (caller should not set On=true).
 func (s *State) activateFactory(p, g int, ship *model.Ship, sess net.Responder) error {
-	if ship.WhatOrbits == model.LevelShip {
-		// Factory on a habitat.
-		carrier := s.ships[ship.DestShipNo]
-		if carrier == nil {
-			sess.Send("Carrier ship not found.\n")
-			return fmt.Errorf("carrier not found")
-		}
-		if carrier.Type != model.StypeHabitat {
-			sess.Send("The factory is currently being transported.\n")
-			return fmt.Errorf("not a habitat")
-		}
-		const habFactOnCost = 4 // HAB_FACT_ON_COST from tweakables.h
-		const habFactSize = 0.2 // HAB_FACT_SIZE from tweakables.h
-		onCost := uint16(habFactOnCost * int(ship.BuildCost))
-		hangerNeeded := (1 + int(habFactSize*float64(s.shipSize(ship)))) -
-			(int(carrier.MaxHanger-carrier.Hanger) + int(ship.Size))
-		if carrier.Resource < onCost {
-			sendf(sess, "You don't have %d resources on Habitat #%d to activate this factory.\n",
-				onCost, ship.DestShipNo)
-			return fmt.Errorf("insufficient resources")
-		}
-		if hangerNeeded > 0 {
-			sendf(sess, "Not enough hanger space free on Habitat #%d. Need %d more.\n",
-				ship.DestShipNo, hangerNeeded)
-			return fmt.Errorf("insufficient hanger")
-		}
-		carrier.Resource -= onCost
-		carrier.Hanger -= ship.Size
-		ship.Size = uint16(1 + int(habFactSize*float64(s.shipSize(ship))))
-		carrier.Hanger += ship.Size
-		s.saveShip(carrier)
-		sendf(sess, "Factory activated at a cost of %d resources.\n", onCost)
-	} else if !landed(ship) {
-		sess.Send("You cannot activate the factory here.\n")
+	switch {
+	case ship.WhatOrbits == model.LevelShip:
+		// Habitat activation must enter through the complete staged command;
+		// never reintroduce the old independent carrier writer here.
+		_ = sess.Send("Use one explicit ship number for habitat factory activation.\n")
+		return fmt.Errorf("habitat activation requires command staging")
+	case !landed(ship):
+		_ = sess.Send("You cannot activate the factory here.\n")
 		return fmt.Errorf("not landed")
-	} else {
+	default:
 		// Landed activation must enter through the complete staged command;
 		// never reintroduce the old independent planet writer here.
 		_ = sess.Send("Use one explicit ship number for landed factory activation.\n")
 		return fmt.Errorf("landed activation requires command staging")
 	}
-	return nil
 }
 
 // dispOrdersHeader prints the column header for the orders display.

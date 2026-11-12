@@ -1,0 +1,19 @@
+Baseline: 97ee43763da31b6b5eec3890e818e394dfcb1bf2
+Command: PATH=<private go1.27.4>/bin GOTOOLCHAIN=local GOCACHE=/tmp/cr17c-habitat-cache TMPDIR=/tmp/GB-cr17c-habitat/test/ctool/obj/tmp CR17C_HABITAT_PREFIX_OUT=<private> go -C go test ./internal/game -run ^TestCR17CPreFixHabitatPartialWrite$ -count=1 -v
+Expected exit: 1. The legacy habitat branch saves the carrier, prints success, then giveOrders saves the factory; the responder raises the existing CR-18 write fence at that real boundary. No runtime instrumentation.
+
+=== RUN   TestCR17CPreFixHabitatPartialWrite
+    habitat_reproduction_test.go:45: after carrier write: carrier resource/hanger actor=72/1 store=72/1; factory on/size actor=false/1 store=false/2
+    habitat_reproduction_test.go:46: after failed factory write: carrier resource/hanger actor=72/1 store=72/1; factory on/size actor=true/1 store=false/2; success=true
+    habitat_reproduction_test.go:48: factory/carrier actor-store disagreement after separate writes
+    habitat_reproduction_test.go:51: failed command persisted a partial record set (carrier debited, factory not activated)
+    habitat_reproduction_test.go:54: success emitted before factory persistence
+    habitat_reproduction_test.go:71: segment: carrier resource=72 hanger=1; factory on=false size=2
+    habitat_reproduction_test.go:71: update: carrier resource=72 hanger=1; factory on=false size=2
+    habitat_reproduction_test.go:71: restart: carrier resource=72 hanger=1; factory on=false size=2
+--- FAIL: TestCR17CPreFixHabitatPartialWrite (0.14s)
+FAIL
+inventory validation for internal/game SKIPPED: -run filter active; run the full package tests to validate the inventory
+FAIL	github.com/phreddrick/GB/go/internal/game	0.147s
+FAIL
+exit=1
