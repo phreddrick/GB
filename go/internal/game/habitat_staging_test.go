@@ -28,19 +28,28 @@ type habitatFixture struct {
 }
 
 func newHabitatFixture(t *testing.T) *habitatFixture {
+	return newHabitatFixtureWithCarrierOwner(t, 1)
+}
+
+func newHabitatFixtureWithCarrierOwner(t *testing.T, carrierOwner uint8) *habitatFixture {
 	t.Helper()
 	f := newEnrollmentActor(t)
 	a := enrollActor(t, f, actorEnrollmentRequest("operator")).Placement
+	if carrierOwner == 2 {
+		// A real second empire is required for subsequent turns and restart,
+		// not just an otherwise dangling Owner=2 on the habitat.
+		enrollActor(t, f, actorEnrollmentRequest("account-2"))
+	}
 	x := &habitatFixture{f, a.Star, a.Planet, 70, 77}
 	onEnrollmentActor(t, f, func() {
 		pl := f.state.planets[a.Star][a.Planet]
 		pl.Info[0].Resource = 100
 		race := f.state.races[0]
 		carrier := &model.Ship{}
-		f.state.getshipDefaults(carrier, model.StypeHabitat, race)
+		f.state.getshipDefaults(carrier, model.StypeHabitat, f.state.races[carrierOwner-1])
 		carrier.Number = x.carrier
-		carrier.Owner = 1
-		carrier.Race = 1
+		carrier.Owner = carrierOwner
+		carrier.Race = carrierOwner
 		carrier.Governor = 0
 		carrier.Alive = true
 		carrier.Active = true
@@ -231,7 +240,15 @@ func assertHabitatOrbit(t *testing.T, f *habitatFixture) {
 }
 
 func TestCR17CHabitatCompleteStateAndBoundaries(t *testing.T) {
-	f := newHabitatFixture(t)
+	for _, owner := range []uint8{1, 2} {
+		t.Run(fmt.Sprintf("carrier-owner-%d", owner), func(t *testing.T) {
+			testHabitatCompleteStateAndBoundaries(t, newHabitatFixtureWithCarrierOwner(t, owner))
+		})
+	}
+}
+
+func testHabitatCompleteStateAndBoundaries(t *testing.T, f *habitatFixture) {
+	t.Helper()
 	before := f.snapshot(t)
 	want := habitatExpected(t, before)
 	aux := habitatAux(t, f)
@@ -258,14 +275,14 @@ func TestCR17CHabitatCompleteStateAndBoundaries(t *testing.T) {
 		}
 	})
 	assertHabitatOrbit(t, f)
-	for _, stage := range []string{"segment", "update", "restart"} {
+	for _, stage := range []string{"restart before turn", "segment", "update", "restart"} {
 		var e error
 		switch stage {
 		case "segment":
 			e = f.state.TriggerSegment(ctxT(t, 10*time.Second))
 		case "update":
 			e = f.state.TriggerUpdate(ctxT(t, 10*time.Second))
-		case "restart":
+		case "restart before turn", "restart":
 			f.restart(t)
 		}
 		if e != nil {
@@ -276,6 +293,18 @@ func TestCR17CHabitatCompleteStateAndBoundaries(t *testing.T) {
 		x := f.snapshot(t)
 		if !x.StoredFactory.On || x.StoredCarrier.Resource != 72 || x.StoredCarrier.Hanger != 1 || x.StoredFactory.Number != f.factory || x.StoredCarrier.Number != f.carrier || !x.StoredFactory.Alive || !x.StoredCarrier.Alive {
 			t.Fatal(stage, "activation lost or cost refunded")
+		}
+		wantCarrierOwner := before.StoredCarrier.Owner
+		if stage != "restart before turn" {
+			// Existing doShip mirrors doship.c:112-118: a carried ship
+			// synchronizes its containing ship's owner/governor. Activation
+			// itself and a restart before any turn preserve foreign ownership.
+			// Go lacks C's earlier doown prepass (CR-13); this assertion
+			// preserves that known turn behavior, not complete C turn parity.
+			wantCarrierOwner = before.StoredFactory.Owner
+		}
+		if x.StoredFactory.Owner != before.StoredFactory.Owner || x.StoredFactory.Race != before.StoredFactory.Race || x.StoredCarrier.Owner != wantCarrierOwner || x.StoredCarrier.Race != before.StoredCarrier.Race {
+			t.Fatal(stage, "factory/carrier ownership differs from existing turn rules")
 		}
 		// doship.c:110 (and State.doShip) recompute every ship's size each
 		// turn, so the 0.2-scaled factory size reverts to ship_size after the
@@ -288,10 +317,19 @@ func TestCR17CHabitatCompleteStateAndBoundaries(t *testing.T) {
 }
 
 func TestCR17CHabitatWriteFailures(t *testing.T) {
+	for _, owner := range []uint8{1, 2} {
+		t.Run(fmt.Sprintf("carrier-owner-%d", owner), func(t *testing.T) {
+			testHabitatWriteFailures(t, owner)
+		})
+	}
+}
+
+func testHabitatWriteFailures(t *testing.T, carrierOwner uint8) {
+	t.Helper()
 	for _, stage := range []string{"habitat.before", "habitat.validated", "habitat.write:1", "habitat.write:2", "habitat.before-commit", "habitat.commit-error", "habitat.after-commit", "fence"} {
 		for _, panics := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/panic=%t", stage, panics), func(t *testing.T) {
-				f := newHabitatFixture(t)
+				f := newHabitatFixtureWithCarrierOwner(t, carrierOwner)
 				before := f.snapshot(t)
 				want := habitatExpected(t, before)
 				actor, disk := actorEnrollmentSnapshot(t, f.actorEnrollmentFixture), enrollmentDBSnapshot(t, f.actorEnrollmentFixture)
@@ -381,7 +419,7 @@ func TestCR17CHabitatValidationAndSelectors(t *testing.T) {
 			}
 		})
 	}
-	for _, kind := range []string{"insufficient resources", "insufficient hanger", "hanger below docked size", "already on", "inactive", "no crew", "unauthorized governor", "inactive governor", "transported by non-habitat", "foreign carrier", "zero AP"} {
+	for _, kind := range []string{"insufficient resources", "insufficient hanger", "hanger below docked size", "already on", "inactive", "no crew", "unauthorized governor", "inactive governor", "transported by non-habitat", "zero AP"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newHabitatFixture(t)
 			g := 0
@@ -424,10 +462,6 @@ func TestCR17CHabitatValidationAndSelectors(t *testing.T) {
 				case "transported by non-habitat":
 					car.Type = model.StypeCargo
 					wantText = "currently being transported"
-				case "foreign carrier":
-					car.Owner = 2
-					car.Race = 2
-					wantText = "not authorized"
 				case "zero AP":
 					f.state.stars[f.star].AP[0] = 0
 				}
@@ -459,6 +493,73 @@ func TestCR17CHabitatValidationAndSelectors(t *testing.T) {
 				t.Fatalf("validation failure escaped workspace or wrong text: %q", r.text())
 			}
 		})
+	}
+}
+
+func TestCR17CHabitatCrossOwnerStaleCarrier(t *testing.T) {
+	for _, field := range []string{"owner", "resources"} {
+		t.Run(field, func(t *testing.T) {
+			f := newHabitatFixtureWithCarrierOwner(t, 2)
+			actor := actorEnrollmentSnapshot(t, f.actorEnrollmentFixture)
+			var disk string
+			reached := false
+			f.store.SetMetaFault(func(op string) error {
+				if op == "habitat.before" {
+					reached = true
+					car, e := f.store.GetShip(f.carrier)
+					if e != nil {
+						t.Error(e)
+						return e
+					}
+					if field == "owner" {
+						car.Owner = 1
+					} else {
+						car.Resource++
+					}
+					if e := f.store.PutShip(car); e != nil {
+						t.Error(e)
+						return e
+					}
+					disk = enrollmentDBSnapshot(t, f.actorEnrollmentFixture)
+				}
+				return nil
+			})
+			out := f.activate(t)
+			if !reached || disk == "" || f.state.Mode() != ModeHalted || strings.Contains(out, "Factory activated") || actor != actorEnrollmentSnapshot(t, f.actorEnrollmentFixture) || disk != enrollmentDBSnapshot(t, f.actorEnrollmentFixture) {
+				t.Fatal("changed foreign carrier preimage was overwritten or installed", out)
+			}
+			if e := f.state.Stop(ctxT(t, 10*time.Second)); !errors.Is(e, ErrHaltedNotFlushed) || disk != enrollmentDBSnapshot(t, f.actorEnrollmentFixture) {
+				t.Fatal("stale carrier permitted shutdown flushing", e)
+			}
+		})
+	}
+}
+
+func TestCR17CHabitatCarrierOwnershipDoesNotAuthorizeFactory(t *testing.T) {
+	f := newHabitatFixtureWithCarrierOwner(t, 2)
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		fac, car := f.state.ships[f.factory], f.state.ships[f.carrier]
+		// Player 1 owns the habitat, but player 2 owns its docked factory.
+		fac.Owner, fac.Race = 2, 2
+		car.Owner, car.Race = 1, 1
+		for _, sh := range []*model.Ship{fac, car} {
+			if e := f.store.PutShip(sh); e != nil {
+				t.Error(e)
+			}
+		}
+	})
+	actor, disk := actorEnrollmentSnapshot(t, f.actorEnrollmentFixture), enrollmentDBSnapshot(t, f.actorEnrollmentFixture)
+	if out := f.activate(t); strings.Contains(out, "Factory activated") || f.state.Mode() != ModeServing || actor != actorEnrollmentSnapshot(t, f.actorEnrollmentFixture) || disk != enrollmentDBSnapshot(t, f.actorEnrollmentFixture) {
+		t.Fatal("habitat ownership authorized another player's factory", out)
+	}
+	// The staged entry independently refuses the same unauthorized factory.
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		if result := f.state.runHabitatActivation(1, 0, f.factory, &recordingResponder{}); result != commandValidationFailed {
+			t.Error("staged entry bypassed factory authority", result)
+		}
+	})
+	if actor != actorEnrollmentSnapshot(t, f.actorEnrollmentFixture) || disk != enrollmentDBSnapshot(t, f.actorEnrollmentFixture) {
+		t.Fatal("unauthorized staged entry changed records")
 	}
 }
 
@@ -1163,7 +1264,7 @@ func TestCR17CHabitatLegacyBypassAndSelectors(t *testing.T) {
 		}
 	})
 	t.Run("authorized governor", func(t *testing.T) {
-		f := newHabitatFixture(t)
+		f := newHabitatFixtureWithCarrierOwner(t, 2)
 		onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
 			sh := f.state.ships[f.factory]
 			sh.Governor = 1

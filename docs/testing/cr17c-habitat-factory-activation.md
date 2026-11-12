@@ -50,6 +50,17 @@ preserved as text, not left as a failing test.
 | After refused factory write | 72/1, 72/1 | true/1, false/2 | partial record set; premature success |
 | Segment, update, restart | 72/1 | false/2 | CR-11 ship reload drops the activation; the debit and the hanger change survive: 28 resources lost, hanger counts 1 for a size-2 factory |
 
+## Maintainer follow-up: current ownership contract
+
+PR #73's initial commit `5ebe816dac788ee150a0c5ace20260aa492f722a`
+introduced a same-owner habitat restriction. The maintainer rejected that
+restriction. Current activation follows C: an authorized factory owner may
+activate the factory while legitimately docked aboard another player's habitat;
+that habitat pays the resources and supplies hangar capacity. Habitat ownership
+or governor authority grants no authority to operate another player's factory.
+The original ledgers and review report below describe the initial revision and
+remain unchanged; the cross-owner follow-up evidence supersedes that policy.
+
 ## Original C semantics and the arithmetic corrections
 
 `source/order.c:519-551` with `HAB_FACT_ON_COST 4`, `HAB_FACT_SIZE 0.2`
@@ -67,7 +78,7 @@ record fields (`ships.h:122,137,266-267`):
 | not a habitat → "The factory is currently being transported." | same text, no mutation |
 | `ship->notified = 0; putship(ship)` after the branch | factory `Notified=false` is part of the same transaction |
 | `doship.c:110 ship->size = ship_size(ship)` every turn | unchanged in Go (`ship.go:304`): the 0.2-scaled size reverts to `ship_size` at the next turn while the habitat keeps the activation-time hanger, exactly as in C. Asserted, not "fixed" |
-| C debits whichever ship `destshipno` names (no owner check on the carrier) | **tightened**: the carrier must be a live habitat of the activating player (`db/habitat.go` and `habitat_command.go`); otherwise "You are not authorized to activate this factory." This is a deliberate authority rule for the migrated path, documented here and in the code; it adds no price or balance rule |
+| C charges the containing habitat without comparing its owner or governor to the factory operator | Preserved: factory owner/governor authorization is required; a living habitat of another player may supply resources and hangar capacity. Docking, actual chain membership, identity and full persisted preimages remain mandatory. Owning a habitat does not authorize its foreign factory |
 
 Owner/governor authorization, crew (`Max_crew - troops > 0 && popn == 0`),
 irradiated (`!Active`), already-on and the explicit-ID rule follow the landed
@@ -83,7 +94,7 @@ race, star data, stars, planets, ships).
 | --- | --- |
 | **Written** (exactly two checked Puts, factory then carrier) | factory: `On=true`, `Notified=false`, `Size=new`; carrier: `Resource-=cost`, `Hanger=hanger-oldsize+newsize`. Every other field of both ships must be unchanged (closed diff) |
 | **Read-only witnesses, checked byte-for-byte inside the transaction** | the player's race (active governor, not dissolved); the universe root when the carrier's chain roots there; every ship of the carrier's child chain (the factory must appear exactly once, each member alive, `WhatOrbits == LevelShip`, `DestShipNo` = carrier); the carrier's own location chain, recursively through any parent carriers to its root star, planet or universe (`telescopeContext.location`), with the carrier appearing exactly once and every member agreeing with the declared orbit; the root planet and star records. The selected factory must also be docked with `WhatDest == LevelShip`; these additional two checks are not claimed for unrelated read-only siblings |
-| **Identity rules** | factory: alive, active, `OtypeFactory`, not on, owner = player, governor authority, `WhatOrbits == WhatDest == LevelShip`, docked, `DestShipNo` = carrier; carrier: alive, `StypeHabitat`, owner = player, not the factory itself, same `StOrbits/PNumOrbits` as the factory |
+| **Identity rules** | factory: alive, active, `OtypeFactory`, not on, owner = player, governor authority, `WhatOrbits == WhatDest == LevelShip`, docked, `DestShipNo` = carrier; carrier: alive, `StypeHabitat`, ownership independent of player, not the factory itself, same `StOrbits/PNumOrbits` as the factory |
 
 Cycles, duplicates, missing records, a dead parent, a planet outside its star or
 a member whose orbit disagrees are refused by the actor stage (HALT: inconsistent
@@ -134,7 +145,7 @@ preserved, no callback between them; the staged header/activation/order-row text
 A failed commit never persists only the resource debit or only the activation:
 both writes sit in one `bolt.Update` after all preimage checks.
 
-## Six real SIGKILL scenarios (`TestCR17CHabitatRealProcessCrash`)
+## Six real SIGKILL boundaries, each with same-owner and cross-owner habitats
 
 The child process (`TestCR17CHabitatCrashChild`, only in `_test.go`) opens the
 disposable store, blocks at the selected boundary after printing a ready marker,
@@ -156,6 +167,7 @@ After each restart: actor and store agree, the planet chain and the carrier's
 docked chain are valid, the government ship is found, a segment and a full update
 run and preserve the result (factory on, 72 resources, hanger 1; factory size
 back to `ship_size` per the turn-time rule), and the ship free list is unchanged.
+The six boundaries now run for both carrier owners (12 actual SIGKILL cases).
 No kill inside bbolt's own fsync path is claimed; uncertain outcomes are not
 restarted as a retry.
 
@@ -164,13 +176,13 @@ restarted as a retry.
 | Test | What executes / asserts |
 | --- | --- |
 | `commandrules.TestHabitat*` (4) | defined order.c arithmetic, C-width cost boundaries, signed hanger arithmetic incl. over-full and maximal sizes, malformed-state refusal, invalid inputs |
-| `db.TestHabitatActivation*` (8) | atomic commit and reopen (metadata, allocator, mass unchanged); failure atomicity at five stages × error/panic; committed vs uncertain with readback and cross-family guard; 45 invalid field/identity/authority/context cases; chain integrity (factory absent/duplicated, witness on other carrier, carrier absent from planet chain, planet chain cycle, dead witness, planet outside star); stale preimages for every participant incl. after preparation and noncanonical bytes; C-width cost/hanger/no-AP; fence and concurrent-adapter conflict |
-| `game.TestCR17CHabitat*` (17 top-level, 227 nodes with db and rules) | complete actor/store state and stable addresses, segment/update/restart; write failures at every stage incl. fence and halted shutdown; selectors and validation texts; C arithmetic through the dispatcher; nested habitat, star-orbit and universe-root carriers; stale/inconsistent worlds incl. legacy load, chain cycles, missing/dead carrier, mismatched links, replaced witness; readback/install/post-install failures; response failure after commit; enrollment and mode compatibility plus the landed path; output and private state wait for commit; admitted command vs following actions; queued behind a turn; internal completion classes; legacy bypass, mixed prefix at carrier scope, authorized governor, bounded response, pending-AP admission; requested-ID map-alias refusal with no shutdown flush; the six crash boundaries |
+| `db.TestHabitatActivation*` | atomic commit and reopen (metadata, allocator, mass unchanged); failure atomicity at five stages × error/panic; committed vs uncertain with readback and cross-family guard; 44 invalid field/identity/authority/context cases plus an independent coherent foreign-factory authorization rejection; chain integrity (factory absent/duplicated, witness on other carrier, carrier absent from planet chain, planet chain cycle, dead witness, planet outside star); stale preimages for every participant incl. after preparation and noncanonical bytes; C-width cost/hanger/no-AP; fence and concurrent-adapter conflict |
+| `game.TestCR17CHabitat*` (current counts in the cross-owner follow-up evidence) | complete actor/store state and stable addresses, segment/update/restart; write failures at every stage incl. fence and halted shutdown; selectors and validation texts; C arithmetic through the dispatcher; nested habitat, star-orbit and universe-root carriers; stale/inconsistent worlds incl. legacy load, chain cycles, missing/dead carrier, mismatched links, replaced witness; readback/install/post-install failures; response failure after commit; enrollment and mode compatibility plus the landed path; output and private state wait for commit; admitted command vs following actions; queued behind a turn; internal completion classes; legacy bypass, mixed prefix at carrier scope, authorized governor, bounded response, pending-AP admission; requested-ID map-alias refusal with no shutdown flush; the six crash boundaries |
 
 ## Authorization, selectors and remaining unsafe paths
 
-Owner and governor (active, authorized) are checked for the factory; the carrier
-must belong to the same player. Numeric overflow and junk ids are refused before
+Owner and governor (active, authorized) are checked for the factory. Carrier
+ownership is independent; an authorized factory can charge its foreign habitat. Numeric overflow and junk ids are refused before
 any lookup. `activateFactory` is now a pure refusal for landed, habitat and
 other locations; `giveOrders` cannot set `On` for a factory. Not changed and still
 open: `land` onto a ship in Go does not set the `WhatOrbits/WhatDest/DestShipNo`
@@ -236,7 +248,7 @@ restart stays QUIESCED), PR #34 WebSocket shutdown close frame (net package
 suite). Data format impact: none (existing ship JSON, buckets and keys; no commit
 kind, schema, allocator, command-id or reconciliation mechanism added).
 
-## Independent review
+## Independent review of initial delivery at `5ebe816`
 
 A separate noninteractive reviewer agent (`/root/habitat_independent_review`),
 independent of Claude's implementation and the Codex correction author, inspected
@@ -270,9 +282,9 @@ before corrections. The original pre-fix artifacts and original execution ledger
 remain unchanged. The additional Codex ledger and independent-review report
 preserve the takeover evidence without committing raw transport logs or secrets.
 
-## Codex final execution (2026-11-12 UTC)
+## Codex initial delivery execution at `5ebe816` (2026-11-12 UTC)
 
-[Final execution ledger](evidence/cr17c-habitat-codex-validation.json) records
+[Initial Codex execution ledger](evidence/cr17c-habitat-codex-validation.json) records
 source/baseline SHA-256 values, commands, exit statuses and output hashes.
 [Independent review](evidence/cr17c-habitat-independent-review.md) retains the
 initial findings, correction dispositions and final audit.
@@ -315,8 +327,8 @@ Conditions are normal maintainer review, the maintainer-applied
 `known-defect-added` acknowledgment and green hosted CI; this is not permission
 to merge or deploy. `gate-change-reviewed` is not required by the actual diff.
 
-The live same-owner carrier requirement is an explicit authority tightening from
-C and remains visible for owner review. C's turn-time factory-size recomputation
+The maintainer rejected the initial same-owner carrier restriction; the current
+operation restores C's ownership-independent activation. C's turn-time factory-size recomputation
 is preserved, including the unchanged activation-time habitat hanger accounting.
 Go land-on-ship linkage and double hanger accounting remain deferred; this PR
 does not repair those paths or broaden its atomicity guarantee to cargo,
@@ -331,3 +343,109 @@ CR-20 remain OPEN. Database-format and CR-18 commit-kind impact: NONE.
 No live database, running game, Kubernetes, Argo CD, Longhorn, image publication,
 DNS, secret, ingress or deployment operation occurred. Other worktrees and the
 retained audit branch were preserved.
+
+
+## PR #73 cross-owner correction — maintainer-directed C parity
+
+The follow-up starts from `5ebe816dac788ee150a0c5ace20260aa492f722a`.
+Only two production conditions were removed: `carrier.Owner == player` in the
+actor and `c.Owner == in.Player` in the closed database validator. Factory owner,
+active governor permission, eligible/live/active factory, living habitat type,
+destination/orbit links, actual parent/child membership and all full preimages
+remain checked. No carrier-owner or carrier-governor permission replaces those
+removed conditions. The shared selector, pure rules and recursive actor/database
+context validators were inspected; their relevant ownership checks apply only
+to the selected factory/caller, not read-only carrier or ancestor witnesses.
+
+The complete carrier expected/proposed record remains a mandatory participant.
+The factory's authorized caller race is the only race context required: the
+operation reads no carrier-owner race attributes and changes neither race.
+Exactly factory On/Notified/Size and carrier Resource/Hanger still commit in
+one transaction. Full canonical preimages (including the foreign Owner field)
+are compared inside that transaction. A change to the foreign carrier's owner
+or resources after proposal construction rejects without a partial write,
+actor installation, success output or stale shutdown flush.
+
+### Fresh regression and authority evidence
+
+The new actor fixture enrolls an actual second empire before installing player
+1's factory aboard player 2's habitat; it does not fabricate a dangling owner.
+The desired cross-owner actor and database/reopen tests were first run against
+the two old restrictions and failed (exit 1). After removal, complete immediate
+actor/store proposals agree: factory remains owner 1 and becomes On=true, Notified=false,
+Size=1; player 2's habitat remains owner 2, pays 28 resources (100 → 72), and its
+hangar changes 2 → 1. Full unrelated world/allocator/placement/metadata snapshots
+remain unchanged. Stable object addresses and delayed output assertions remain.
+A restart **before any turn** retains this complete cross-owner result.
+
+Positive database/reopen and real actor/turn/restart tests now run for both
+carrier owners. The entire actor error/panic/fence/committed-reporting/uncertainty
+matrix and all six SIGKILL boundaries also run for both owners (12 actual kill
+cases). Every kill reopens only a known precommit or confirmed-postcommit store
+and checks the full old or complete new world, unrelated records, allocator,
+restart and subsequent segment/update. No genuine uncertainty is auto-repaired.
+An authorized nonzero factory governor also activates inside the foreign habitat.
+
+The former negative foreign-carrier test is removed. Its inverse remains
+forbidden: player 1 cannot activate player 2's factory inside player 1's habitat.
+Actual dispatch, direct staged entry and a separate database request with
+coherent expected/proposed factory records independently reject this case.
+Changing carrier ownership grants no factory authority.
+
+### Existing CR-13 turn behavior is distinct from activation
+
+The expanded test initially asserted both owners would remain unchanged after
+a segment. Fresh execution disproved that new test assumption; the failed runs
+are retained in the follow-up ledger and reviewer report. Existing Go
+`ship.go:306-312` synchronizes a containing ship's Owner/Governor from a carried
+ship during `doShip`, matching the isolated assignment in C `doship.c:112-118`.
+But C `doturn.c:202-206` first calls `doown` (`doship.c:223-232`) to propagate
+carrier ownership down to children, and Go omits that prepass (already-open
+**CR-13**). Therefore a later Go segment in this fixture changes the habitat's
+Owner to 1, keeping its Race field 2. Activation itself and the pre-turn restart
+keep Owner=2. Tests assert these explicit current-engine values, retained
+activation/resource/hangar fields and valid chains after segment/update/restart;
+they do not claim whole-turn cross-owner C parity. No turn or ownership-sync
+code was changed. CR-13 remains open alongside CR-11/CR-17/CR-20.
+
+### Follow-up validation and review
+
+Fresh execution and independent review are recorded separately in
+[evidence/cr17c-habitat-crossowner-validation.json](evidence/cr17c-habitat-crossowner-validation.json)
+and [the cross-owner review](evidence/cr17c-habitat-crossowner-review.md).
+Claude's original artifacts and both earlier validation ledgers/review history
+remain unchanged. The current commit adds no lint allowance or protected tooling
+change; maintainer `known-defect-added` remains required for the original five
+removals, and the agent applies no label.
+
+
+Fresh follow-up execution (Go 1.27.4, `GOTOOLCHAIN=local`, disposable stores):
+
+| Check | Actual result |
+| --- | --- |
+| `go test -count=1 -json ./...` | 3,951 passing nodes / 419 top-level passes; two existing opt-in skips; 21 tested packages pass |
+| `GB_LONG_TESTS=1 go test -count=1 -race -json ./...` | 3,953 passing nodes / 421 top-level passes; no test skips/failures/race warnings |
+| Habitat normal and independent race coverage | 260 passing nodes / 32 top-level entries; all 12 SIGKILL leaves pass |
+| Build / gofmt / vet / C fixtures / module verify and tidy diff | PASS; no drift |
+| Inventory / golden parity / all 15 mutations | PASS; 1,248 PASS / 143 XFAIL / 0 XPASS / 0 FAIL golden cases; all expected mutation outcomes retained |
+| Lint / growth / gate self-tests | 1,000 baseline/report/matched, zero new/stale; no follow-up baseline change; no simulated acknowledgment label; all self-tests pass |
+| Offline manifests / workflow | 21 valid resources; actionlint and ShellCheck pass; 188 helper tests / 17 policy checks pass |
+| Strict govulncheck v1.9.0 | Zero reachable vulnerabilities; 17 non-reachable module findings remain reported |
+| Working/staged diff checks | Clean |
+
+A fresh independent noninteractive reviewer inspected factory authority, the
+foreign carrier and all transaction participants, ownership-independent witness
+traversal, inverse authorization, delayed effects, full preimages and failure/
+crash behavior. Its own timeout-bounded race run exited 0 with all 260 nodes and
+12 actual SIGKILL cases passing. It independently confirmed CR-13's omitted C
+prepass and the explicit pre-turn/post-turn distinction; the failed initial
+ownership-invariance assumption is preserved rather than rewritten as a pass.
+The follow-up review report records code approval and the final evidence audit.
+
+Verdict: **PASS WITH CONDITIONS** for this maintainer-directed ownership fix.
+The condition remains normal maintainer review/`known-defect-added` for the
+original five lint removals and hosted CI. No `gate-change-reviewed` label is
+required; no label was applied. CR-13, CR-11, CR-17 and CR-20 remain open.
+No game turn code, schema, commit kind, authentication or public interface was
+changed, and no live game/database, deployment, Kubernetes or image publication
+operation occurred.

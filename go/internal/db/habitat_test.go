@@ -97,7 +97,21 @@ func assertHabitatRecords(t *testing.T, s *Store, in HabitatActivation, after bo
 }
 
 func TestHabitatActivationAtomicAndReopen(t *testing.T) {
+	for _, owner := range []uint8{1, 2} {
+		t.Run(fmt.Sprintf("carrier-owner-%d", owner), func(t *testing.T) {
+			testHabitatActivationAtomicAndReopen(t, owner)
+		})
+	}
+}
+
+func testHabitatActivationAtomicAndReopen(t *testing.T, carrierOwner uint8) {
+	t.Helper()
 	s, path, in := habitatStoreFixture(t)
+	in.Carrier.Expected.Owner, in.Carrier.Expected.Race = carrierOwner, carrierOwner
+	in.Carrier.Proposed.Owner, in.Carrier.Proposed.Race = carrierOwner, carrierOwner
+	if e := s.PutShip(in.Carrier.Expected); e != nil {
+		t.Fatal(e)
+	}
 	before, _ := json.Marshal(in)
 	meta := map[string][]byte{}
 	for _, key := range [][]byte{KeyCommit, KeySchedule, KeyMaintenance, KeyUniverse} {
@@ -140,6 +154,23 @@ func TestHabitatActivationAtomicAndReopen(t *testing.T) {
 		t.Fatal("carrier resource/hanger/mass semantics", got.Resource, got.Hanger)
 	}
 }
+func TestHabitatActivationCarrierOwnershipDoesNotAuthorizeFactory(t *testing.T) {
+	s, _, in := habitatStoreFixture(t)
+	in.Factory.Expected.Owner, in.Factory.Expected.Race = 2, 2
+	in.Factory.Proposed.Owner, in.Factory.Proposed.Race = 2, 2
+	if e := s.PutShip(in.Factory.Expected); e != nil {
+		t.Fatal(e)
+	}
+	// Factory preimage, proposal and chain agree; only the caller lacks
+	// authority over this factory. Owning habitat #70 grants no such authority.
+	before := enrollmentSnapshot(t, s)
+	out, e := s.CommitHabitatActivation(in)
+	assertCommandError(t, out, e, CommandInvalid, CommandNotCommitted)
+	if before != enrollmentSnapshot(t, s) {
+		t.Fatal("habitat ownership authorized another player's factory")
+	}
+}
+
 func TestHabitatActivationFailureAtomicity(t *testing.T) {
 	for _, stage := range []string{"habitat.before", "habitat.validated", "habitat.write:1", "habitat.write:2", "habitat.before-commit"} {
 		for _, panics := range []bool{false, true} {
@@ -228,7 +259,7 @@ func TestHabitatActivationCommittedAndUncertain(t *testing.T) {
 func TestHabitatActivationInvalidFields(t *testing.T) {
 	cases := map[string]func(*HabitatActivation){
 		"player": func(i *HabitatActivation) { i.Player = 0 }, "governor": func(i *HabitatActivation) { i.Governor = model.MaxGovernors + 1 }, "inactive governor": func(i *HabitatActivation) { i.Governor = 1 }, "nil factory": func(i *HabitatActivation) { i.Factory.Expected = nil }, "nil proposed": func(i *HabitatActivation) { i.Factory.Proposed = nil }, "nil carrier": func(i *HabitatActivation) { i.Carrier.Expected = nil }, "nil carrier proposed": func(i *HabitatActivation) { i.Carrier.Proposed = nil }, "nil race": func(i *HabitatActivation) { i.Context.Race = nil }, "dissolved race": func(i *HabitatActivation) { i.Context.Race.Dissolved = true },
-		"owner": func(i *HabitatActivation) { i.Factory.Expected.Owner = 2 }, "carrier owner": func(i *HabitatActivation) { i.Carrier.Expected.Owner = 2 }, "governor authority": func(i *HabitatActivation) {
+		"factory owner": func(i *HabitatActivation) { i.Factory.Expected.Owner = 2 }, "governor authority": func(i *HabitatActivation) {
 			i.Governor = 1
 			i.Context.Race.Governor[1].Active = true
 			i.Factory.Expected.Governor = 2

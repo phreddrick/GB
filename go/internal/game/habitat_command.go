@@ -13,7 +13,8 @@ import (
 
 // habitatFactory reports a factory that claims to be docked aboard another
 // ship (order.c's `whatorbits == LEVEL_SHIP` branch). Whether that ship is a
-// live habitat of the same player is decided by the staged operation.
+// live habitat with valid docking links is decided by the staged operation.
+// C permits the authorized factory to use another player's habitat.
 func habitatFactory(sh *model.Ship) bool {
 	return sh != nil && sh.Type == model.OtypeFactory && sh.WhatOrbits == model.LevelShip && sh.Docked
 }
@@ -69,9 +70,6 @@ func (s *State) habitatStage(p, g int, id uint32) (*commandWorkspace, db.Habitat
 	}
 	if carrier.Type != model.StypeHabitat {
 		return nil, in, "The factory is currently being transported.\n", nil
-	}
-	if int(carrier.Owner) != p {
-		return nil, in, "You are not authorized to activate this factory.\n", nil
 	}
 	if f.StOrbits != carrier.StOrbits || f.PNumOrbits != carrier.PNumOrbits {
 		return nil, in, "", errors.New("inconsistent carrier location")

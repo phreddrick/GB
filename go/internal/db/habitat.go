@@ -45,10 +45,10 @@ func prepareHabitatActivation(in HabitatActivation) (preparedHabitat, error) {
 	if model.Shipdata[model.OtypeFactory][model.AbilMaxCrew]-int64(f.Troops) > 0 && f.Popn == 0 {
 		return invalid()
 	}
-	// The carrier must be the live habitat the factory is docked in and must
-	// belong to the same player: original C debits whichever ship the factory
-	// names, which this operation does not reproduce.
-	if c.Number == 0 || c.Number == f.Number || c.Type != model.StypeHabitat || !c.Alive || int(c.Owner) != in.Player || f.StOrbits != c.StOrbits || f.PNumOrbits != c.PNumOrbits {
+	// C charges the actual containing habitat, independent of its owner.
+	// Factory authority is checked above; full carrier identity, membership
+	// and persisted preimages remain required below.
+	if c.Number == 0 || c.Number == f.Number || c.Type != model.StypeHabitat || !c.Alive || f.StOrbits != c.StOrbits || f.PNumOrbits != c.PNumOrbits {
 		return invalid()
 	}
 	ctx := telescopeContext{stars: map[uint8]*model.Star{}, planets: map[[2]uint8]*model.Planet{}, ships: map[uint32]*model.Ship{}, data: in.Context.StarData}

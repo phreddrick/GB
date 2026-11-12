@@ -80,9 +80,18 @@ func TestCR17CHabitatCrashChild(t *testing.T) {
 // response. Restart must show either the complete original or the complete
 // activated factory/carrier pair, never one half.
 func TestCR17CHabitatRealProcessCrash(t *testing.T) {
+	for _, owner := range []uint8{1, 2} {
+		t.Run(fmt.Sprintf("carrier-owner-%d", owner), func(t *testing.T) {
+			testHabitatRealProcessCrash(t, owner)
+		})
+	}
+}
+
+func testHabitatRealProcessCrash(t *testing.T, carrierOwner uint8) {
+	t.Helper()
 	for _, stage := range []string{"habitat.before", "habitat.write:1", "habitat.write:2", "habitat.before-commit", "habitat.after-commit", habitatInstallStage} {
 		t.Run(stage, func(t *testing.T) {
-			f := newHabitatFixture(t)
+			f := newHabitatFixtureWithCarrierOwner(t, carrierOwner)
 			if e := f.state.Stop(ctxT(t, 10*time.Second)); e != nil {
 				t.Fatal(e)
 			}
