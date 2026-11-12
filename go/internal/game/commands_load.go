@@ -54,6 +54,9 @@ func (s *State) cmdUnload(p, g int, args []string, sess net.Responder) {
 // mode=false → load (C: mode=0); mode=true → unload (C: mode=1).
 // Mirrors load() in load.c.
 func (s *State) doLoad(p, g int, args []string, sess net.Responder, unloadMode bool) {
+	if s.handlePopulation(p, g, args, sess, unloadMode) {
+		return
+	}
 	if s.handleCargo(p, g, args, sess, unloadMode) {
 		return
 	}
@@ -335,6 +338,8 @@ func (s *State) doLoad(p, g int, args []string, sess net.Responder, unloadMode b
 				sendf(sess, "crew complement of %s is now %d.\n", shipDisplayName(ship), ship.Popn)
 				if err := s.store.PutPlanet(planet); err != nil {
 					s.logError("PutPlanet", err)
+				} else if s.testHooks != nil && s.testHooks.afterLegacyPlanetWrite != nil {
+					s.testHooks.afterLegacyPlanetWrite(planet)
 				}
 			}
 		case 'm':
@@ -381,6 +386,8 @@ func (s *State) doLoad(p, g int, args []string, sess net.Responder, unloadMode b
 				sendf(sess, "troop complement of %s is now %d.\n", shipDisplayName(ship), ship.Troops)
 				if err := s.store.PutPlanet(planet); err != nil {
 					s.logError("PutPlanet", err)
+				} else if s.testHooks != nil && s.testHooks.afterLegacyPlanetWrite != nil {
+					s.testHooks.afterLegacyPlanetWrite(planet)
 				}
 			}
 		case 'd':
