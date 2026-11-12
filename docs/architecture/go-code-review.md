@@ -496,3 +496,31 @@ preserved for this persistence-only migration. See
 failure/crash evidence, validation and review. CR-17, CR-11 and CR-20 remain open;
 carrier activation, cargo, other aim users and broader staging/dedup/outbox work
 are not declared fixed.
+
+**CR-17C habitat factory follow-up:** explicit-ID `order #N on` for a factory
+docked aboard a habitat now stages the complete invocation: factory On/Notified/Size
+and carrier Resource/Hanger are two checked writes in one transaction, with the race,
+universe root, the carrier's docked chain, the carrier's own location chain and its
+root star/planet as read-only witnesses; actor objects install and bounded output is
+released only after confirmed persistence. The hanger expression uses signed 64-bit
+intermediates as C's int promotion does (an over-full habitat is refused with C's
+number, no uint16 underflow), the cost is a full-width unsigned value, a stored hanger
+smaller than the docked factory is refused instead of wrapped, carrier mass is left
+unchanged and no AP is charged, all as in `source/order.c:519-551`. Factory
+owner/governor authority is required; carrier ownership is independent, so the
+authorized factory may activate aboard another player's legitimately linked
+habitat. The same-owner restriction from PR #73's initial revision was removed
+at the maintainer's direction. The legacy
+carrier writer is retired. Turn-time recomputation of every ship's size (doship.c:110)
+is unchanged. See [`cr17c-habitat-factory-activation.md`](../testing/cr17c-habitat-factory-activation.md)
+for the pre-fix evidence, fault matrix, six SIGKILL scenarios, validation and review.
+CR-17, CR-11 and CR-20 remain open; cargo, movement/navigation, construction and the
+remaining direct saves are not staged, and Go's `land` onto a ship still does not set
+the carrier linkage fields that C's `insert_sh_ship` sets (a separate, pre-existing
+finding, not changed here).
+
+Cross-owner regressions also distinguish activation from existing CR-13 turn
+behavior: activation and restart-before-turn preserve both owners; later Go
+`doShip` may synchronize the containing habitat's Owner/Governor from its child.
+C runs an earlier `doown` prepass that Go still omits. This follow-up changes no
+turn code and does not claim cross-owner whole-turn C parity or close CR-13.

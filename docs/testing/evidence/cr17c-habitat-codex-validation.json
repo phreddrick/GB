@@ -1,0 +1,511 @@
+{
+  "schema": 1,
+  "baseline": "97ee43763da31b6b5eec3890e818e394dfcb1bf2",
+  "branch": "feature/cr17c-habitat-factory",
+  "date_utc": "2026-11-12T01:45:46.013009+00:00",
+  "environment": {
+    "go": "go1.27.4 linux/amd64",
+    "GOTOOLCHAIN": "local",
+    "GOCACHE": "/tmp/cr17c-habitat-cache",
+    "TMPDIR": "/tmp/GB-cr17c-habitat/test/ctool/obj/tmp",
+    "stores": "disposable only",
+    "transport_tests": "authorized loopback networking; no live listener/database accessed"
+  },
+  "source_sha256": {
+    "go/internal/commandrules/habitat.go": "ef1d1fc68cb152cdc409c7f19a227247b4a55dd66870712fb974700ebea3986c",
+    "go/internal/commandrules/habitat_test.go": "9dec34578ea82aff80708cfe2e9725ec144a0a5eaf4e76ddc9e1b208e3230ecd",
+    "go/internal/db/habitat.go": "d3a46cc38a73f477456b7f7de59117b685ad874d0a8365bd18f61cf047059cd9",
+    "go/internal/db/habitat_test.go": "603d22649075c697408eb1f873cbdae65fcecf215177423e2d02e59f49f210ac",
+    "go/internal/game/habitat_command.go": "04d225c4fcc628afd00dfe53d767d60a329025c4b3064e043bf9bc6f701682a7",
+    "go/internal/game/habitat_staging_test.go": "1a2e7cffd8e44bd05950663a0e9c64c37000bc6390d54dc0384327b5ff1c4962",
+    "go/internal/game/habitat_crash_test.go": "8b7b0b36a7d661f8b7587b639d652e8d5bf7b7fbeca7189782ee2697d4088a50",
+    "go/internal/game/factory_command.go": "0e8a5d9473ba6335cf9884ed15dcf53164583567bb60fc87ba39285df8cd6a7c",
+    "go/internal/game/commands_order.go": "feb4f6a0fc181e628c982bca43ab29e10a98ebc253cd077eef48ea070789ade5",
+    "go/internal/game/lifecycle.go": "c4412b206d6ea3e7e9c4f9e70a11862c18f2db363a81c98ee9aff640f0c37a5d",
+    "docs/testing/lint-baseline.txt": "9f5af8adf1031de2f032d85b8217adce34f34add504cc84395f7634f86a6b58f"
+  },
+  "preserved_history": {
+    "original_ledger": "cr17c-habitat-validation.json",
+    "original_ledger_sha256": "d91a17c480b34fd4194afff9b0f6e79ca666333532ec70bbc9a36bcc747676eb",
+    "original_staged_patch_sha256": "44a3244b4fcff1d586865b7e03eeeb5ace2e5c7a8b61ae562b99abcc6c859f3a",
+    "verification": "All eleven historical source/baseline hashes matched the original staged index blobs before final staging. Original pre-fix artifacts and ledger unchanged."
+  },
+  "runs": {
+    "final-rules": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./internal/commandrules"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447783.2134535,
+      "elapsed_seconds": 1.417,
+      "exit_code": 0,
+      "stdout_sha256": "684faf89756017e0982cd5d7abdf353badeaedb121418fd8d4d4114f43aeb98d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "build": {
+      "command": [
+        "go",
+        "build",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447086.4667258,
+      "elapsed_seconds": 1.241,
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "vet": {
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447087.8259792,
+      "elapsed_seconds": 0.971,
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "formatting": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; gofmt -l . > /tmp/cr17c-habitat-resume/gofmt-files.txt; test ! -s /tmp/cr17c-habitat-resume/gofmt-files.txt"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447213.9318838,
+      "elapsed_seconds": 0.167,
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fixtures": {
+      "command": [
+        "make",
+        "-C",
+        "test/ctool",
+        "check"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447117.6973822,
+      "elapsed_seconds": 0.067,
+      "exit_code": 0,
+      "stdout_sha256": "d370f8f8af7cf64e7d4108b97f9faafbc6b5328486b47d179b527bcd6fc1b047",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "final-normal": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447163.358361,
+      "elapsed_seconds": 61.351,
+      "exit_code": 0,
+      "stdout_sha256": "5338bfd46321b48e0203e24fc676b1a109ec91bbb30115b023ca0d2a0ac301b8",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_nodes": {
+        "pass": 3918,
+        "skip": 2
+      },
+      "top_level_passes": 416,
+      "tested_packages_passed": 21,
+      "habitat_pass_nodes": 227,
+      "habitat_top_level_entries": 29,
+      "habitat_sigkill_cases": [
+        "TestCR17CHabitatRealProcessCrash/habitat.before",
+        "TestCR17CHabitatRealProcessCrash/habitat.write:1",
+        "TestCR17CHabitatRealProcessCrash/habitat.write:2",
+        "TestCR17CHabitatRealProcessCrash/habitat.before-commit",
+        "TestCR17CHabitatRealProcessCrash/habitat.after-commit",
+        "TestCR17CHabitatRealProcessCrash/habitat.installed"
+      ]
+    },
+    "final-long-race": {
+      "command": [
+        "env",
+        "GB_LONG_TESTS=1",
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447163.604589,
+      "elapsed_seconds": 441.094,
+      "exit_code": 0,
+      "stdout_sha256": "7bce49fd2da9a0cf644217bf8a6c3fa760eea9cdb8864f9139ab74f88cb48afe",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_nodes": {
+        "pass": 3920
+      },
+      "top_level_passes": 418,
+      "tested_packages_passed": 21,
+      "habitat_pass_nodes": 227,
+      "habitat_top_level_entries": 29,
+      "habitat_sigkill_cases": [
+        "TestCR17CHabitatRealProcessCrash/habitat.before",
+        "TestCR17CHabitatRealProcessCrash/habitat.write:1",
+        "TestCR17CHabitatRealProcessCrash/habitat.write:2",
+        "TestCR17CHabitatRealProcessCrash/habitat.before-commit",
+        "TestCR17CHabitatRealProcessCrash/habitat.after-commit",
+        "TestCR17CHabitatRealProcessCrash/habitat.installed"
+      ]
+    },
+    "final-core-race": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./internal/db",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447323.013223,
+      "elapsed_seconds": 403.019,
+      "exit_code": 0,
+      "stdout_sha256": "0d23e39a106afb422a34c0be3b12511fd01263f3b7e4d02f9e441252ea0f9753",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_nodes": {
+        "pass": 1375
+      },
+      "top_level_passes": 269,
+      "tested_packages_passed": 2,
+      "habitat_pass_nodes": 214,
+      "habitat_top_level_entries": 25,
+      "habitat_sigkill_cases": [
+        "TestCR17CHabitatRealProcessCrash/habitat.before",
+        "TestCR17CHabitatRealProcessCrash/habitat.write:1",
+        "TestCR17CHabitatRealProcessCrash/habitat.write:2",
+        "TestCR17CHabitatRealProcessCrash/habitat.before-commit",
+        "TestCR17CHabitatRealProcessCrash/habitat.after-commit",
+        "TestCR17CHabitatRealProcessCrash/habitat.installed"
+      ]
+    },
+    "final-lint": {
+      "command": [
+        "test/scripts/lint-gate.sh",
+        "/tmp/cr17c-habitat-resume/final-lint.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447163.0036166,
+      "elapsed_seconds": 16.648,
+      "exit_code": 0,
+      "stdout_sha256": "92940dbb367d0b1841928c26cbebcb51fd04a62ec248116fea63f02895148b58",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "final-inventory": {
+      "command": [
+        "test/scripts/inventory-check.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447162.3581479,
+      "elapsed_seconds": 62.097,
+      "exit_code": 0,
+      "stdout_sha256": "632607dc747386dfe4783e7ef9fbc8179606ce671a3b9d55165c6fbbc1bd89ec",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "final-golden-mutations": {
+      "command": [
+        "test/scripts/golden-mutations.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447165.2720313,
+      "elapsed_seconds": 558.198,
+      "exit_code": 0,
+      "stdout_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "final-vulnerabilities": {
+      "command": [
+        "go",
+        "run",
+        "golang.org/x/vuln/cmd/govulncheck@v1.9.0",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447163.0398467,
+      "elapsed_seconds": 8.61,
+      "exit_code": 0,
+      "stdout_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "final-gate-selftests": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; test/scripts/gate-approval-selftest.sh; test/scripts/lint-gate-selftest.sh; test/scripts/golden-mutations-selftest.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447262.796503,
+      "elapsed_seconds": 161.884,
+      "exit_code": 0,
+      "stdout_sha256": "c95f033bba74ff2f28535440202a15cd7c1ff715cc9e50f8e9e2e03492205165",
+      "stderr_sha256": "ba16fba577c48db46d1635ef66854b68129f9d4db100dc548d409e326c039eb7"
+    },
+    "modules": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; go mod verify; go mod tidy -diff"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447213.3187041,
+      "elapsed_seconds": 0.567,
+      "exit_code": 0,
+      "stdout_sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "workflow": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; actionlint -no-color; shellcheck -S warning .github/scripts/*.sh; python3 .github/scripts/workflow_policy_check.py; python3 -m unittest discover -s .github/scripts -p \"test_*.py\""
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447206.6209984,
+      "elapsed_seconds": 25.661,
+      "exit_code": 0,
+      "stdout_sha256": "3b85837a9135ad49428e9ee71166cb3d138928fd869a9724bf7bda2242a52462",
+      "stderr_sha256": "e9692d3318c42ce53e13deb630fd8ea3ddea712973dfd4fdae0301a293977a46"
+    },
+    "growth": {
+      "command": [
+        "test/scripts/growth-gate.sh",
+        "origin/master"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447232.3244586,
+      "elapsed_seconds": 0.415,
+      "exit_code": 0,
+      "stdout_sha256": "9ec497a995a2de526aa5cadf5cdd1c9b7659f09855e1ee2044677ad65447be9d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "manifests": {
+      "command": [
+        "deploy/kustomize/tests/run.sh",
+        "--require-published-image"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447211.7079926,
+      "elapsed_seconds": 23.945,
+      "exit_code": 0,
+      "stdout_sha256": "90dd2927159ca2b04c36a7d8a74e19ba58e211c3f60f3100cc96cd9d2c3c190f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "review_correction_reproducer": {
+    "test": "TestCR17CHabitatRequestedShipIdentity",
+    "before_fix_exit_code": 1,
+    "before_fix_stdout_sha256": "7859c6c26b3d19a192863ccab79216d536af68528d9a3e1aec9ffcf3f9a39e95",
+    "before_fix_observation": "Both #77 and 77 activated valid factory 78 through a corrupt map key and changed durable records. Valid carrier membership rules out a secondary chain failure.",
+    "after_fix_exit_code": 0,
+    "after_fix_stdout_sha256": "ad44db7a93ce726aec7a458977a7877a5bd989dc76993aae433ab6ca8e5e9936",
+    "corrected_behavior": "HALTED, no success text, complete actor and store snapshots unchanged, no shutdown flush."
+  },
+  "initial_restricted_attempts": {
+    "full-normal": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447083.6867824,
+      "elapsed_seconds": 14.074,
+      "exit_code": 1,
+      "stdout_sha256": "e7fcd4d941f828d85f9f122bdc350a33644f5e093f015158327da84aa50c1309",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reason": "Sandbox denied loopback listeners or pinned tool/DNS downloads; final authorized rerun above passed."
+    },
+    "full-long-race": {
+      "command": [
+        "env",
+        "GB_LONG_TESTS=1",
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447085.1054108,
+      "elapsed_seconds": 121.441,
+      "exit_code": 1,
+      "stdout_sha256": "47a659a589f9cc73c372f3fe5521b5890faeb82dd6f0087208b413bb4afbdde4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reason": "Sandbox denied loopback listeners or pinned tool/DNS downloads; final authorized rerun above passed."
+    },
+    "inventory": {
+      "command": [
+        "test/scripts/inventory-check.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447117.673144,
+      "elapsed_seconds": 10.278,
+      "exit_code": 1,
+      "stdout_sha256": "af72042062c10a238dcc1ef0da089e0907673edef438b9a7a4774089c49d6d0c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reason": "Sandbox denied loopback listeners or pinned tool/DNS downloads; final authorized rerun above passed."
+    },
+    "golden-mutations": {
+      "command": [
+        "test/scripts/golden-mutations.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447117.6271677,
+      "elapsed_seconds": 12.139,
+      "exit_code": 1,
+      "stdout_sha256": "81b07014f082669ba8b363a9c845ccbfbde272dc0f2de4ed7d829ad2bb20b998",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reason": "Sandbox denied loopback listeners or pinned tool/DNS downloads; final authorized rerun above passed."
+    },
+    "lint": {
+      "command": [
+        "test/scripts/lint-gate.sh",
+        "/tmp/cr17c-habitat-resume/lint.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447117.686226,
+      "elapsed_seconds": 0.039,
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "6ac7d91f5395737ab6d1e21bd8fb7c94d334620ba741cbe12d4b77638261061e",
+      "reason": "Sandbox denied loopback listeners or pinned tool/DNS downloads; final authorized rerun above passed."
+    },
+    "vulnerabilities": {
+      "command": [
+        "go",
+        "run",
+        "golang.org/x/vuln/cmd/govulncheck@v1.9.0",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447117.6647708,
+      "elapsed_seconds": 0.018,
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "f3b24eff3cbf23bc8f225d0d0d757af44bbba37787fe8456121bff7598c99418",
+      "reason": "Sandbox denied loopback listeners or pinned tool/DNS downloads; final authorized rerun above passed."
+    },
+    "gate-selftests": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; test/scripts/gate-approval-selftest.sh; test/scripts/lint-gate-selftest.sh; test/scripts/golden-mutations-selftest.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794447205.4697006,
+      "elapsed_seconds": 7.799,
+      "exit_code": 1,
+      "stdout_sha256": "d58b3e72425d7610359394affe7f228d27df4426058df54f715e94d2a4d40bc2",
+      "stderr_sha256": "6ac7d91f5395737ab6d1e21bd8fb7c94d334620ba741cbe12d4b77638261061e",
+      "reason": "Sandbox denied loopback listeners or pinned tool/DNS downloads; final authorized rerun above passed."
+    }
+  },
+  "independent_review": {
+    "mechanism": "Separate noninteractive reviewer agent, explicit read-only instructions; first review bounded to 12 minutes, follow-ups to 6 minutes; test subprocess timeouts 240 and 180 seconds. No interactive stdin invocation.",
+    "agent": "/root/habitat_independent_review",
+    "status": "APPROVE: independent code, documentation and final execution-evidence audit completed; all five findings resolved",
+    "api_process_exit_status": "not applicable (tool-managed agent); test subprocess exit statuses below",
+    "review_test_runs": [
+      {
+        "log": "independent-review-tests.json",
+        "output_sha256": "87a3bb814417a80c7ce3d7a21330b4fbe849a18899468f5859b97f30dbaf5fde",
+        "timeout_seconds": 240,
+        "exit_code": 0,
+        "test_nodes": {
+          "pass": 224
+        },
+        "sigkill_cases_passed": 6
+      },
+      {
+        "log": "independent-review-final-tests.json",
+        "output_sha256": "282f79f51747d3ef5480ffc8bae6c48b2904b88d85790e0b57c198e285c3b605",
+        "timeout_seconds": 180,
+        "exit_code": 0,
+        "test_nodes": {
+          "pass": 227
+        },
+        "sigkill_cases_passed": 6
+      }
+    ],
+    "report_sha256": "b09f70ee7e3df20d8acae1a38c62f1a3973519f335c9312e0fc9f1bb811aba14"
+  },
+  "limitations": [
+    "Private habitat factory activation only; CR-17, CR-11 and CR-20 remain open.",
+    "No durable command IDs, deduplication, outbox, group commit, schema or CR-18 kind change.",
+    "Pre-existing land-on-ship linkage and double hanger accounting remain deferred.",
+    "C turn-time size recomputation retained; activation hanger is not retroactively rescaled.",
+    "Carrier must be a live same-owner habitat; original C had no carrier-owner check.",
+    "Docker/buildx, Trivy, Syft and kind remain hosted CI checks."
+  ],
+  "required_maintainer_labels": [
+    "known-defect-added"
+  ],
+  "gate_change_reviewed_required": false
+}

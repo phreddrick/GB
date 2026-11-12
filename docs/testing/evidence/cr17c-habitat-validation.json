@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "baseline": "97ee43763da31b6b5eec3890e818e394dfcb1bf2",
+  "branch": "feature/cr17c-habitat-factory",
+  "scope": "explicit single-ID habitat factory activation only; other CR-17 paths remain open",
+  "environment": {
+    "date_utc": "2026-11-11",
+    "go": "go1.27.4 linux/amd64 (verified private binary)",
+    "GOTOOLCHAIN": "local",
+    "GOCACHE": "/tmp/cr17c-habitat-cache",
+    "TMPDIR": "/tmp/GB-cr17c-habitat/test/ctool/obj/tmp",
+    "stores": "disposable only"
+  },
+  "source_sha256": {
+    "go/internal/commandrules/habitat.go": "ef1d1fc68cb152cdc409c7f19a227247b4a55dd66870712fb974700ebea3986c",
+    "go/internal/commandrules/habitat_test.go": "36aac5956dd9ff6c4ca5444d91cd162265b2dcfe9f6247557426b51047de73e5",
+    "go/internal/db/habitat.go": "d3a46cc38a73f477456b7f7de59117b685ad874d0a8365bd18f61cf047059cd9",
+    "go/internal/db/habitat_test.go": "603d22649075c697408eb1f873cbdae65fcecf215177423e2d02e59f49f210ac",
+    "go/internal/game/habitat_command.go": "04d225c4fcc628afd00dfe53d767d60a329025c4b3064e043bf9bc6f701682a7",
+    "go/internal/game/habitat_staging_test.go": "89166ce8ce582a629468f078259e9f584c817fa395f830dde9548e310e5998c6",
+    "go/internal/game/habitat_crash_test.go": "217b075d79e69de6205ed0dba129a2e63f6bedf096fde4922fc6d2a2f4111280",
+    "go/internal/game/factory_command.go": "dda5c3e286b408d311e99b0166ce820807c55ffe10c23d5d18b1025c31b73ddc",
+    "go/internal/game/commands_order.go": "feb4f6a0fc181e628c982bca43ab29e10a98ebc253cd077eef48ea070789ade5",
+    "go/internal/game/lifecycle.go": "c4412b206d6ea3e7e9c4f9e70a11862c18f2db363a81c98ee9aff640f0c37a5d",
+    "docs/testing/lint-baseline.txt": "9f5af8adf1031de2f032d85b8217adce34f34add504cc84395f7634f86a6b58f"
+  },
+  "runs": {
+    "pre_fix": {
+      "command": "go -C go test ./internal/game -run ^TestCR17CPreFixHabitatPartialWrite$ -count=1 -v",
+      "expected_exit": 1,
+      "exit_code": 1,
+      "output_sha256": "4e33bb1d079d6264bcb9cc46d8405aeea576a3b498bcd2a60c1cd772482d3caa"
+    },
+    "all": {
+      "command": "go test -count=1 -json ./...",
+      "exit_code": 0,
+      "nodes": {
+        "pass": 3915,
+        "skip": 2
+      },
+      "output_sha256": "0b5e1af83b001c7c0331390ca1a7c8a9c9ee8e7d56438f44f065545dd116c559"
+    },
+    "race": {
+      "command": "GB_LONG_TESTS=1 go test -count=1 -race -json ./...",
+      "exit_code": 0,
+      "nodes": {
+        "pass": 3917
+      },
+      "data_races": 0,
+      "output_sha256": "cc0054a5ec90f3473c33557ba1d7587e0b5ad7254adabcfa7408eaae16421f1a"
+    },
+    "lint_gate": {
+      "exit_code": 0,
+      "result": "baseline 1000, report 1000, matched 1000, new 0, stale 0",
+      "output_sha256": "92940dbb367d0b1841928c26cbebcb51fd04a62ec248116fea63f02895148b58"
+    },
+    "growth_gate": {
+      "exit_code": 0,
+      "result": "allowances reduced only (5 removals); no protected gate tooling changed; label simulated locally only",
+      "output_sha256": "9ec497a995a2de526aa5cadf5cdd1c9b7659f09855e1ee2044677ad65447be9d"
+    },
+    "ctool_check": {
+      "exit_code": 0,
+      "result": "fixtures reproduce exactly",
+      "output_sha256": "23ede285e08e5a4f250bb7b46b427e282162a017a43512bd1905122966c12e1a"
+    },
+    "golden_mutations": {
+      "exit_code": 0,
+      "result": "all fifteen scenarios behaved as required",
+      "output_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927"
+    },
+    "gate_selftests": {
+      "lint": "fa3661dc644fa0a00ab5cef17da6cc111525f874e4f65ce3345cae7a39657f13",
+      "approval": "0793630382f69a970efd2f3edf88526ac84ceb8872a21698f7a010f41e5001fc",
+      "golden_mutations_helpers": "97c280045f4c80954a3ebf2f84dded376fa8e0bb927df473cb6f0c71880d6bd0",
+      "exit_codes": [
+        0,
+        0,
+        0
+      ]
+    },
+    "manifests": {
+      "exit_code": 0,
+      "result": "21 resources valid",
+      "output_sha256": "0ec1a5ae530ccd4d6f71c88b45519b6c6a185d5f250026af90f95095f3a013ed"
+    },
+    "workflow_helpers": {
+      "exit_code": 0,
+      "result": "188 tests OK; policy 17 passed"
+    },
+    "govulncheck": {
+      "version": "v1.9.0",
+      "exit_code": 0,
+      "result": "0 reachable; 17 non-reachable module findings",
+      "output_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994"
+    },
+    "modules": {
+      "verify": "all modules verified",
+      "tidy_diff_bytes": 0
+    }
+  },
+  "habitat_coverage": {
+    "passing_nodes_normal": 224,
+    "passing_nodes_race": 224,
+    "top_level_entries": 28
+  },
+  "not_run_locally": [
+    "docker/buildx",
+    "trivy",
+    "syft",
+    "kind"
+  ]
+}

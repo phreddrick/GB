@@ -1,0 +1,530 @@
+{
+  "schema": 1,
+  "baseline": "5ebe816dac788ee150a0c5ace20260aa492f722a",
+  "origin_master": "97ee43763da31b6b5eec3890e818e394dfcb1bf2",
+  "date_utc": "2026-11-12T02:45:45.394801+00:00",
+  "branch": "feature/cr17c-habitat-factory",
+  "pull_request": 73,
+  "decision": "Maintainer restores original C ownership-independent habitat activation; factory authority retained.",
+  "source_sha256": {
+    "go/internal/commandrules/habitat.go": "ef1d1fc68cb152cdc409c7f19a227247b4a55dd66870712fb974700ebea3986c",
+    "go/internal/commandrules/habitat_test.go": "9dec34578ea82aff80708cfe2e9725ec144a0a5eaf4e76ddc9e1b208e3230ecd",
+    "go/internal/db/habitat.go": "d9973bda3fcdf3188957f46b12c40fecd596ee1c28eb88f5edba2dc7e645c566",
+    "go/internal/db/habitat_test.go": "86ce3fdddbf264a6e22378831e6749bfd26f67cf2e93dba0ec4a8459335113a7",
+    "go/internal/game/habitat_command.go": "5555ccab3cda9419ba8ab28654fa57b6403ad7c5096a0bb4b2d264f5b7cd719e",
+    "go/internal/game/habitat_staging_test.go": "483599ea2cc1604a5ad087531fd0861b11e3f8c9584425f5192e6f54e3f44b76",
+    "go/internal/game/habitat_crash_test.go": "d5eacb088f7fd637de84a6143d3e7d3042da5d8e3a39568cdcb497662853b92a",
+    "go/internal/game/factory_command.go": "0e8a5d9473ba6335cf9884ed15dcf53164583567bb60fc87ba39285df8cd6a7c",
+    "go/internal/game/commands_order.go": "feb4f6a0fc181e628c982bca43ab29e10a98ebc253cd077eef48ea070789ade5",
+    "go/internal/game/lifecycle.go": "c4412b206d6ea3e7e9c4f9e70a11862c18f2db363a81c98ee9aff640f0c37a5d",
+    "docs/testing/lint-baseline.txt": "9f5af8adf1031de2f032d85b8217adce34f34add504cc84395f7634f86a6b58f"
+  },
+  "preserved_evidence_sha256": {
+    "docs/testing/evidence/cr17c-habitat-codex-validation.json": "389f04221be64a6f4b39dd0ccaa9a540557cb19fc37e50f30d8e4ac27d7b87c6",
+    "docs/testing/evidence/cr17c-habitat-independent-review.md": "b09f70ee7e3df20d8acae1a38c62f1a3973519f335c9312e0fc9f1bb811aba14",
+    "docs/testing/evidence/cr17c-habitat-pre-fix-fixture.go.txt": "8421fd19a3eee27ae8e14c210e3baeefedb1cf43b195414c5f8c67cbbb6cfeb1",
+    "docs/testing/evidence/cr17c-habitat-pre-fix-records.json.gz": "2b66ae51faefab6bd4646f387ccb65967f3a154594ec866815d63f223ef12dbe",
+    "docs/testing/evidence/cr17c-habitat-pre-fix-reproducer.go.txt": "465fd676a4a8364d40dbb5fc1cca81f44d75c572d45be6e9ffe8edde82064073",
+    "docs/testing/evidence/cr17c-habitat-pre-fix.txt": "3e4d78262c6e2d7fd30fa486c3d39742a15a6ee552d0b6da759dffb1bfed1c2c",
+    "docs/testing/evidence/cr17c-habitat-validation.json": "d91a17c480b34fd4194afff9b0f6e79ca666333532ec70bbc9a36bcc747676eb"
+  },
+  "runs": {
+    "habitat-corrected": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game",
+        "-run",
+        "Habitat"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450736.7233045,
+      "elapsed_seconds": 9.19,
+      "exit_code": 0,
+      "stdout_sha256": "b05fbca87c6cbf67902d2c4804f3d0ade6744cf3563a31905c229b7e66b1521f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": {
+        "nodes": {
+          "pass": 260
+        },
+        "top_level_passes": 32,
+        "tested_packages_passed": 3,
+        "habitat_pass_nodes": 260,
+        "habitat_top_level_entries": 32,
+        "sigkill_passed": [
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.installed",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.installed"
+        ],
+        "failures": []
+      }
+    },
+    "normal": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450806.3439958,
+      "elapsed_seconds": 75.36,
+      "exit_code": 0,
+      "stdout_sha256": "f9cecc96298a14488995150b3d377bac970c12b32d1451a58cb20518791c206c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": {
+        "nodes": {
+          "pass": 3951,
+          "skip": 2
+        },
+        "top_level_passes": 419,
+        "tested_packages_passed": 21,
+        "habitat_pass_nodes": 260,
+        "habitat_top_level_entries": 32,
+        "sigkill_passed": [
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.installed",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.installed"
+        ],
+        "failures": []
+      }
+    },
+    "long-race": {
+      "command": [
+        "env",
+        "GB_LONG_TESTS=1",
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450806.9949677,
+      "elapsed_seconds": 454.127,
+      "exit_code": 0,
+      "stdout_sha256": "1849dc06c9795195043805bd5afd18f42723b5cdfdc1dcfccb978415c3d08269",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": {
+        "nodes": {
+          "pass": 3953
+        },
+        "top_level_passes": 421,
+        "tested_packages_passed": 21,
+        "habitat_pass_nodes": 260,
+        "habitat_top_level_entries": 32,
+        "sigkill_passed": [
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.installed",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.installed"
+        ],
+        "failures": []
+      }
+    },
+    "build-vet-format": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; go build ./...; go vet ./...; gofmt -l . > /tmp/cr17c-habitat-crossowner/gofmt.txt; test ! -s /tmp/cr17c-habitat-crossowner/gofmt.txt"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450822.9857252,
+      "elapsed_seconds": 3.72,
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fixtures-modules": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; make -C test/ctool check; cd go; go mod verify; go mod tidy -diff"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450823.1151378,
+      "elapsed_seconds": 1.179,
+      "exit_code": 0,
+      "stdout_sha256": "7d835601d056bd1f59280a4456227a6183e40547a59987c8246d11296f34b26f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "lint": {
+      "command": [
+        "test/scripts/lint-gate.sh",
+        "/tmp/cr17c-habitat-crossowner/lint.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450806.4768758,
+      "elapsed_seconds": 16.993,
+      "exit_code": 0,
+      "stdout_sha256": "92940dbb367d0b1841928c26cbebcb51fd04a62ec248116fea63f02895148b58",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "security": {
+      "command": [
+        "go",
+        "run",
+        "golang.org/x/vuln/cmd/govulncheck@v1.9.0",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450806.6628006,
+      "elapsed_seconds": 7.073,
+      "exit_code": 0,
+      "stdout_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory": {
+      "command": [
+        "test/scripts/inventory-check.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450806.6296704,
+      "elapsed_seconds": 75.612,
+      "exit_code": 0,
+      "stdout_sha256": "5a8aeafd39056f1d5b17c3af2b4c3c181c778162da7d1f87ea6854bdd43bf5b2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "growth": {
+      "command": [
+        "test/scripts/growth-gate.sh",
+        "origin/master"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450823.1081424,
+      "elapsed_seconds": 1.607,
+      "exit_code": 0,
+      "stdout_sha256": "9ec497a995a2de526aa5cadf5cdd1c9b7659f09855e1ee2044677ad65447be9d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "workflow": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; actionlint -no-color; shellcheck -S warning .github/scripts/*.sh; python3 .github/scripts/workflow_policy_check.py; python3 -m unittest discover -s .github/scripts -p 'test_*.py'"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450822.8683186,
+      "elapsed_seconds": 34.329,
+      "exit_code": 0,
+      "stdout_sha256": "3b85837a9135ad49428e9ee71166cb3d138928fd869a9724bf7bda2242a52462",
+      "stderr_sha256": "6ac63af637964c2a784d76b2239edbfa8211bc03ae1bd69c6cc9b415f41a11c2"
+    },
+    "manifests": {
+      "command": [
+        "deploy/kustomize/tests/run.sh",
+        "--require-published-image"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450825.501948,
+      "elapsed_seconds": 34.053,
+      "exit_code": 0,
+      "stdout_sha256": "ca9eb3c9ac0fc5b840e550e5e5681c940f112628caa9e06ad65e949d9fbe885f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "selftests": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; test/scripts/gate-approval-selftest.sh; test/scripts/lint-gate-selftest.sh; test/scripts/golden-mutations-selftest.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450859.604952,
+      "elapsed_seconds": 159.79,
+      "exit_code": 0,
+      "stdout_sha256": "c95f033bba74ff2f28535440202a15cd7c1ff715cc9e50f8e9e2e03492205165",
+      "stderr_sha256": "2d6e95ffcdc66cb1170200a422ac98a9dad8caf1841591ffed2d164a6d79cedb"
+    },
+    "golden-mutations": {
+      "command": [
+        "test/scripts/golden-mutations.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450806.7229247,
+      "elapsed_seconds": 570.969,
+      "exit_code": 0,
+      "stdout_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "retained_expected_or_diagnostic_failures": {
+    "pre-fix-crossowner": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./internal/db",
+        "./internal/game",
+        "-run",
+        "TestHabitatActivationAtomicAndReopen/carrier-owner-2|TestCR17CHabitatCompleteStateAndBoundaries/carrier-owner-2"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450541.639129,
+      "elapsed_seconds": 2.631,
+      "exit_code": 1,
+      "stdout_sha256": "39c6158c1ac1b68aa4005f1d3bc4cec88ead5b536ba52cda0287f18c61cfe9c0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": {
+        "nodes": {
+          "fail": 4
+        },
+        "top_level_passes": 0,
+        "tested_packages_passed": 0,
+        "habitat_pass_nodes": 0,
+        "habitat_top_level_entries": 0,
+        "sigkill_passed": [],
+        "failures": [
+          "TestHabitatActivationAtomicAndReopen/carrier-owner-2",
+          "TestHabitatActivationAtomicAndReopen",
+          "TestCR17CHabitatCompleteStateAndBoundaries/carrier-owner-2",
+          "TestCR17CHabitatCompleteStateAndBoundaries"
+        ]
+      },
+      "reason": "Desired cross-owner behavior rejected by old owner checks."
+    },
+    "habitat": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game",
+        "-run",
+        "Habitat"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450595.8085709,
+      "elapsed_seconds": 8.346,
+      "exit_code": 1,
+      "stdout_sha256": "f2ac82aeda737763b216a4731c945a43ce29562676e88ab2362289461222196e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": {
+        "nodes": {
+          "pass": 255,
+          "fail": 2
+        },
+        "top_level_passes": 30,
+        "tested_packages_passed": 2,
+        "habitat_pass_nodes": 255,
+        "habitat_top_level_entries": 30,
+        "sigkill_passed": [
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.installed",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.installed"
+        ],
+        "failures": [
+          "TestCR17CHabitatCompleteStateAndBoundaries/carrier-owner-2",
+          "TestCR17CHabitatCompleteStateAndBoundaries"
+        ]
+      },
+      "reason": "New post-turn ownership invariant was false because of existing CR-13; corrected to explicit restart-before-turn and unchanged Go turn behavior without changing runtime turn code."
+    },
+    "habitat-final": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game",
+        "-run",
+        "Habitat"
+      ],
+      "cwd": "/tmp/GB-cr17c-habitat/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794450652.0819793,
+      "elapsed_seconds": 7.888,
+      "exit_code": 1,
+      "stdout_sha256": "983c1a6f6dbe8008748e261f4fd237171a927d3830d6e3f72b61d9e101f889fa",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": {
+        "nodes": {
+          "pass": 258,
+          "fail": 2
+        },
+        "top_level_passes": 31,
+        "tested_packages_passed": 2,
+        "habitat_pass_nodes": 258,
+        "habitat_top_level_entries": 31,
+        "sigkill_passed": [
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.installed",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:1",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:2",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.after-commit",
+          "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.installed"
+        ],
+        "failures": [
+          "TestCR17CHabitatCompleteStateAndBoundaries/carrier-owner-2",
+          "TestCR17CHabitatCompleteStateAndBoundaries"
+        ]
+      },
+      "reason": "New post-turn ownership invariant was false because of existing CR-13; corrected to explicit restart-before-turn and unchanged Go turn behavior without changing runtime turn code."
+    }
+  },
+  "independent_review": {
+    "mechanism": "Separate noninteractive review agent, bounded 8-minute source/review turns; independent race subprocesses timeout240s with recorded exit statuses.",
+    "status": "APPROVE: code, docs and final evidence reviewed",
+    "runs": [
+      {
+        "log": "reviewer-race.json",
+        "exit_code": 1,
+        "timeout_seconds": 240,
+        "stdout_sha256": "76fef14b69467ada9a2765765cbc9777ef90bc5ba37b72db8ef18190b472e488",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "tests": {
+          "nodes": {
+            "pass": 258,
+            "fail": 2
+          },
+          "top_level_passes": 31,
+          "tested_packages_passed": 2,
+          "habitat_pass_nodes": 258,
+          "habitat_top_level_entries": 31,
+          "sigkill_passed": [
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:1",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:2",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before-commit",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.after-commit",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.installed",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:1",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:2",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before-commit",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.after-commit",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.installed"
+          ],
+          "failures": [
+            "TestCR17CHabitatCompleteStateAndBoundaries/carrier-owner-2",
+            "TestCR17CHabitatCompleteStateAndBoundaries"
+          ]
+        }
+      },
+      {
+        "log": "reviewer-final-race.json",
+        "exit_code": 0,
+        "timeout_seconds": 240,
+        "stdout_sha256": "2326a3f3ca13d7a1537b285bc609b52c1371a8bbbe99cab63145149faa1fc8b0",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "tests": {
+          "nodes": {
+            "pass": 260
+          },
+          "top_level_passes": 32,
+          "tested_packages_passed": 3,
+          "habitat_pass_nodes": 260,
+          "habitat_top_level_entries": 32,
+          "sigkill_passed": [
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:1",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.write:2",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.before-commit",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.after-commit",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-1/habitat.installed",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:1",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.write:2",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.before-commit",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.after-commit",
+            "TestCR17CHabitatRealProcessCrash/carrier-owner-2/habitat.installed"
+          ],
+          "failures": []
+        }
+      }
+    ],
+    "report_sha256": "f9e43649254936417fa4126c4d6652ee39be0eba33a6bdd70ff64e61094cae65"
+  },
+  "limitations": [
+    "CR-13 remains: Go lacks C doown prepass; doShip may sync containing habitat Owner/Governor from child during subsequent turns. Activation/restart-before-turn preserve original foreign ownership. No whole-turn C parity claimed.",
+    "CR-11/CR-17/CR-20 and landing/hangar/deferred commands remain open.",
+    "No schema, commit kind, command IDs, outbox, automatic recovery or deployment change.",
+    "Hosted Docker/buildx/Trivy/Syft/kind remain CI checks."
+  ],
+  "required_maintainer_labels": [
+    "known-defect-added"
+  ],
+  "gate_change_reviewed_required": false
+}

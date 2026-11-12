@@ -12,10 +12,12 @@ import (
 	"github.com/phreddrick/GB/go/internal/net"
 )
 
-// handleLandedFactoryOrder runs before cmdOrder emits output or iterates ships.
-// Only an explicit single ship ID can enter the migrated operation. Numeric
-// IDs are range-checked before the legacy selector can truncate them to uint32.
-func (s *State) handleLandedFactoryOrder(p, g int, args []string, sess net.Responder) bool {
+// handleFactoryOrder runs before cmdOrder emits output or iterates ships.
+// Only an explicit single ship ID can enter a migrated operation: a landed
+// factory (planet stockpile) or a factory docked aboard a habitat (carrier
+// resources and hanger). Numeric IDs are range-checked before the legacy
+// selector can truncate them to uint32.
+func (s *State) handleFactoryOrder(p, g int, args []string, sess net.Responder) bool {
 	if len(args) < 2 || !matchCmd(strings.ToLower(args[1]), "on") {
 		return false
 	}
@@ -35,31 +37,38 @@ func (s *State) handleLandedFactoryOrder(p, g int, args []string, sess net.Respo
 		if sh == nil || !sh.Alive || int(sh.Owner) != p {
 			return false
 		}
-		if sh.Type != model.OtypeFactory || !landed(sh) {
+		if sh.Type != model.OtypeFactory || (!landed(sh) && !habitatFactory(sh)) {
 			return false
 		}
 		if len(args) != 2 {
 			_ = sess.Send("Usage: order #<factory> on\n")
 			return true
 		}
-		s.runFactoryActivation(p, g, sh.Number, sess)
+		if landed(sh) {
+			s.runFactoryActivation(p, g, uint32(n), sess)
+		} else {
+			s.runHabitatActivation(p, g, uint32(n), sess)
+		}
 		return true
 	}
 	// The on selector is inspected without mutation. A mixed/ambiguous request
 	// cannot run a nonfactory prefix then reach a staged factory later in the loop.
-	landed, err := s.onSelectionHasLandedFactory(p, g, spec)
+	staged, err := s.onSelectionHasStagedFactory(p, g, spec)
 	if err != nil {
 		s.halt("factory selection has inconsistent orbital records; operator reconciliation required", "")
 		_ = sess.Send("Factory selection refused; the engine has halted for operator review.\n")
 		return true
 	}
-	if landed {
+	if staged {
 		_ = sess.Send("Factory activation requires one explicit ship number; no orders changed.\n")
 		return true
 	}
 	return false
 }
-func (s *State) onSelectionHasLandedFactory(p, g int, spec string) (bool, error) {
+
+// onSelectionHasStagedFactory reports whether a wildcard/type selector would
+// reach a landed or habitat-docked factory of this player in the current scope.
+func (s *State) onSelectionHasStagedFactory(p, g int, spec string) (bool, error) {
 	dir := s.dirs[p-1][g]
 	var next uint32
 	switch dir.Level {
@@ -93,7 +102,7 @@ func (s *State) onSelectionHasLandedFactory(p, g int, spec string) (bool, error)
 			return false, errors.New("invalid scope chain")
 		}
 		seen[next] = true
-		if sh.Alive && int(sh.Owner) == p && sh.Type == model.OtypeFactory && landed(sh) && matchShipSpec(sh, spec) {
+		if sh.Alive && int(sh.Owner) == p && sh.Type == model.OtypeFactory && (landed(sh) || habitatFactory(sh)) && matchShipSpec(sh, spec) {
 			return true, nil
 		}
 		next = sh.NextShip

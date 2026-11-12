@@ -1,5 +1,15 @@
 # Static-analysis baseline (Phase 0, shrunk by Phase 1)
 
+**CR-17C habitat factory update (2026-11-11 UTC): current total 1,000.** Retiring
+the legacy habitat branch of `activateFactory` removes exactly five stale entries:
+three unchecked `sess.Send` calls and the two G115 `int -> uint16` conversions
+(`onCost` and the rescaled `ship.Size`). The staged replacement (`commandrules`,
+`db.CommitHabitatActivation`, `habitat_command.go` and their tests) is lint-clean
+under the same configuration; no allowance is added or moved. The maintainer must
+apply `known-defect-added` under CLAUDE.md; a local simulated label is not
+acknowledgment. Protected gate tooling is unchanged. Prior totals below are
+historical.
+
 **Telescope aiming update (2026-11-11 UTC): current total 1,005.** Retiring
 `mkExplAimedAt` removes exactly three stale entries: two unchecked `sess.Send`
 calls and its G115 `int -> uint8` GetPlanet index conversion. No allowance is
