@@ -26,8 +26,7 @@ type dumpFixture struct {
 
 func newDumpFixture(t *testing.T) *dumpFixture {
 	t.Helper()
-	f := newEnrollmentActor(t)
-	a := enrollActor(t, f, actorEnrollmentRequest("operator")).Placement
+	f, a := newCommandEnrollmentActor(t)
 	enrollActor(t, f, actorEnrollmentRequest("account-2"))
 	d := &dumpFixture{f, a.Star}
 	onEnrollmentActor(t, f, func() {
