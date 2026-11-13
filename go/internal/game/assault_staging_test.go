@@ -284,6 +284,8 @@ func TestGroundAssaultActorOutcomesAndRefusals(t *testing.T) {
 				case "wrongorigin":
 					p.Sectors[0].Owner = 2
 				case "hostile-unload":
+					now := f.state.now()
+					f.state.now = func() time.Time { return now }
 					sh := f.state.ships[f.factory]
 					sh.LandX = 1
 					sh.LandY = 0
@@ -378,6 +380,10 @@ func TestGroundAssaultActorOutcomesAndRefusals(t *testing.T) {
 					}
 				}
 			})
+			var shipWant db.ShipGroundAssault
+			if kind == "hostile-unload" {
+				shipWant = shipAssaultPrepared(t, f, false, 1)
+			}
 			before := assaultRecords(t, f)
 			actor := actorEnrollmentSnapshot(t, f.actorEnrollmentFixture)
 			r := &recordingResponder{}
@@ -389,7 +395,17 @@ func TestGroundAssaultActorOutcomesAndRefusals(t *testing.T) {
 				t.Fatal(e)
 			}
 			valid := kind == "mutual" || kind == "repulse" || kind == "empty" || kind == "absorption"
-			if valid {
+			if kind == "hostile-unload" {
+				// Newly authorized ship assault: retain full atomicity/effect
+				// checks instead of the historical blanket refusal assertion.
+				if !strings.Contains(r.text(), "Casualties:") {
+					t.Fatal("approved ship assault did not execute", r.text())
+				}
+				assertShipAssaultActor(t, f, shipWant)
+				if !reflect.DeepEqual(assaultRecords(t, f), shipAssaultExpectedRecords(t, before, shipWant)) {
+					t.Fatal("partial newly enabled ship assault")
+				}
+			} else if valid {
 				if reflect.DeepEqual(before, assaultRecords(t, f)) {
 					t.Fatal("all combat rejected", r.text())
 				}
