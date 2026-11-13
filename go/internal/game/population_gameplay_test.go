@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/phreddrick/GB/go/internal/db"
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
@@ -278,13 +279,37 @@ func TestPopulationAuthorityForeignAndAssaultBoundary(t *testing.T) {
 					cargoPeer(t, f, level)
 					onEnrollmentActor(t, f.actorEnrollmentFixture, func() { f.state.ships[f.factory].PNumOrbits = 1; persistCargo(t, f) })
 				}
+				// Hostile positive unload is now an approved atomic operation.
+				// Keep all prior rejection cases; verify the newly enabled case
+				// against its COMPLETE durable proposal, not just response text.
+				var assault db.ShipGroundAssault
+				var records map[string]string
+				if scenario == "hostile unload" {
+					onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+						// This fixture now prepares and dispatches a durable
+						// assault: keep its message timestamp deterministic too.
+						now := f.state.now()
+						f.state.now = func() time.Time { return now }
+						f.state.assaultRandom = highAssaultDraw
+					})
+					assault = shipAssaultPrepared(t, f.factoryFixture, commodity == "m", 2)
+					records = assaultRecords(t, f.factoryFixture)
+				}
 				before := enrollmentDBSnapshot(t, f.actorEnrollmentFixture)
 				actor := actorEnrollmentSnapshot(t, f.actorEnrollmentFixture)
 				r := &recordingResponder{}
 				if e := f.state.HandleCommand(ctxT(t, 10*time.Second), 1, g, command, r); e != nil {
 					t.Fatal(e)
 				}
-				if success {
+				if scenario == "hostile unload" {
+					if !strings.Contains(r.text(), "Casualties:") {
+						t.Fatal("approved hostile unload did not execute", r.text())
+					}
+					assertShipAssaultActor(t, f.factoryFixture, assault)
+					if !reflect.DeepEqual(assaultRecords(t, f.factoryFixture), shipAssaultExpectedRecords(t, records, assault)) {
+						t.Fatal("incomplete newly enabled hostile operation")
+					}
+				} else if success {
 					if !strings.Contains(r.text(), "complement") {
 						t.Fatal(r.text())
 					}

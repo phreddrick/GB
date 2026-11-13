@@ -41,7 +41,11 @@ func (s *State) handlePopulation(p, g int, args []string, sess net.Responder, un
 			return true
 		}
 	}
-	s.runPopulation(p, g, uint32(id), commandrules.PopulationRequest{Commodity: args[1][0], Amount: amount, Unload: unload}, sess)
+	request := commandrules.PopulationRequest{Commodity: args[1][0], Amount: amount, Unload: unload}
+	if s.handleShipGroundAssault(p, g, uint32(id), request, sess) {
+		return true
+	}
+	s.runPopulation(p, g, uint32(id), request, sess)
 	return true
 }
 func (s *State) populationStage(p, g int, id uint32, request commandrules.PopulationRequest) (*commandWorkspace, db.PopulationTransfer, string, error) {

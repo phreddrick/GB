@@ -573,3 +573,13 @@ See [the implementation and acceptance record](../testing/cr17c-ground-assault.m
 and [preserved Phase 0 reproduction](../testing/cr17c-ground-assault-phase0.md).
 The earlier CR-19/41A paragraphs are historical findings and scopes, not a claim
 that this bounded slice accepts mechanical, multi-step or ship-origin assaults.
+
+**CR-17C hostile ship-unload follow-up:** one explicit authorized planet-landed
+`unload #N c|m [amount]` now uses private proposals and one checked bbolt
+transaction for ship complement/mass, complete planet accounting, both races,
+combat news and defender inbox allocation. Zero AP is immutable context.
+Owner-approved survivor mass refund corrects C's duplicate retreat debit.
+Mechanical/targeted-transporter/reverse/mixed hostile variants remain refused;
+noncombat #41A and sector-origin PR78 contracts remain separate. See
+[implementation/evidence](../testing/cr17c-ship-ground-assault.md). This bounded
+change does not close CR-17, CR-11, CR-13, CR-20, #41 or #51.

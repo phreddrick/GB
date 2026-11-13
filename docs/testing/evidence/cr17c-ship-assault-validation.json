@@ -1,0 +1,162 @@
+{
+  "status": "BLOCKED_BEFORE_IMPLEMENTATION",
+  "baseline": "7a17a1bc7edf75091386f30944a529a0ccf48d8d",
+  "branch": "feature/cr17c-ship-ground-assault",
+  "toolchain": "go1.27.4 linux/amd64",
+  "GOTOOLCHAIN": "local",
+  "blocker": "Explicit approval for ship-specific retreat survivor mass refund",
+  "source_sha256": {
+    "source/load.c": "ae4be32ce6df02983ab524fee06c30e4dbd4fa4c1c38fe3bc04738843fab3dad",
+    "source/move.c": "b3784ada59f87ec2f5161052bad0eb8b5dab6ecce1b3148dbd4e3a1d306d8e61",
+    "source/rand.c": "5fd544827ead63bda02dd08107fbbe84377f6e309d5d97e145b685bdc9bbcdac",
+    "source/shlmisc.c": "55591647313466fcfd80dfaff82b4e087f62b810cd9ca29871561c654e743ea6",
+    "source/ships.h": "9dfdae7808b0302eecbb847b9f230aac7c17be941529bcd8e9c99df49238a068",
+    "source/GB_server.c": "a8f48a65bb7cba6ff78d4b36f76bd63f1c50134677b6517189bfa1fea39caeb2",
+    "go/internal/game/commands_load.go": "fa2ee806bf958802fff0eb27a93e466f83e5965b2666b03042af000307b130aa",
+    "go/internal/game/population_command.go": "6e2a3fded5ec0cc006fe2acfee37668beec6e3cb22b44061f72a88299722b55b",
+    "go/internal/commandrules/population.go": "159a3c03fc7029885c0952792e687121a4a832c42050e5cc9340e3821267f6d4",
+    "go/internal/db/population.go": "694990a23b5a53276271dd88dd0f6458eb40c9d5075c8ed84691f46ff063db54",
+    "go/internal/game/assault_command.go": "301507896b38143163905a8df7e1dbefa7222e4df955d5e2bde2c39c8223e9fc",
+    "go/internal/commandrules/assault.go": "1e10bbb348a3cc104a7d4ba53be212885dc139bd751a27b22f7e0fe8ef047cb2",
+    "go/internal/db/assault.go": "2b9f48cb720334caa716e6ec3eaa02fea14ee02d908c5b6fd71617744ef94d05",
+    "go/internal/game/command_workspace.go": "4d5f89f013a8090eaef9f5b1e663eb07b3069c0d8c4cee0778db82fea23781d3"
+  },
+  "commands": {
+    "cwd": "/tmp/GB-cr17c-ship-ground-assault",
+    "toolchain": "/tmp/gb-go1274-evidence/go/bin/go",
+    "environment": {
+      "GOTOOLCHAIN": "local"
+    },
+    "c_build_initial": {
+      "command": "gcc -std=gnu89 -fcommon -w -O0 -ffunction-sections -fdata-sections -Wl,--gc-sections -Isource -Itest/ctool/include -I/tmp/cr17c-ship-assault-evidence /tmp/cr17c-ship-assault-evidence/c-ship-audit.c /tmp/cr17c-ship-assault-evidence/c-unreached-stubs.c source/load.c source/move.c source/rand.c -lm -o /tmp/cr17c-ship-assault-evidence/c-ship-audit",
+      "exit": 1,
+      "stderr": "c-build.err"
+    },
+    "c_build_rerun": {
+      "command": "gcc -std=gnu89 -fcommon -w -O0 -ffunction-sections -fdata-sections -Wl,--gc-sections -Isource -Itest/ctool/include -I/tmp/cr17c-ship-assault-evidence /tmp/cr17c-ship-assault-evidence/c-ship-audit.c /tmp/cr17c-ship-assault-evidence/c-unreached-stubs.c source/load.c source/move.c source/rand.c -lm -o /tmp/cr17c-ship-assault-evidence/c-ship-audit",
+      "exit": 0,
+      "stderr": "c-build-rerun.err"
+    },
+    "refusal": {
+      "cwd": "/tmp/GB-cr17c-ship-ground-assault/go",
+      "command": "GOTOOLCHAIN=local /tmp/gb-go1274-evidence/go/bin/go test -count=1 -race -json -overlay=/tmp/cr17c-ship-assault-evidence/overlay.json -run ^TestShipAssaultPhase0Refusal$ ./internal/game",
+      "exit": 0
+    },
+    "accepted-regressions": {
+      "cwd": "/tmp/GB-cr17c-ship-ground-assault/go",
+      "command": "GOTOOLCHAIN=local /tmp/gb-go1274-evidence/go/bin/go test -count=1 -race -json -run '^(TestPopulation|TestGroundAssault)' ./internal/game ./internal/db ./internal/commandrules",
+      "exit": 0
+    }
+  },
+  "results": {
+    "refusal": {
+      "passed_nodes": 9,
+      "passed_leaves": 8,
+      "failures": 0,
+      "packages": [
+        {
+          "package": "github.com/phreddrick/GB/go/internal/game",
+          "elapsed": 3.7640000000000002,
+          "action": "pass"
+        }
+      ],
+      "population_sigkill_leaves": 0,
+      "ground_sigkill_leaves": 0,
+      "exit": 0
+    },
+    "accepted-regressions": {
+      "passed_nodes": 465,
+      "passed_leaves": 437,
+      "failures": 0,
+      "packages": [
+        {
+          "package": "github.com/phreddrick/GB/go/internal/commandrules",
+          "elapsed": 1.093,
+          "action": "pass"
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/db",
+          "elapsed": 6.779,
+          "action": "pass"
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/game",
+          "elapsed": 22.622,
+          "action": "pass"
+        }
+      ],
+      "population_sigkill_leaves": 24,
+      "ground_sigkill_leaves": 20,
+      "exit": 0
+    }
+  },
+  "evidence_sha256": {
+    "README.txt": "80a65f05782b7e0c7b846447af602159495e36bf417520189fef6ebf078803c4",
+    "accepted-regressions.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "accepted-regressions.jsonl": "bca91d37ff6a483e8618e6684e5722f67b349ad6c5c0e353281635626e1fad7c",
+    "accepted-regressions.result.json": "20b780b45b47f5a8b964f1c6b20e04046a1b0429c04ae9b4d2f3f353a6b3b30c",
+    "c-build-rerun.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "c-build-rerun.out": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "c-build.err": "7168bb57fd88231e0a1c667eea98fa4c2d3d6a1a790dc3d5f74fd096c4408d75",
+    "c-build.out": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "c-helpers.inc": "69b8e4a8ac56671529992e71330656743e0b7a54bc88e0bcee1229e6637baec9",
+    "c-ship-audit.c": "f2c9e8ebe3b683bcd4d0d7fce03f3ff3de289cb150bd84b15a6c8e6514836a60",
+    "c-unreached-stubs.c": "0948b373f64e432eda9e14c422998e27c13179ba8d8331bb30073795e6265e12",
+    "commands.json": "828c5bab6f689189b591711c3d5925366704c8ea92a6f892d377566a8529d6e5",
+    "independent-c-build.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent-c-build.out": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent-evidence-review.md": "eed9235684efb816bdecc4407cc61cc035594928c03275040a26e38580299e06",
+    "independent-helper-comparison.json": "c5c2fc240f4477b64737228d321698a09ee2d314d7a702afea96c24934ac17c9",
+    "independent-military-retreat.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent-military-retreat.out": "0b9f5dd0340bd8256614741d9f60e34fe487ce5e9165f444306e00174ffe1aad",
+    "independent-mutual.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent-mutual.out": "abae402c0d2d0a596aff7cdba323ba2becea35be2e723293cf3a431a3e881592",
+    "independent-partial-retreat.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent-partial-retreat.out": "120d9fc74774cd8dff7f8914f5c5565b637976a935789c3dd919b7d4ef56e9c2",
+    "independent-phase0-review.md": "de98270668b077d900894d54fca2aa1e08e6e565b981bed6c4f009b292b7044c",
+    "independent-refusal-result.json": "6dda996a86c07535d9eb042d3e7596d16072478cbd0dd7a74a78ca54f2d59e9d",
+    "independent-refusal.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent-refusal.jsonl": "0f9f882250acde748a4db67eca94c916252f024b6002017799d07524122852bb",
+    "independent-runtime-results.json": "1c8535feeeb612052d683e47e81498ccb4617b28f582530a1779c756f7645728",
+    "independent-source-check.json": "a524f02c1e5d494f1e23dd6872ac1d6e0f0158dd8df4d08aadde3888d68a22e5",
+    "independent-victory.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent-victory.out": "f433b962d9eeb7a94808573bc315dfb9c1c2afc96151f30df931906a71174892",
+    "independent-zero-loss-retreat.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent-zero-loss-retreat.out": "1afd938e48fa52fb5b537e1d1e08f26134242378423ec76c3cfc545d26266fff",
+    "military-retreat.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "military-retreat.out": "0b9f5dd0340bd8256614741d9f60e34fe487ce5e9165f444306e00174ffe1aad",
+    "military-retreat.result.json": "b6a6fb96c25f06f8eb2f168daeffcdc55368407caeeb482a0f8b0147ec89abea",
+    "mutual.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mutual.out": "abae402c0d2d0a596aff7cdba323ba2becea35be2e723293cf3a431a3e881592",
+    "mutual.result.json": "d2c386befc209d0dcf0ec827669c39d752a4f52b4db0772d37b26d9e94855a32",
+    "overlay.json": "df5bf717f9039e47d33c6b06dab6428988b98bd7bffc2f515420ad9df774273f",
+    "partial-retreat.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "partial-retreat.out": "120d9fc74774cd8dff7f8914f5c5565b637976a935789c3dd919b7d4ef56e9c2",
+    "partial-retreat.result.json": "256708dab28eec15333f8ece161a6f2a329f17f5572e6754e275a0ef32a4f003",
+    "refusal.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "refusal.jsonl": "02b6944ae0c7dbf5c41fe27f600b918f638a01c0e9e963de8200885a289cd64e",
+    "refusal.result.json": "2f9e39ac5ef4fd9279227a14b9a0870bafe79f5c8550d995ee2c6d8dcbdb9c3d",
+    "ship_refusal_test.go.txt": "2b398e14f3adb82c779f76d1aa40dce56097be0eae7f529f034df0942e35b3eb",
+    "source-sha256.json": "abae9319bb1a5654c28a6b8bab40f77e192bdc927bb178ca2007b271788ad34d",
+    "toolchain.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "toolchain.out": "a29205bd83967c2f70e6768fae009600038d6056499fa289de9d5f9b79beaef4",
+    "victory.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "victory.out": "f433b962d9eeb7a94808573bc315dfb9c1c2afc96151f30df931906a71174892",
+    "victory.result.json": "247d1cb2b6446f43f1ad959e75a1eaf8d63e613e9005b50bb7c19b401100350b",
+    "worktrees-final.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "worktrees-final.out": "07e559fd902a026c71e61162793cebed9a7277fc00e92f33ac35cf7540964683",
+    "zero-loss-retreat.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "zero-loss-retreat.out": "1afd938e48fa52fb5b537e1d1e08f26134242378423ec76c3cfc545d26266fff",
+    "zero-loss-retreat.result.json": "1a6e4999ae703e0756120b7a05ea4f4c751c4a7a662b76f017422188027c8db2"
+  },
+  "preserved_files_sha256": {
+    "docs/testing/cr17c-ship-ground-assault-phase0.md": "0bcbfc076c0f7abd2782fb213c2d46183fac76a0b1a74eefcc8f41b8bb824323",
+    "docs/testing/evidence/cr17c-ship-assault-phase0.tar.gz": "b645d885bd4673046755a620482001558fc107d06933ca91e0048749e22b329d",
+    "docs/testing/evidence/cr17c-ship-assault-review.md": "de98270668b077d900894d54fca2aa1e08e6e565b981bed6c4f009b292b7044c",
+    "docs/testing/evidence/cr17c-ship-assault-evidence-review.md": "eed9235684efb816bdecc4407cc61cc035594928c03275040a26e38580299e06"
+  },
+  "implementation_gates": "NOT RUN: mandatory owner-decision stop before implementation",
+  "new_ship_assault_crash_acceptance": "NOT IMPLEMENTED",
+  "independent_review": "Phase0 source/design and reproducible evidence only; not implementation approval",
+  "commit_push_pr": "NOT CREATED"
+}
