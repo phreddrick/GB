@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/phreddrick/GB/go/internal/commandrules"
 	"github.com/phreddrick/GB/go/internal/config"
 	"github.com/phreddrick/GB/go/internal/db"
 	"github.com/phreddrick/GB/go/internal/model"
@@ -50,6 +51,9 @@ type Registry interface {
 // The networking layer calls methods on State from per-player goroutines;
 // those methods communicate with the actor via channels.
 type State struct {
+	// Actor-owned optional deterministic source; nil uses isolated crypto randomness.
+	assaultRandom func(commandrules.AssaultDraw) (commandrules.AssaultDraw, error)
+
 	cfg     *config.Config
 	store   *db.Store
 	logger  *slog.Logger

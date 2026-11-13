@@ -556,3 +556,20 @@ captured Owner, while ground movement still lacks C's defender-elimination
 ownership assignment. No combat code is fixed or declared complete here.
 See [implementation, C inventory, pre-fix records and crash evidence](../testing/cr17c-noncombat-population.md).
 Issues #38/#41/#51 and CR-17/CR-11/CR-13/CR-20 remain open.
+
+**CR-17C #41B / CR-19 bounded ground movement:** the owner-approved single-step,
+nonmechanical hostile `move`/`deploy` path now prepares private civilian/military
+combat outcomes and commits the complete planet/sectors, both races, star AP,
+one combat-news entry and defender inbox message in one checked bbolt transaction.
+It restores defender-elimination ownership assignment and defined C morale,
+Points and translation; approved mutual destruction is neutral/no winner, empty
+foreign sectors permit unopposed occupation, absorption cannot resurrect a force,
+and ownership/population/mobilization counters follow actual final transitions.
+Full-route classification rejects multi-step hostile or mechanical cases before
+legacy prefix effects. Accepted nonhostile movement remains legacy; hostile ship
+unloading remains refused by #41A. CR-17, #41, #51, CR-11, CR-13 and CR-20 remain
+OPEN; no general command durability, deduplication or outbox is claimed.
+See [the implementation and acceptance record](../testing/cr17c-ground-assault.md)
+and [preserved Phase 0 reproduction](../testing/cr17c-ground-assault-phase0.md).
+The earlier CR-19/41A paragraphs are historical findings and scopes, not a claim
+that this bounded slice accepts mechanical, multi-step or ship-origin assaults.

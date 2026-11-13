@@ -1,0 +1,1643 @@
+{
+  "unit": "CR-17C #41B / CR-19 approved one-step nonmechanical ground movement only",
+  "baseline": "b3ac84d404cc180400336f91dadb828b52c5491a",
+  "branch": "feature/cr17c-ground-assault",
+  "worktree": "/tmp/GB-cr17c-ground-assault",
+  "toolchain": "go version go1.27.4 linux/amd64",
+  "GOTOOLCHAIN": "local",
+  "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+  "final_source_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+  "source_manifest_artifact": "accepted-final-source-binding.json",
+  "executions": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestGroundAssaultActorOutcomesAndRefusals$/(mechanical|mechanical-peer|third-party-afv)$|^TestGroundAssaultAlliedAFVIsImmutableWitness$",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794553160.4902809,
+      "elapsed_seconds": 4.223,
+      "exit_code": 0,
+      "name": "R2-independent-correction",
+      "source_before_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "source_after_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "stable": true,
+      "matches_final": true,
+      "out_sha256": "989653f1c7019327839543a8c4360497f1cad01cf2d6d258f2eb46028e3029b8",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestGroundAssaultActorOutcomesAndRefusals$/mechanical-peer$",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794553061.8418624,
+      "elapsed_seconds": 6.978,
+      "exit_code": 1,
+      "name": "R2-mechanical-peer-before",
+      "source_before_sha256": "3530167345fb674bac4979610487f9a4b9ceb67c20f26dd477af8404e3bfe8f7",
+      "source_after_sha256": "3530167345fb674bac4979610487f9a4b9ceb67c20f26dd477af8404e3bfe8f7",
+      "stable": true,
+      "matches_final": false,
+      "out_sha256": "66e713ef28dc99d020d3e275521465db376ed535baf10f771ca33cc0ed605f4d",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestGroundAssaultActorOutcomesAndRefusals$|^TestGroundAssaultAllied",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794553111.739787,
+      "elapsed_seconds": 15.278,
+      "exit_code": 0,
+      "name": "R2-mechanical-peer-corrected",
+      "source_before_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "source_after_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "stable": true,
+      "matches_final": true,
+      "out_sha256": "5d21631ed618802f8824dff721af4d0e5e5ed0c488014802f4b8f30eb5ba6e78",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794552626.513488,
+      "elapsed_seconds": 45.411,
+      "exit_code": 0,
+      "name": "acceptance-normal",
+      "source_before_sha256": "3240fe2f1d6ccd632813bb24b868e4ec493aec2fcba7900ab6fa44775101aa2d",
+      "source_after_sha256": "3240fe2f1d6ccd632813bb24b868e4ec493aec2fcba7900ab6fa44775101aa2d",
+      "stable": true,
+      "matches_final": false,
+      "out_sha256": "bc662b8ecd2921c7f71ed54e36569346cdc0a8556dd408ceedefaeea7eca307e",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794552630.0705395,
+      "elapsed_seconds": 338.079,
+      "exit_code": 0,
+      "name": "acceptance-race",
+      "source_before_sha256": "3240fe2f1d6ccd632813bb24b868e4ec493aec2fcba7900ab6fa44775101aa2d",
+      "source_after_sha256": "3240fe2f1d6ccd632813bb24b868e4ec493aec2fcba7900ab6fa44775101aa2d",
+      "stable": true,
+      "matches_final": false,
+      "out_sha256": "7315652044c00d519891de7732f9d3f2277b34a3df189212b03a88c4d4a4d417",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; cd go; test -z \"$(gofmt -l .)\"; go build ./...; go vet ./...; go mod verify; go mod tidy -diff; go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...; cd ..; bash test/scripts/lint-gate.sh /tmp/cr17c-ground-assault-implementation-evidence/accepted-lint.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794553175.0795765,
+      "elapsed_seconds": 12.754,
+      "exit_code": 0,
+      "name": "accepted-source-basic-security",
+      "source_before_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "source_after_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "stable": true,
+      "matches_final": true,
+      "out_sha256": "2d770f64cbcd47c7c8755e320520b54dd58f7c3760a768ada7ef33abc663bd8a",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/golden-mutations.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794553171.2818875,
+      "elapsed_seconds": 525.737,
+      "exit_code": 0,
+      "name": "accepted-source-golden-mutations",
+      "source_before_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "source_after_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "stable": true,
+      "matches_final": true,
+      "out_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "env",
+        "GB_LONG_TESTS=1",
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794553641.687869,
+      "elapsed_seconds": 330.888,
+      "exit_code": 0,
+      "name": "accepted-source-long-race",
+      "source_before_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "source_after_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "stable": true,
+      "matches_final": true,
+      "out_sha256": "76c7bb8ceda46abad55b9720925c2962009a90eb31e66127601a86cf5b27b488",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "env",
+        "GB_TEST_SUMMARY=/tmp/cr17c-ground-assault-implementation-evidence/accepted-known-defects.txt",
+        "GB_INVENTORY_RECORDS=/tmp/cr17c-ground-assault-implementation-evidence/accepted-inventory-records",
+        "bash",
+        "test/scripts/inventory-check.sh",
+        "-json"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794553167.8175805,
+      "elapsed_seconds": 46.072,
+      "exit_code": 0,
+      "name": "accepted-source-normal-inventory",
+      "source_before_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "source_after_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "stable": true,
+      "matches_final": true,
+      "out_sha256": "6761e13d555e3db55e253e672f07be118cb181c35210f595dc504e0ecbe7efda",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794553115.089118,
+      "elapsed_seconds": 372.516,
+      "exit_code": 0,
+      "name": "accepted-source-race",
+      "source_before_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "source_after_sha256": "3da030e68163e12f3dde7f85b8be724e41437a20ab0e8c38b2e10f111e917a85",
+      "stable": true,
+      "matches_final": true,
+      "out_sha256": "9f99cd1000c51f3229306e264cab8e9c08ff9695590bd4dc902a040a51285c1d",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestGroundAssaultAliases|^TestGroundAssaultActorCR19Capture|^TestGroundAssaultActorOutcomes",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551363.7892365,
+      "elapsed_seconds": 12.392,
+      "exit_code": 1,
+      "name": "actor-additional-boundaries",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "02d5a9401063f34375f6227fe9d951351134cbd5f443be00236ee06956f379c3",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestGroundAssaultAliases",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551597.0457273,
+      "elapsed_seconds": 10.888,
+      "exit_code": 0,
+      "name": "alias-fixture-boundary-correction",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "5e216ae974e320c4c16659541c27e1df0fdd5eeeaf44d2c9a82a56bbf16b2349",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; go build ./...; go vet ./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794550938.3501313,
+      "elapsed_seconds": 2.879,
+      "exit_code": 0,
+      "name": "build-vet",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestGroundAssaultRealProcessCrash$",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794552459.4351518,
+      "elapsed_seconds": 17.596,
+      "exit_code": 0,
+      "name": "crash-raw-metadata",
+      "source_before_sha256": "bc8f169ae6b5a388db0bbd3286a103eed7dfb481141759def938b7f50439b489",
+      "source_after_sha256": "bc8f169ae6b5a388db0bbd3286a103eed7dfb481141759def938b7f50439b489",
+      "stable": true,
+      "matches_final": false,
+      "out_sha256": "74d2b5fc69868538e5bf5f51c3070c55656b9c9f367c6c8bc6c9195b9031e3f1",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestGroundAssault|^TestAssault|^TestCommandFixture",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794552213.0789518,
+      "elapsed_seconds": 18.704,
+      "exit_code": 0,
+      "name": "final-focused-binding",
+      "source_before_sha256": "8ffb29cf75df60579e8d956830df3c47a73ea3f53c5dee25c84f83ec82d319c4",
+      "source_after_sha256": "8ffb29cf75df60579e8d956830df3c47a73ea3f53c5dee25c84f83ec82d319c4",
+      "stable": true,
+      "matches_final": false,
+      "out_sha256": "e321434693d64c7d062926d275ab9ef24498f4bc8b8231e69298c1b977f0007c",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestAssaultPartial|^TestGroundAssaultAllied",
+        "./internal/commandrules",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794552556.8820431,
+      "elapsed_seconds": 11.87,
+      "exit_code": 0,
+      "name": "final-partial-and-allied",
+      "source_before_sha256": "3240fe2f1d6ccd632813bb24b868e4ec493aec2fcba7900ab6fa44775101aa2d",
+      "source_after_sha256": "3240fe2f1d6ccd632813bb24b868e4ec493aec2fcba7900ab6fa44775101aa2d",
+      "stable": true,
+      "matches_final": false,
+      "out_sha256": "738a051387a1c4bb004defb0c81db8d8d31c508eca87d67f301ff1590ffd0b48",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; cd go; go test -count=1 -race -json -run \"^TestAssault\" ./internal/commandrules; cd ..; bash test/scripts/lint-gate.sh /tmp/cr17c-ground-assault-implementation-evidence/lint-accepted.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794552129.3486507,
+      "elapsed_seconds": 7.082,
+      "exit_code": 0,
+      "name": "final-rules-and-lint",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "86f572224399fb015ecb5f5e511ac14a913fd55bcc4a5d146047743965ca8f4a",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "-run",
+        "^TestGroundAssault|^TestAssault",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794550621.0584161,
+      "elapsed_seconds": 3.661,
+      "exit_code": 1,
+      "name": "focused-fixture-correction",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "e02c9f8b3ea9b43af81d34b0640e0187c31d63d168591c7ec3313664f20f6cc0",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "-run",
+        "^TestGroundAssault|^TestAssault",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794550682.6198158,
+      "elapsed_seconds": 3.738,
+      "exit_code": 0,
+      "name": "focused-sequence-and-snapshot",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "a707e130455aa629c6eb9932f6bd1e4e750d2ce2ccad3d44ebee78780d451c8a",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestGroundAssault|^TestAssault",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794550809.3520396,
+      "elapsed_seconds": 19.654,
+      "exit_code": 0,
+      "name": "focused-with-real-crashes",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "45bd53115d11c9841b962c71b0264e3ae416c184a80088e95358ccf8391bf2e5",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; make -C test/ctool check; bash test/scripts/golden-mutations-selftest.sh; bash test/scripts/lint-gate-selftest.sh; bash test/scripts/gate-approval-selftest.sh; actionlint -no-color; shellcheck -S warning .github/scripts/*.sh; python3 .github/scripts/workflow_policy_check.py; python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551418.7220988,
+      "elapsed_seconds": 186.305,
+      "exit_code": 0,
+      "name": "gates-static",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "dce5cc1fce6bc199bb0f93f68f861009e92fa71f8dbca56628cec3c348e91323",
+      "err_sha256": "a06c4b31a02272a93e705e92cc827c8cde295aa645cd608fdf19d067a5baf02a"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/golden-mutations.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551824.2718742,
+      "elapsed_seconds": 558.055,
+      "exit_code": 0,
+      "name": "golden-mutations-rerun",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/golden-mutations.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551490.6659584,
+      "elapsed_seconds": 41.959,
+      "exit_code": 1,
+      "name": "golden-mutations",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "0aa8a344cda2334ae998625644f732b3c678fe4ce45f9ace7385081b01f70d55",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/growth-gate.sh",
+        "b3ac84d404cc180400336f91dadb828b52c5491a"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794552331.519411,
+      "elapsed_seconds": 0.366,
+      "exit_code": 0,
+      "name": "growth",
+      "source_before_sha256": "8ffb29cf75df60579e8d956830df3c47a73ea3f53c5dee25c84f83ec82d319c4",
+      "source_after_sha256": "8ffb29cf75df60579e8d956830df3c47a73ea3f53c5dee25c84f83ec82d319c4",
+      "stable": true,
+      "matches_final": false,
+      "out_sha256": "08238b7be313515ea1566e3b48a684cbbde682223cd45c79860597e7b8d46140",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "-run",
+        "^TestGroundAssault|^TestAssault",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794550553.8104594,
+      "elapsed_seconds": 2.424,
+      "exit_code": 1,
+      "name": "initial-focused",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "34e9cd115b64479ffe8f26c0fe06d93509ef3e11aad43c1d2b40f5b0faa0ff0a",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestGroundAssaultInstall|^TestGroundAssaultSerialization|^TestGroundAssaultActorLifecycle",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794550919.616189,
+      "elapsed_seconds": 9.436,
+      "exit_code": 0,
+      "name": "installation-and-lifecycle",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "01d2f384170540adf4323e84aa4f04d8768dcd4d192094089b1a5185cd2fc339",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "env",
+        "GB_TEST_SUMMARY=/tmp/cr17c-ground-assault-implementation-evidence/known-defects-final.txt",
+        "GB_INVENTORY_RECORDS=/tmp/cr17c-ground-assault-implementation-evidence/inventory-final-records",
+        "bash",
+        "test/scripts/inventory-check.sh",
+        "-json"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551820.797938,
+      "elapsed_seconds": 48.885,
+      "exit_code": 0,
+      "name": "inventory-final-normal-rerun",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "1a11e0af9c5761f148b5f14f5e5194c251c52a53183382a7f87ac3605daac641",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "env",
+        "GB_TEST_SUMMARY=/tmp/cr17c-ground-assault-implementation-evidence/known-defects.txt",
+        "GB_INVENTORY_RECORDS=/tmp/cr17c-ground-assault-implementation-evidence/inventory-records",
+        "bash",
+        "test/scripts/inventory-check.sh",
+        "-json"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551415.038269,
+      "elapsed_seconds": 46.047,
+      "exit_code": 1,
+      "name": "inventory-final-normal",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "4569b6c1f6212cef8b87d138130672c7fa8d1088d4085f5144a64da108b73387",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/lint-gate.sh",
+        "/tmp/cr17c-ground-assault-implementation-evidence/lint-corrections.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551092.9586725,
+      "elapsed_seconds": 9.149,
+      "exit_code": 1,
+      "name": "lint-corrections",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "21fc18686f971c958ea8759dd88a3bc3e12edfcc59435505ce96c0940f1966d2",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/lint-gate.sh",
+        "/tmp/cr17c-ground-assault-implementation-evidence/lint-final.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794552076.139093,
+      "elapsed_seconds": 7.776,
+      "exit_code": 1,
+      "name": "lint-final",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "56cc88514a2e2ebaef112e8fe8c9d063b43b4262c1c0b6ed5d284b454c058c9c",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/lint-gate.sh",
+        "/tmp/cr17c-ground-assault-implementation-evidence/lint-first.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794550937.029792,
+      "elapsed_seconds": 9.206,
+      "exit_code": 1,
+      "name": "lint-first",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "6a2d8db07a5ed2a977e6e770f203c65aed73155e412e9b9e39aaa17391def64c",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "test/scripts/lint-gate.sh",
+        "/tmp/cr17c-ground-assault-implementation-evidence/lint-rooted-snapshots.json"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551284.2304394,
+      "elapsed_seconds": 7.549,
+      "exit_code": 0,
+      "name": "lint-rooted-snapshots",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "92940dbb367d0b1841928c26cbebcb51fd04a62ec248116fea63f02895148b58",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "env",
+        "GB_LONG_TESTS=1",
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794552231.4932084,
+      "elapsed_seconds": 353.509,
+      "exit_code": 0,
+      "name": "long-race-final",
+      "source_before_sha256": "8ffb29cf75df60579e8d956830df3c47a73ea3f53c5dee25c84f83ec82d319c4",
+      "source_after_sha256": "3240fe2f1d6ccd632813bb24b868e4ec493aec2fcba7900ab6fa44775101aa2d",
+      "stable": false,
+      "matches_final": false,
+      "out_sha256": "f11abf42f25aab42686ead115b1312251dcdc9f034b6b80bf0007d19d342a4c3",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "deploy/kustomize/tests/run.sh"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551494.4696183,
+      "elapsed_seconds": 24.58,
+      "exit_code": 0,
+      "name": "manifests",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "19cd6293a45beb531e82e04049e2ed6197836a96667312aa62d12ec30e5b77d8",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; cd go; test -z \"$(gofmt -l .)\"; go build ./...; go vet ./...; go mod verify; go mod tidy -diff; go version; go env GOTOOLCHAIN"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551498.0690112,
+      "elapsed_seconds": 2.585,
+      "exit_code": 0,
+      "name": "modules-format",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "e2e4422ca919a2f4f1c73cf17206ed3e49becdab8012dee21663d0c5c8fad113",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "-overlay=/tmp/cr17c-ground-assault-implementation-evidence/mutant-capture.json",
+        "-run",
+        "^TestGroundAssaultActorCR19Capture$",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551544.1641386,
+      "elapsed_seconds": 3.286,
+      "exit_code": 1,
+      "name": "negative-capture",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "8f6a9a2591295096cc44a0b7ab7431328840da9532b6b8e4506141e133fae95d",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "-overlay=/tmp/cr17c-ground-assault-implementation-evidence/mutant-missing-news.json",
+        "-run",
+        "^TestAssaultStoreAtomicReopen$",
+        "./internal/db"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551549.5732696,
+      "elapsed_seconds": 2.132,
+      "exit_code": 1,
+      "name": "negative-missing-news",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "4a2f3090cc43c8b500535a34189f91dcadbfc47448bcb1f077ea9cb7b00cba95",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "-overlay=/tmp/cr17c-ground-assault-implementation-evidence/mutant-missing-telegram.json",
+        "-run",
+        "^TestAssaultStoreAtomicReopen$",
+        "./internal/db"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551551.7362335,
+      "elapsed_seconds": 2.33,
+      "exit_code": 1,
+      "name": "negative-missing-telegram",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "721dbd2d26e95e65a20f8de54282186a2fdfe24a84253c15895788d16c1c5cc3",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "-overlay=/tmp/cr17c-ground-assault-implementation-evidence/mutant-split-write.json",
+        "-run",
+        "^TestAssaultStoreFailuresAndOutcomes$/assault.before/panic=false$",
+        "./internal/db"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551547.480987,
+      "elapsed_seconds": 2.06,
+      "exit_code": 1,
+      "name": "negative-split-write",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "b2f8824567cdf92eeaf681fc558d6cc4c4010628ce0780a9df3fea1674efac9f",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551174.7191346,
+      "elapsed_seconds": 34.167,
+      "exit_code": 0,
+      "name": "normal-full",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "adaa8f1c2466c1f8e63d0e289e0df4b3adeb1cd8c8bda8d4f9ef685987584e56",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551817.2030737,
+      "elapsed_seconds": 386.103,
+      "exit_code": 0,
+      "name": "race-full-final",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "06b4f36894d21ef7cc009a58c5f4a61e1b1ed29c3146cd428552c5da579f0546",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551411.314133,
+      "elapsed_seconds": 365.687,
+      "exit_code": 1,
+      "name": "race-full",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "fcb2c7bc47b8c239464faa3a80f13b5016a2db36afaeafa8ed70df844a9075a3",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "run",
+        "golang.org/x/vuln/cmd/govulncheck@v1.9.0",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794551179.0188143,
+      "elapsed_seconds": 2.175,
+      "exit_code": 0,
+      "name": "security",
+      "source_binding": "Not captured at execution time; historical run, not a final-source binding claim.",
+      "out_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "required_final_acceptance": [
+    "accepted-source-normal-inventory",
+    "accepted-source-race",
+    "accepted-source-long-race",
+    "accepted-source-golden-mutations",
+    "accepted-source-basic-security",
+    "gates-static",
+    "manifests",
+    "growth"
+  ],
+  "normal_counts": {
+    "github.com/phreddrick/GB/go/cmd/gb-client": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/cmd/gb-server": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/cmd/gbctl": {
+      "pass_nodes": 52,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 50,
+      "package": {
+        "Time": "2026-11-12T23:59:29.29263924-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/cmd/gbctl",
+        "Elapsed": 0.553
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/cmd/makeuniv": {
+      "pass_nodes": 1,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 1,
+      "package": {
+        "Time": "2026-11-12T23:59:28.763561288-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/cmd/makeuniv",
+        "Elapsed": 0.024
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/cmd/racegen": {
+      "pass_nodes": 4,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 4,
+      "package": {
+        "Time": "2026-11-12T23:59:28.766931773-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/cmd/racegen",
+        "Elapsed": 0.027
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/admin": {
+      "pass_nodes": 26,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 24,
+      "package": {
+        "Time": "2026-11-12T23:59:32.262903886-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/admin",
+        "Elapsed": 3.385
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/commandrules": {
+      "pass_nodes": 91,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 86,
+      "package": {
+        "Time": "2026-11-12T23:59:28.927134994-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/commandrules",
+        "Elapsed": 0.049
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/config": {
+      "pass_nodes": 11,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 11,
+      "package": {
+        "Time": "2026-11-12T23:59:28.896439904-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/config",
+        "Elapsed": 0.015
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/db": {
+      "pass_nodes": 751,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 696,
+      "package": {
+        "Time": "2026-11-12T23:59:35.264127618-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/db",
+        "Elapsed": 4.87
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/engine": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/enroll": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/enrollmentapi": {
+      "pass_nodes": 3,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 3,
+      "package": {
+        "Time": "2026-11-12T23:59:30.405095084-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/enrollmentapi",
+        "Elapsed": 0.01
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/game": {
+      "pass_nodes": 1427,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 1297,
+      "package": {
+        "Time": "2026-11-13T00:00:13.068302879-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/game",
+        "Elapsed": 41.787
+      },
+      "assault_SIGKILL_leaves": 20,
+      "population_SIGKILL_leaves": 24
+    },
+    "github.com/phreddrick/GB/go/internal/model": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/net": {
+      "pass_nodes": 24,
+      "fail_nodes": 0,
+      "skip_nodes": 1,
+      "leaf_nodes": 25,
+      "package": {
+        "Time": "2026-11-12T23:59:38.807368794-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/net",
+        "Elapsed": 7.526
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/operatorenroll": {
+      "pass_nodes": 2,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 2,
+      "package": {
+        "Time": "2026-11-12T23:59:31.62103376-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/operatorenroll",
+        "Elapsed": 0.34
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/platform/logging": {
+      "pass_nodes": 2,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 2,
+      "package": {
+        "Time": "2026-11-12T23:59:31.292140763-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/platform/logging",
+        "Elapsed": 0.011
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/platform/metrics": {
+      "pass_nodes": 4,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 4,
+      "package": {
+        "Time": "2026-11-12T23:59:31.293527788-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/platform/metrics",
+        "Elapsed": 0.012
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/racegen": {
+      "pass_nodes": 2324,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 2321,
+      "package": {
+        "Time": "2026-11-12T23:59:31.632635325-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/racegen",
+        "Elapsed": 0.351
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/testutil": {
+      "pass_nodes": 7,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 7,
+      "package": {
+        "Time": "2026-11-12T23:59:33.102631474-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/testutil",
+        "Elapsed": 1.821
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/universe": {
+      "pass_nodes": 5,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 5,
+      "package": {
+        "Time": "2026-11-12T23:59:31.368114263-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/universe",
+        "Elapsed": 0.086
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/wirejson": {
+      "pass_nodes": 1,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 1,
+      "package": {
+        "Time": "2026-11-12T23:59:31.296783107-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/wirejson",
+        "Elapsed": 0.015
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/test/acceptance": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/test/e2e": {
+      "pass_nodes": 27,
+      "fail_nodes": 0,
+      "skip_nodes": 1,
+      "leaf_nodes": 25,
+      "package": {
+        "Time": "2026-11-13T00:00:02.470652108-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/test/e2e",
+        "Elapsed": 31.188
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/tools/growthgate": {
+      "pass_nodes": 10,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 10,
+      "package": {
+        "Time": "2026-11-12T23:59:31.34289897-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/tools/growthgate",
+        "Elapsed": 0.06
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/tools/inventorycheck": {
+      "pass_nodes": 7,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 7,
+      "package": {
+        "Time": "2026-11-12T23:59:31.301253085-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/tools/inventorycheck",
+        "Elapsed": 0.019
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/tools/lintdiff": {
+      "pass_nodes": 18,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 18,
+      "package": {
+        "Time": "2026-11-12T23:59:31.320003347-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/tools/lintdiff",
+        "Elapsed": 0.036
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    }
+  },
+  "long_race_counts": {
+    "github.com/phreddrick/GB/go/cmd/gb-client": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/cmd/gb-server": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/cmd/gbctl": {
+      "pass_nodes": 52,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 50,
+      "package": {
+        "Time": "2026-11-13T00:07:29.366465884-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/cmd/gbctl",
+        "Elapsed": 6.505
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/cmd/makeuniv": {
+      "pass_nodes": 1,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 1,
+      "package": {
+        "Time": "2026-11-13T00:07:23.944712478-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/cmd/makeuniv",
+        "Elapsed": 1.083
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/cmd/racegen": {
+      "pass_nodes": 4,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 4,
+      "package": {
+        "Time": "2026-11-13T00:07:23.914035053-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/cmd/racegen",
+        "Elapsed": 1.052
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/admin": {
+      "pass_nodes": 26,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 24,
+      "package": {
+        "Time": "2026-11-13T00:07:34.145204117-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/admin",
+        "Elapsed": 11.283
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/commandrules": {
+      "pass_nodes": 91,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 86,
+      "package": {
+        "Time": "2026-11-13T00:07:24.147518967-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/commandrules",
+        "Elapsed": 1.285
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/config": {
+      "pass_nodes": 11,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 11,
+      "package": {
+        "Time": "2026-11-13T00:07:23.906681199-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/config",
+        "Elapsed": 1.044
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/db": {
+      "pass_nodes": 751,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 696,
+      "package": {
+        "Time": "2026-11-13T00:07:55.466209989-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/db",
+        "Elapsed": 32.488
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/engine": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/enroll": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/enrollmentapi": {
+      "pass_nodes": 3,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 3,
+      "package": {
+        "Time": "2026-11-13T00:07:24.027808538-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/enrollmentapi",
+        "Elapsed": 1.049
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/game": {
+      "pass_nodes": 1427,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 1297,
+      "package": {
+        "Time": "2026-11-13T00:12:52.562829728-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/game",
+        "Elapsed": 329.421
+      },
+      "assault_SIGKILL_leaves": 20,
+      "population_SIGKILL_leaves": 24
+    },
+    "github.com/phreddrick/GB/go/internal/model": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/net": {
+      "pass_nodes": 25,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 25,
+      "package": {
+        "Time": "2026-11-13T00:08:38.695715696-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/net",
+        "Elapsed": 75.554
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/operatorenroll": {
+      "pass_nodes": 2,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 2,
+      "package": {
+        "Time": "2026-11-13T00:07:27.767513076-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/operatorenroll",
+        "Elapsed": 4.626
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/platform/logging": {
+      "pass_nodes": 2,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 2,
+      "package": {
+        "Time": "2026-11-13T00:07:24.166592644-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/platform/logging",
+        "Elapsed": 1.025
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/platform/metrics": {
+      "pass_nodes": 4,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 4,
+      "package": {
+        "Time": "2026-11-13T00:07:24.256380617-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/platform/metrics",
+        "Elapsed": 1.114
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/racegen": {
+      "pass_nodes": 2324,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 2321,
+      "package": {
+        "Time": "2026-11-13T00:07:25.084255202-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/racegen",
+        "Elapsed": 1.942
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/testutil": {
+      "pass_nodes": 7,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 7,
+      "package": {
+        "Time": "2026-11-13T00:07:26.369664919-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/testutil",
+        "Elapsed": 3.227
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/universe": {
+      "pass_nodes": 5,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 5,
+      "package": {
+        "Time": "2026-11-13T00:07:24.783678606-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/universe",
+        "Elapsed": 1.641
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/internal/wirejson": {
+      "pass_nodes": 1,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 1,
+      "package": {
+        "Time": "2026-11-13T00:07:24.936946026-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/internal/wirejson",
+        "Elapsed": 1.028
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/test/acceptance": {
+      "pass_nodes": 0,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 0,
+      "package": null,
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/test/e2e": {
+      "pass_nodes": 28,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 25,
+      "package": {
+        "Time": "2026-11-13T00:10:10.526763791-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/test/e2e",
+        "Elapsed": 166.611
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/tools/growthgate": {
+      "pass_nodes": 10,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 10,
+      "package": {
+        "Time": "2026-11-13T00:07:25.07743185-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/tools/growthgate",
+        "Elapsed": 1.131
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/tools/inventorycheck": {
+      "pass_nodes": 7,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 7,
+      "package": {
+        "Time": "2026-11-13T00:07:25.069959338-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/tools/inventorycheck",
+        "Elapsed": 1.04
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    },
+    "github.com/phreddrick/GB/go/tools/lintdiff": {
+      "pass_nodes": 18,
+      "fail_nodes": 0,
+      "skip_nodes": 0,
+      "leaf_nodes": 18,
+      "package": {
+        "Time": "2026-11-13T00:07:25.218757778-07:00",
+        "Action": "pass",
+        "Package": "github.com/phreddrick/GB/go/tools/lintdiff",
+        "Elapsed": 1.07
+      },
+      "assault_SIGKILL_leaves": 0,
+      "population_SIGKILL_leaves": 0
+    }
+  },
+  "exact_race_game_seconds": 363.384,
+  "notes": [
+    "Each bash -c set -e result0 confirms every listed subcommand completed.",
+    "Standalone early failures and corrected fixture errors are preserved in early-attempts.md and raw run records.",
+    "Pre-R2 full-suite passes and test-only source drift are historical evidence, not final acceptance.",
+    "Go JSON counts include parent test nodes; leaves are counted separately. Crash child entry is not a SIGKILL boundary.",
+    "Final tests use isolated worlds; no source C or protected gate/allowance changes.",
+    "General fixture snapshots normalize three schedule timestamps; new crash assertions separately compare raw commit/schedule/maintenance/universe bytes.",
+    "A SIGKILL old/new oracle is not physical disk failure/fsync fault proof. No uncertain handle is reopened as recovery.",
+    "All old #41A tests and24 SIGKILL boundaries remain unchanged; no full #41/#51/#38 issue closure.",
+    "Offline manifest runner is unchanged and internally sets GOTOOLCHAIN=auto for its pinned helper only; application/tests/scanner invocations are local Go1.27.4."
+  ],
+  "negative_controls": {
+    "capture": "negative-capture",
+    "split-write": "negative-split-write",
+    "missing-news": "negative-missing-news",
+    "missing-telegram": "negative-missing-telegram",
+    "expected": "Each exited1 with the specific intended assertion, not a build error. Independently repeated in independent-negative-controls/.",
+    "R2_mechanical_peer": "R2-mechanical-peer-before failed by actually committing assault; corrected run passes with exact existing Go mechanical refusal."
+  },
+  "format_impact": "NONE; existing world records and news/telegram buckets, unchanged CR18 kinds/schema; no command IDs or outbox",
+  "hosted_ci": "Created after this pre-commit ledger; actual run URL/results reported in PR and final response."
+}

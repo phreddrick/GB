@@ -337,6 +337,9 @@ func (s *State) peopleAttackMech(
 // movePopn is the shared implementation for cmdMove (CIV) and cmdDeploy (MIL).
 // Mirrors move_popn() in move.c.
 func (s *State) movePopn(p, g int, args []string, sess net.Responder, what int) {
+	if s.handleGroundAssault(p, g, args, sess, what) {
+		return
+	}
 	dir := s.dirs[p-1][g]
 	if int(dir.Level) != model.LevelPlan {
 		sess.Send("Wrong scope — change to planet level first.\n")
