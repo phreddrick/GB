@@ -1,0 +1,1458 @@
+{
+  "unit": "CR-17C #41B / CR-19 Phase 0 only",
+  "baseline": "b3ac84d404cc180400336f91dadb828b52c5491a",
+  "branch": "feature/cr17c-ground-assault",
+  "status": "BLOCKED_BEFORE_PRODUCTION_IMPLEMENTATION",
+  "toolchain": "go1.27.4",
+  "GOTOOLCHAIN": "local",
+  "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+  "executions": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-run",
+        "^TestPopulation|^TestCommandFixture",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794547295.6759346,
+      "elapsed_seconds": 25.737,
+      "exit_code": 0,
+      "execution": "accepted-population-regression",
+      "expected_exit_code": 0,
+      "out_sha256": "ae033282ff68df4e208efbaf4c5132bc20a417fc853f9628287053bc1806e67c",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gcc",
+        "-std=gnu89",
+        "-fcommon",
+        "-w",
+        "-O0",
+        "-g",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-Isource",
+        "-Itest/ctool/include",
+        "-I/tmp/cr17c-ground-assault-evidence",
+        "-Wl,--gc-sections",
+        "-o",
+        "/tmp/cr17c-ground-assault-evidence/c-move-audit",
+        "/tmp/cr17c-ground-assault-evidence/c-move-audit.c",
+        "/tmp/cr17c-ground-assault-evidence/c-unreached-stubs.c",
+        "source/move.c",
+        "source/rand.c",
+        "-lm"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794546601.8987927,
+      "elapsed_seconds": 0.265,
+      "exit_code": 0,
+      "execution": "c-build",
+      "expected_exit_code": 0,
+      "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "/tmp/cr17c-ground-assault-evidence/c-move-audit",
+        "civ"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794546602.194487,
+      "elapsed_seconds": 0.002,
+      "exit_code": 0,
+      "execution": "c-civilian",
+      "expected_exit_code": 0,
+      "out_sha256": "97357f83acef51dd3cdd8851104cf71157c59edc30fa8ea69984ea05e59d57ef",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "make",
+        "-C",
+        "test/ctool",
+        "check"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794547300.7991736,
+      "elapsed_seconds": 1.168,
+      "exit_code": 0,
+      "execution": "c-fixtures",
+      "expected_exit_code": 0,
+      "out_sha256": "8f3f39ffbaab75d9d10a50d6906e202140cabbf6e3b13185b27e6e8c63bec658",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "/tmp/cr17c-ground-assault-evidence/c-move-audit",
+        "mil"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794546602.2254653,
+      "elapsed_seconds": 0.002,
+      "exit_code": 0,
+      "execution": "c-military",
+      "expected_exit_code": 0,
+      "out_sha256": "8b4361e055662cdc3e2d8412a79553daf37b3410c498cd63d4a2dabdccb73015",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "/tmp/cr17c-ground-assault-evidence/c-move-audit",
+        "mutual"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794546602.2578948,
+      "elapsed_seconds": 0.001,
+      "exit_code": 0,
+      "execution": "c-mutual",
+      "expected_exit_code": 0,
+      "out_sha256": "6dbd5c95c12a6b818304aba0a433409327f7556cd26fbe3009faccec07314af3",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-overlay=/tmp/cr17c-ground-assault-evidence/audit-capture-probe.json",
+        "-run",
+        "^TestAssaultAuditCR19Capture$/military=/fence=false$",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794547116.83012,
+      "elapsed_seconds": 8.933,
+      "exit_code": 0,
+      "execution": "capture-causal-probe",
+      "expected_exit_code": 0,
+      "out_sha256": "36ab8b2ff154691cc5fb5f2a9a5ea8f42f3bb3ed3e0cca148b081930a54ea2af",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-overlay=/tmp/cr17c-ground-assault-evidence/audit-overlay.json",
+        "-run",
+        "^TestAssaultAudit",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794546898.464229,
+      "elapsed_seconds": 10.585,
+      "exit_code": 1,
+      "execution": "cr19-actor-prefx",
+      "expected_exit_code": 1,
+      "out_sha256": "be42dac18e7adb80715b7f25c8669e61f7387304033612761f72ecf02f033ab8",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "-overlay=/tmp/cr17c-ground-assault-evidence/audit-legacy-overlay.json",
+        "-run",
+        "^TestAssaultAuditHostileUnload$",
+        "./internal/game"
+      ],
+      "cwd": "/tmp/GB-cr17c-ground-assault/go",
+      "go": "go1.27.4",
+      "GOTOOLCHAIN": "local",
+      "started_unix": 1794546971.6162663,
+      "elapsed_seconds": 8.632,
+      "exit_code": 0,
+      "execution": "ship-legacy-audit",
+      "expected_exit_code": 0,
+      "out_sha256": "c7a1e46d816537d6b27f0c92e5aa575927ff22572f9a41cabdf7806dce0bfb92",
+      "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "prior_attempts": [
+    {
+      "execution": "initial C harness link",
+      "exit_code": 1,
+      "stderr": "c-build-initial.err",
+      "note": "Unresolved Ship/do_collateral/Shipnames; preserved failure, added fail-loud unreachable stubs and repeated build. Initial compound shell ended with cat; do not confuse its shell status with GCC failure."
+    },
+    {
+      "execution": "initial JSON snapshot extraction",
+      "result": "failed",
+      "note": "Large Go T.Log JSON spans multiple output frames. Concatenated per-test Output and decoded complete JSON; no test result altered."
+    }
+  ],
+  "test_counts": {
+    "accepted_population_and_fixture": {
+      "nodes": 355,
+      "leaves": 333,
+      "rules_nodes": 21,
+      "db_nodes": 111,
+      "game_nodes": 223,
+      "skip_nodes": 0,
+      "real_SIGKILL_boundary_leaves": 24,
+      "game_elapsed_seconds": 20.109
+    },
+    "capture_regression": {
+      "failing_capture_leaves": 4,
+      "passing_hostile_guard": 1,
+      "expected_status": "FAIL reproduces original defect"
+    },
+    "capture_probe": {
+      "passing_capture_leaves": 2,
+      "diagnostic_only": true
+    }
+  },
+  "not_executed": [
+    "new assault implementation and atomicity tests",
+    "new assault SIGKILL acceptance",
+    "full normal/race/GB_LONG_TESTS suites",
+    "all gates for nonexistent implementation",
+    "hosted CI"
+  ],
+  "repository_changes": "Only additive documentation/evidence; all preexisting tracked files unchanged; external Go compiler overlays are private diagnostics, not installed source.",
+  "source_fingerprints": [
+    {
+      "path": "source/GB_copyright.h",
+      "sha256": "c7053f72264933bfa798eb7351979823d39f1686c71efed249381be3e87f9f57"
+    },
+    {
+      "path": "source/GB_racegen.c",
+      "sha256": "4926f34a1f37d23f941ce28630ba758f34718ebd1bd92f7bc8f153d62220650b"
+    },
+    {
+      "path": "source/GB_server.c",
+      "sha256": "a8f48a65bb7cba6ff78d4b36f76bd63f1c50134677b6517189bfa1fea39caeb2"
+    },
+    {
+      "path": "source/GB_server.p",
+      "sha256": "ba2d8c5682bbbcc92627a46b4c43b3d5a4ce6c098aa2a8c45c1cde38915838af"
+    },
+    {
+      "path": "source/Makefile",
+      "sha256": "04042b402bffa4cfccd1f121f9292597d10c2cd6ba41cc8e3d41a001fa5c5373"
+    },
+    {
+      "path": "source/Makelist.c",
+      "sha256": "b76046ca30ce6db44cbcd1eab0576fc8d1c26826e1594d2085d6537f142a26c9"
+    },
+    {
+      "path": "source/TinyMUD_copyright.h",
+      "sha256": "cf0cb3daea0d53b0cc93bc681164e07a4f69887369a9ee6bb2fdb7a842cd6091"
+    },
+    {
+      "path": "source/VN.c",
+      "sha256": "3908029af012827aa812df0fefc423434aa7da1714e47b9a439e1b3a3f2b6983"
+    },
+    {
+      "path": "source/VN.p",
+      "sha256": "d2e71439e8583d1c93e48f80d581e4701487d50b0d5d2a6d90dca73996d510fa"
+    },
+    {
+      "path": "source/analysis.c",
+      "sha256": "1c185ca1412bd25bca81da68cd791c34d88612951632c64c735cc495ecff27e4"
+    },
+    {
+      "path": "source/analysis.p",
+      "sha256": "005e7859ba1782549ff0feeb57bcfa816ae987259cf9fa97e311437ddda0444e"
+    },
+    {
+      "path": "source/autoreport.c",
+      "sha256": "52d16cd398fe3840eb1877a85f8910020ef19b92097107444b06d17ba863979f"
+    },
+    {
+      "path": "source/autoreport.p",
+      "sha256": "93e687015524886b222c9f1c504b7544b56fd9e6fc6ece4f4a5c648400f7c17e"
+    },
+    {
+      "path": "source/autoshoot.c",
+      "sha256": "62d0b8e4c99b349431726340b9d3e00ddd6f90a3520c0c40c73298c98e761ab6"
+    },
+    {
+      "path": "source/autoshoot.p",
+      "sha256": "c13bfe943879a40829ce723ab7afe5a6ddd70ecc6fe1b9efb8827944fc604c1b"
+    },
+    {
+      "path": "source/buffers.h",
+      "sha256": "e2aea329fdfd94d91396c86eb4f43b59a6d16e605429c84516a5dec934556648"
+    },
+    {
+      "path": "source/build.c",
+      "sha256": "71c98ab4abf4dd621fbe443e37b527388fd4f7b03c78bab78ede4282d451e9ab"
+    },
+    {
+      "path": "source/build.p",
+      "sha256": "ce2a405501f75c74c9c7187980eac69e650966e2cf0f11a6580955c6b1e86085"
+    },
+    {
+      "path": "source/capital.c",
+      "sha256": "6f0d5c29c216dc5ae08fa42051976cdd09a1844bbd66c150d884af5d0cca689b"
+    },
+    {
+      "path": "source/capital.p",
+      "sha256": "d0b2cf01f6ccb7a358690af33121208445bb6294653fcd5f29f84b011f9cdc8e"
+    },
+    {
+      "path": "source/capture.c",
+      "sha256": "f7d55658a90df11bec1e5fca3a13a8ddc1520b6b295e4ff31344c880be7a8da0"
+    },
+    {
+      "path": "source/capture.p",
+      "sha256": "a87382074e8cf38e2b941345337624349a7b3d091971305570a7cb4b03dfd81d"
+    },
+    {
+      "path": "source/config.h",
+      "sha256": "b58a9ff432021a86a7f962641823e8d71cb56e0e8bc94bb276b5f5640fd40fb8"
+    },
+    {
+      "path": "source/cs.c",
+      "sha256": "9bfdc96ea2433e10b6ec7faed2cfeef556be61ef405b8e7a77b0a4b56d3f96a9"
+    },
+    {
+      "path": "source/cs.p",
+      "sha256": "f669b4ae8b38ff1c9ee72971b4aa2f853bba53a39441e02d93b86e3c70bf4970"
+    },
+    {
+      "path": "source/csp.h",
+      "sha256": "be04e532dbf83d8c4dc76a0288ca8b445a80c276e32f4e3b1e740cf0dc91d2bd"
+    },
+    {
+      "path": "source/csp_types.h",
+      "sha256": "93c792218c6680dd2cc076487cc6fd9cdfe621b2f42c228ed32f1300903d6dec"
+    },
+    {
+      "path": "source/declare.c",
+      "sha256": "b78e25d773a8b4cb8408c3cbec3df397a75557a8ebb65396154bf05eebdf40ff"
+    },
+    {
+      "path": "source/declare.p",
+      "sha256": "edf69ad8fe97b2a550c782e9051e10ad11925408dc7ac3b45e2f2d3209de2ac2"
+    },
+    {
+      "path": "source/dissolve.c",
+      "sha256": "66e3ab60147c7fc32e401e42da32df6205c4986d9a21296d311d452b5baaf9bb"
+    },
+    {
+      "path": "source/dissolve.p",
+      "sha256": "a5e59796e465fd5fa4ea782a63415f56a66c26ad5c131c48dbab4cbbdd1d62d8"
+    },
+    {
+      "path": "source/dock.c",
+      "sha256": "a84e2e2d755512ec8bc1a86dd340ae27a76830915eca30b0f849b942d36cca81"
+    },
+    {
+      "path": "source/dock.p",
+      "sha256": "9a6b90799f32260f23989ec000298424d4eb13a94a0afd8c19bc69abd65ec686"
+    },
+    {
+      "path": "source/doplanet.c",
+      "sha256": "77075629c9c73861d93921f99db5e67c6595a7288fa301655d9daa82ad291e31"
+    },
+    {
+      "path": "source/doplanet.p",
+      "sha256": "e5a2fff2f7b818aba37f271d95e29ab34d9b4da8804f0265db8af73edc1166e7"
+    },
+    {
+      "path": "source/dosector.c",
+      "sha256": "03f7b0a121f2ef630b340f1c032c201b7e7abe30e20a5fa1c2c861c7a0e0ea5f"
+    },
+    {
+      "path": "source/dosector.p",
+      "sha256": "8c06f3d3e7c7ab105d1a89b41fec58f2cfcd02fe3ed94695a4d2d4518b4851b9"
+    },
+    {
+      "path": "source/doship.c",
+      "sha256": "78e61c32b2fc6336184672162ff4725d3a9e6c665c2ec42eb8032dcae95940b4"
+    },
+    {
+      "path": "source/doship.p",
+      "sha256": "291ba238faebced211b2a02603a94b0f4a5c64b8e04ced6606abd2d414647693"
+    },
+    {
+      "path": "source/doturn.c",
+      "sha256": "d70cbbaf9b9f677e45357b160a0e4407a9cb8445ec284cb082d548e99ce95a88"
+    },
+    {
+      "path": "source/doturn.h",
+      "sha256": "b8d295b5f8b6f0dce813afe2a73a4433980103ace11fe1637b0b69508c236c41"
+    },
+    {
+      "path": "source/doturn.p",
+      "sha256": "303edea386b751a7c47c98bd8b609665c483b54e88e27aeba2dddc34b189c836"
+    },
+    {
+      "path": "source/enrol.c",
+      "sha256": "1553ea89b2e4a82eeb3bcca1c2bfb56755d7d743705404f5681473335e096518"
+    },
+    {
+      "path": "source/enroll.c",
+      "sha256": "8525884ff9d17b1eef40e5f9af794c91d5a6ed15da88d9ba7c1e07a9c11ee129"
+    },
+    {
+      "path": "source/enroll_valid.c",
+      "sha256": "7f393f9a8f781fd3f8d37cd3518685e1abd2e8fe67372fec18f4adabaea3c046"
+    },
+    {
+      "path": "source/enslave.c",
+      "sha256": "8f9c6c691447fe1bb3e51872c8a1967f7f1842a351756439617408ad4670788a"
+    },
+    {
+      "path": "source/enslave.p",
+      "sha256": "2cdc4dfb729c2242c46cd89424a4fd29435a604a02ce619fed3f3a5b31648e54"
+    },
+    {
+      "path": "source/examine.c",
+      "sha256": "937621e14fb306fb8a1ca6510166b5228255dbcd8ea2c358567c8c68f5cf2b27"
+    },
+    {
+      "path": "source/examine.p",
+      "sha256": "996b2fd649bff303b445e2bb78be917ef2eebfbd54441b19e472c88a592031c3"
+    },
+    {
+      "path": "source/explore.c",
+      "sha256": "9e7212b23666c0c451250033b5116e422027da8c9276a48961e6f5237a9ed1a2"
+    },
+    {
+      "path": "source/explore.p",
+      "sha256": "ba3cd8603bc0fb47f544632325ea7688e73f1dabfd7d8a5ee26e6ed961c5182e"
+    },
+    {
+      "path": "source/file.h",
+      "sha256": "eeafab459b241cad2f990bf8dd9bd1aa885e3f9f73310bdbfa31948511372791"
+    },
+    {
+      "path": "source/files.c",
+      "sha256": "c9b957a7aa24dc3ab1d554efaf0434c9113e150b2228f6ebc43eea1443b276e5"
+    },
+    {
+      "path": "source/files.h",
+      "sha256": "babab89a71c77ad86a47e76d68f0e6b374aec4ca39d429d6a994c8659e38c695"
+    },
+    {
+      "path": "source/files_rw.c",
+      "sha256": "2125979948a1a936c47c19c7cc762d61d1f2d72eb1947d0aad1ecd0bc3a1e58d"
+    },
+    {
+      "path": "source/files_rw.p",
+      "sha256": "f77ea1a8c789f0f69bbaa03c0ebf73d51252c744fe7b5d3ef5185e0624093791"
+    },
+    {
+      "path": "source/files_shl.c",
+      "sha256": "6ee4765d02e04e353e95f480803a184bc69416aac4651c4976b1319de53b10d3"
+    },
+    {
+      "path": "source/files_shl.p",
+      "sha256": "54f669a3309170e53dc58cea4eb51b64aa42a29e626de014772c0f157e329c07"
+    },
+    {
+      "path": "source/fire.c",
+      "sha256": "afdb18f6f25320937a355dc66464463e1432aeabc542f1fcee220e2c00c0a0e8"
+    },
+    {
+      "path": "source/fire.p",
+      "sha256": "11de6db328286776a6b1bba7cb232b15e4a65649f3ddb29d4eb556ed55a0d1b6"
+    },
+    {
+      "path": "source/fuel.c",
+      "sha256": "750d7a8e8903954d730f5cc77dc7314b52b9e65a09011030c711aea240b48496"
+    },
+    {
+      "path": "source/fuel.p",
+      "sha256": "122499d46cf79aa733efb2a5f4ebdd74a37682a968286f9d29ae0ee3aad6e192"
+    },
+    {
+      "path": "source/game_info.h",
+      "sha256": "1405b919969039d88ee34fafbd47fb9e5ceea8b5f6a61f0e59418ddb169d8e15"
+    },
+    {
+      "path": "source/get4args.c",
+      "sha256": "304513f96e1bc217a6eac070e84331b67c7f4fd7299764f32eaa80f767a5b7fd"
+    },
+    {
+      "path": "source/get4args.p",
+      "sha256": "ec8677277f245c744de891ea6e36d8352372be759095bfd7036c34f9272dbdfd"
+    },
+    {
+      "path": "source/getplace.c",
+      "sha256": "3f76bc72ce847985a93f7ed8c122712d5b00fcc7055b940590c1cbb634abad19"
+    },
+    {
+      "path": "source/getplace.p",
+      "sha256": "0bedb74534666fd66ea7f843d0462b6fa61313817c0db77145b8ac40a44183af"
+    },
+    {
+      "path": "source/guardian.c",
+      "sha256": "9d7d20458d36c05666db9407d609c478aa8a4de952f125b9a42db9310c15a3ec"
+    },
+    {
+      "path": "source/interface.h",
+      "sha256": "5747da6dba9b9756080a1a314d6f4e52d06653746b4b49c4ba16350f1d451d1d"
+    },
+    {
+      "path": "source/land.c",
+      "sha256": "0dbd44959aac7b54f3b8d4f52d9960b463101f8aec905276804a8fdd9bcd83d6"
+    },
+    {
+      "path": "source/land.p",
+      "sha256": "3b66f475bc28dc7c909f09bbd9dbd5bc1b1527086501ff8a3749221078c0c3a1"
+    },
+    {
+      "path": "source/launch.c",
+      "sha256": "8cee01bd1af78777aa195e15bc3d479074fdb047de2e469d4baf88925b677bd4"
+    },
+    {
+      "path": "source/launch.p",
+      "sha256": "022a87988cf26e7e99affc1ee03140b98e59b2c5decfc80428a8104963226229"
+    },
+    {
+      "path": "source/load.c",
+      "sha256": "ae4be32ce6df02983ab524fee06c30e4dbd4fa4c1c38fe3bc04738843fab3dad"
+    },
+    {
+      "path": "source/load.p",
+      "sha256": "b835dfbd12ad5e6af8688cffff508b9324349a41b6da10fa60f39c90341a147e"
+    },
+    {
+      "path": "source/makeplanet.c",
+      "sha256": "7c9c04ecabebe7c32f8abd9c9e88158cf97642c9652d59c23a429535a87fd782"
+    },
+    {
+      "path": "source/makestar.c",
+      "sha256": "33e501d79b1ceb5bc8aa2113c5d1572898fe48438cbde572730640ba8537ac4d"
+    },
+    {
+      "path": "source/makeuniv.c",
+      "sha256": "47a6c87ab2615d088d69b49ff77c5c21d0bec307c43e5c06cfa7a3314c7fe1f5"
+    },
+    {
+      "path": "source/map.c",
+      "sha256": "883caa8877a2937236ff724d4026057b2730d2224e8d782d7dbc166149836b3d"
+    },
+    {
+      "path": "source/map.p",
+      "sha256": "62cc584b7b4e279c12f36a1bf6e2aa48e737f8115e0937892834f1e68a53e84d"
+    },
+    {
+      "path": "source/max.c",
+      "sha256": "f82cd0e8f0b7963b44dc81b3f9dc4e0b3cfe27a8fa674a1e48d63004cfb41954"
+    },
+    {
+      "path": "source/max.p",
+      "sha256": "4c2361b5508e48aa84f6fac8366cb2a369230ebb7c30c588b0be2fcd190d821c"
+    },
+    {
+      "path": "source/misc.c",
+      "sha256": "c072ee1e2a151fd47b5bed4f26afbe232cc767280fc4eca7fb9ba9b43d14bb61"
+    },
+    {
+      "path": "source/misc.p",
+      "sha256": "84edf285d5086df8009b2671da6a870b8a116153b1d7d676864a5405f45e28c3"
+    },
+    {
+      "path": "source/mobiliz.c",
+      "sha256": "9b4c50496b45977c35f66e10d16a684832530d5008c9d4310018a157a47638ad"
+    },
+    {
+      "path": "source/mobiliz.p",
+      "sha256": "c472cc7c7b38e3c8800a36ef97cbae7c84f64328ab8894d75f05efecc0c14eda"
+    },
+    {
+      "path": "source/move.c",
+      "sha256": "b3784ada59f87ec2f5161052bad0eb8b5dab6ecce1b3148dbd4e3a1d306d8e61"
+    },
+    {
+      "path": "source/move.p",
+      "sha256": "f5d3ef93d52996bba76c7154e136312c205bb318716f4d362f5a80d8c89891ad"
+    },
+    {
+      "path": "source/moveplanet.c",
+      "sha256": "102f451031b1a421a7c653936dbeac6342f7249bb936057b9a897a1f0fd0d774"
+    },
+    {
+      "path": "source/moveplanet.p",
+      "sha256": "6957d48a8b30f54c7934a8a8453062efeb3276b85485bd20b33e3b3c5bf9ba6e"
+    },
+    {
+      "path": "source/moveship.c",
+      "sha256": "39d0f2d0aa2eefb4b7f64be972ef2be29d2be624fc57c403324d30fc519c605c"
+    },
+    {
+      "path": "source/moveship.p",
+      "sha256": "1ac5f8d829d12cba1635c5c1e3806c19b55cba2c9aded3033e278472751aca6c"
+    },
+    {
+      "path": "source/name.c",
+      "sha256": "0515f6ac7bf81234ca2abb671808324d79b0056e1cd41293536377d7acd9f235"
+    },
+    {
+      "path": "source/name.p",
+      "sha256": "ed548b184a7527b79a55b515481f8e72e78f9f2538a60f4172ab90f8194cd68a"
+    },
+    {
+      "path": "source/orbit.c",
+      "sha256": "1aec4223d8cd37c1f4a26cbcf57319ba9d0a229ace2a5cc396226c91d2898645"
+    },
+    {
+      "path": "source/orbit.p",
+      "sha256": "d9a73b269d0822f83dd155dbfbaee228d1a324a563f4be1bb00885607af65e28"
+    },
+    {
+      "path": "source/order.c",
+      "sha256": "712891f02a0ad09d655d71bc0d3991f06d873e844b6780ba5ffae993e161368a"
+    },
+    {
+      "path": "source/order.p",
+      "sha256": "17efbd8632a0493fd3a4b6f65036d2b0f9ead5f226fc6fe867fea1356af0301e"
+    },
+    {
+      "path": "source/perm.c",
+      "sha256": "8d3e283efafe989d9f6eec9beefd73badc9fc1f3d8f5bb89f6525c57b4eaf0c6"
+    },
+    {
+      "path": "source/perm.p",
+      "sha256": "cad13b3563d08f3ef2971c886563f1e535613cd483c5b7899fe671e23f206f7d"
+    },
+    {
+      "path": "source/planet.list",
+      "sha256": "958ec9f683206b164bffed0a3a54f708a74cb06b19c13056f3644466964e71e8"
+    },
+    {
+      "path": "source/power.c",
+      "sha256": "277a63a5e0eb58c86b82c245ee22fb9eba17136bd3d290748cfc4c5e31afe3e7"
+    },
+    {
+      "path": "source/power.h",
+      "sha256": "a4816dcf339291e89ec8ae2e7f88dfb5da3a27fc64bf9694646a69343062e600"
+    },
+    {
+      "path": "source/power.p",
+      "sha256": "ccf9c10a9a30043cd31c9d0c5c8b8abf5e1de28f4637a4a460c6210eba70b309"
+    },
+    {
+      "path": "source/prof.c",
+      "sha256": "8707df85fb8a543b9368c26292022907f731be7148c7a12b39ef700fa60fb6db"
+    },
+    {
+      "path": "source/prof.p",
+      "sha256": "282b597a7f4a1d200dad2155011186d332b30830e7ffda42b523d8a3883eb55a"
+    },
+    {
+      "path": "source/proto.h",
+      "sha256": "d932f3ab70b9861909e91ad5cec1a22687420937e89303093b49611e738af22e"
+    },
+    {
+      "path": "source/racegen.c",
+      "sha256": "90dd7a4e220e62297a5ec47a7fa7712549a0bb2c84b4fa0b7cad57ded16c29bf"
+    },
+    {
+      "path": "source/racegen.h",
+      "sha256": "c828722667c73c49f59610d5428b771199e53b4b2c7f86ea66b577c4f4770f91"
+    },
+    {
+      "path": "source/races.h",
+      "sha256": "912c1eb4ef4ece453de96ea931fbfbcec0c526b1df73d7458741c7ca8e3925cb"
+    },
+    {
+      "path": "source/rand.c",
+      "sha256": "5fd544827ead63bda02dd08107fbbe84377f6e309d5d97e145b685bdc9bbcdac"
+    },
+    {
+      "path": "source/rand.p",
+      "sha256": "d242d083d36057fac4e553789586cb4165e39b03a414ecfc5410b006644b4688"
+    },
+    {
+      "path": "source/ranks.h",
+      "sha256": "978c4bfd1aabc4a7597d6393242e87d902e5bc2aebf1c7e9aee384f1277979a7"
+    },
+    {
+      "path": "source/read_teleg.c",
+      "sha256": "9502fbc241136a8b8737bd65e117ee4249d18a0ab68fd8b8916f2807a2532533"
+    },
+    {
+      "path": "source/read_teleg.p",
+      "sha256": "9db9cffd9fd041463da2ced84032f85f0d7e208abb583c8b42e7a00a75f04783"
+    },
+    {
+      "path": "source/relation.c",
+      "sha256": "4899257f5497d6abedf57d199710ef6a518c7d5fd86ea0fd92483f004d1c3745"
+    },
+    {
+      "path": "source/relation.p",
+      "sha256": "ce5a6a74f1b9bfcb92d8994d4d47a9220ae895dbfafe91db2fbc940731dc6614"
+    },
+    {
+      "path": "source/rst.c",
+      "sha256": "af90645830e423bc52790a4bf5a529b1765e7d7f5a2a89dea6dffae4ca87a89f"
+    },
+    {
+      "path": "source/rst.p",
+      "sha256": "7a3a9daa286163c6a32a5bd80c01af7d4f08a4f01b0a6d46254f4a78ad008687"
+    },
+    {
+      "path": "source/scrap.c",
+      "sha256": "ce0d7aef6d9f1639a797b3115d0b554b0699ddff9cea695f2241e9441f827865"
+    },
+    {
+      "path": "source/scrap.p",
+      "sha256": "a802569dd99db44f9e495459816ccf03546ffe1ba5316e4664bd5cc16b5b346d"
+    },
+    {
+      "path": "source/shipdata.h",
+      "sha256": "9a737f4b0fc06ab817edf24101414d63c579a80b3e14e089cfa74d8edb7aa43f"
+    },
+    {
+      "path": "source/ships.h",
+      "sha256": "9dfdae7808b0302eecbb847b9f230aac7c17be941529bcd8e9c99df49238a068"
+    },
+    {
+      "path": "source/shlmisc.c",
+      "sha256": "55591647313466fcfd80dfaff82b4e087f62b810cd9ca29871561c654e743ea6"
+    },
+    {
+      "path": "source/shlmisc.p",
+      "sha256": "dd53a06ca1d2fe415ce98d8e93269bf4ea252d7ca07631f8989d2f6d0608c42d"
+    },
+    {
+      "path": "source/shootblast.c",
+      "sha256": "d30119ebbe6691a7fee9d6defa4e3463ac4da96e8d9c3d2117a6e381fa274414"
+    },
+    {
+      "path": "source/shootblast.p",
+      "sha256": "c74a19cef132ace346f237cf4a64ba871cabe79945f14effc911b2533c6bd57b"
+    },
+    {
+      "path": "source/sizes.c",
+      "sha256": "6a833d9d2f316fe1bf5975f1af5f5111e777f15a23d1e8e1f5bbf5fca01a2b86"
+    },
+    {
+      "path": "source/star.list",
+      "sha256": "d28fd06f33434aff6e73de92efec96cf6c332693cebb71040bb63271b85a847a"
+    },
+    {
+      "path": "source/survey.c",
+      "sha256": "151bc6f450a5f393871684e10dde45745c8585b73f013e6fbaa3e98e7762ec17"
+    },
+    {
+      "path": "source/survey.p",
+      "sha256": "ece026fd10212ea50674433dc28ca0b1c22a0d2b04465f815c2a363d81dafc6f"
+    },
+    {
+      "path": "source/tech.c",
+      "sha256": "0eff5207ef41c518b662b08c8fd93c0c97bc74b8e467e8c14c1f87d000c1f746"
+    },
+    {
+      "path": "source/tech.p",
+      "sha256": "25fee06096c3d394a01062e6d04581f5557b5983427026336092a84d276d229f"
+    },
+    {
+      "path": "source/tele.c",
+      "sha256": "e37356ed4c9a9d8af9e88eb4e52ebb06720b28eda836fd5291dad0aa91184112"
+    },
+    {
+      "path": "source/teleg_send.c",
+      "sha256": "287a99665e027d4597341a8990544ef438a111f9911bab2f72e1147ed4579cfc"
+    },
+    {
+      "path": "source/teleg_send.p",
+      "sha256": "273acb37427660639580d709837bd7197e55cb80ea636a8a2cb35a7e23e7905c"
+    },
+    {
+      "path": "source/test.c",
+      "sha256": "df5a0902d226c2adfbe3ed2304a312c2e97bc1a10906b62672c97f6b2388e619"
+    },
+    {
+      "path": "source/toggle.c",
+      "sha256": "f45a0c795681d702ba1396173869e2d0e953cabda95ec9b282c9d283a9b8946b"
+    },
+    {
+      "path": "source/toggle.p",
+      "sha256": "98d2f1f1a3f9c560aebb49baa150f81f200ed91abe84ff913dd42421532f67b2"
+    },
+    {
+      "path": "source/toxicity.c",
+      "sha256": "117eea4829b25736ce72badf540b23bb8ae9e56973d9c1e5db20d9ba7fe5e64a"
+    },
+    {
+      "path": "source/toxicity.p",
+      "sha256": "103f0099b2f868f65abce1f68e00f71eebaacf6fb3d44bec28915163cd32083d"
+    },
+    {
+      "path": "source/tweakables.h",
+      "sha256": "171237c0b81f93a32bf7e5d7bd1ccdb104076a56cdbde22425d79dd05e86d635"
+    },
+    {
+      "path": "source/vars.h",
+      "sha256": "093e797c22ef7b20cb872730b7ab86c58a4b09a8346e7f9209d4177e38b598cb"
+    },
+    {
+      "path": "source/victory.c",
+      "sha256": "17800fb41ad6db3a2847972ad429a9bf78015789d5cceb2d7fc25ef089f8138c"
+    },
+    {
+      "path": "source/victory.p",
+      "sha256": "c8919b4098acebe4d1b38bbd40db7a3e5c20fd5544b1656bc9d0f58ccc145ba9"
+    },
+    {
+      "path": "source/zoom.c",
+      "sha256": "2dbb144a40564c222b03eb0d8d70215f3d2ea6a79c385fb276d56fd97eef5fa7"
+    },
+    {
+      "path": "source/zoom.p",
+      "sha256": "37d7875025023358e633a158e1960564b1bfb0665cc7e0b4cb1f03161d265a14"
+    },
+    {
+      "path": "go/internal/game/admin.go",
+      "sha256": "51606f41794f18f6543983c9b223f4987a2a0185218ad9e3c346352622cb6f0d"
+    },
+    {
+      "path": "go/internal/game/authentication.go",
+      "sha256": "3ee9dc69d7bb5f2d7267c0cfb3855d18133757491a9d8da254f5f08d6e73671f"
+    },
+    {
+      "path": "go/internal/game/build.go",
+      "sha256": "b5fd358b53a125f0cd611a999d37484727fc2b2ce4fcc5b769c1daa750abe8bd"
+    },
+    {
+      "path": "go/internal/game/cargo_command.go",
+      "sha256": "23198a7b0f0b6386544e86b027a76368739fb8e5656a8608fda891334125d004"
+    },
+    {
+      "path": "go/internal/game/cargo_crash_test.go",
+      "sha256": "d5515ec4f7cda744ec633aff9201eba037dcc4465d0d83871984943514ee038f"
+    },
+    {
+      "path": "go/internal/game/cargo_staging_test.go",
+      "sha256": "7873d6c8535d386768036602e6aea772dbbe15c2acb87456afc21769fef2b8bf"
+    },
+    {
+      "path": "go/internal/game/cargo_test.go",
+      "sha256": "2d10373a6a69a38d0508372cb562de3390989d4b32bcb2ffe455491e8c5a6a16"
+    },
+    {
+      "path": "go/internal/game/cew_callsite_test.go",
+      "sha256": "fa1378382745ddd6229d121d0691e51570a1f3866ca86671c7be34a101f274ad"
+    },
+    {
+      "path": "go/internal/game/combat.go",
+      "sha256": "555b3371eb5abe09e4b04ca83e4a259415ea1319785a0ab22de9d606559e7b9f"
+    },
+    {
+      "path": "go/internal/game/command_crash_test.go",
+      "sha256": "f2c74856479cf50c6a0f08757517a77223e6355001599b5caa4939cbbd3353e2"
+    },
+    {
+      "path": "go/internal/game/command_fixture_test.go",
+      "sha256": "4e191057c8c83d23c69abc14c873987a42b0d3ae8e89fe302c8f35dbe05138cb"
+    },
+    {
+      "path": "go/internal/game/command_records.go",
+      "sha256": "31f924387f2f722c0f55c45e45fd7791c6a16a9fe99db5a67dea73a6840f093d"
+    },
+    {
+      "path": "go/internal/game/command_records_test.go",
+      "sha256": "8ddb2ab0c5e2f57e627d56234b30baa342bb56e5d6a21e146e67f9b1ee002972"
+    },
+    {
+      "path": "go/internal/game/command_workspace.go",
+      "sha256": "4d5f89f013a8090eaef9f5b1e663eb07b3069c0d8c4cee0778db82fea23781d3"
+    },
+    {
+      "path": "go/internal/game/commands.go",
+      "sha256": "1caa479773a666c1131501d79874435a0128663aa1de68b3e165255140a034e5"
+    },
+    {
+      "path": "go/internal/game/commands_cs.go",
+      "sha256": "0ecc0e9c8c9bc067f41e49e9502a1bd7c2c7de1d53a9af7d906f7d509caa735f"
+    },
+    {
+      "path": "go/internal/game/commands_fire.go",
+      "sha256": "2d1dccda4f3bdd60306664ce5c35fe885576b84c33339084ae8550c0a7fcf03b"
+    },
+    {
+      "path": "go/internal/game/commands_load.go",
+      "sha256": "fa2ee806bf958802fff0eb27a93e466f83e5965b2666b03042af000307b130aa"
+    },
+    {
+      "path": "go/internal/game/commands_misc.go",
+      "sha256": "4d1c773e00ead9e6f3b8aade5316316c2fc94a0b592a93f1e9d6213897709933"
+    },
+    {
+      "path": "go/internal/game/commands_move.go",
+      "sha256": "b96c67dc8e0d77075904ef712f443c32b5ae2b4c16ca962bf1428f24dcc53d47"
+    },
+    {
+      "path": "go/internal/game/commands_nav.go",
+      "sha256": "0d937999c1a1c73f0e33423bfef271f41f3490f00ae27e997dabf57dbf65707f"
+    },
+    {
+      "path": "go/internal/game/commands_order.go",
+      "sha256": "feb4f6a0fc181e628c982bca43ab29e10a98ebc253cd077eef48ea070789ade5"
+    },
+    {
+      "path": "go/internal/game/commands_power.go",
+      "sha256": "8eab8959a63376868fa71976c11bc303e24f46c1181b923340a5bb1e9ee532d4"
+    },
+    {
+      "path": "go/internal/game/commands_profile.go",
+      "sha256": "44c2478e0ffb0655f790929b74e8d4b429fd7fe4f8bbb22f24d82aeb4e8f3af3"
+    },
+    {
+      "path": "go/internal/game/commands_tech.go",
+      "sha256": "af2d74d760ab5779f94cc17bddac60343dc6feb1d967176e458577426d3d6509"
+    },
+    {
+      "path": "go/internal/game/commands_teleg.go",
+      "sha256": "06782cd529c5cb5e6596880cec48006e21310b5fac3a2e7635692f64793aca9f"
+    },
+    {
+      "path": "go/internal/game/commit.go",
+      "sha256": "ed0b3b75ac73b181df7c76c7f8f6596ac92d8c50f71ce0ea3d18e00537454504"
+    },
+    {
+      "path": "go/internal/game/commit_remediation_test.go",
+      "sha256": "16d2198a5e6755ecb6862a13e5e5b742e6b1b6c905f4fa364fd0125c193172ec"
+    },
+    {
+      "path": "go/internal/game/commit_test.go",
+      "sha256": "09a24fb54c95526bc6a71a70319e3e96ebc7d26083560782c2d058cbb90b87bd"
+    },
+    {
+      "path": "go/internal/game/enrollment.go",
+      "sha256": "4548ed84a7b3a95bb7fa2b01d44c4175d9ec25a1f8043f937db80d4ebffabf48"
+    },
+    {
+      "path": "go/internal/game/enrollment_acceptance_test.go",
+      "sha256": "c29739ef62dd08e43722aa3a7004850f291061859f6b1b50a95095f37ed6d735"
+    },
+    {
+      "path": "go/internal/game/enrollment_interfaces_test.go",
+      "sha256": "1518eaea53e5451019a91f5490f41441651bd4d4f370dcb6c78f34625707deeb"
+    },
+    {
+      "path": "go/internal/game/enrollment_status.go",
+      "sha256": "6c73b0cd866ff928e95f0fcc948b38cc90933d7fd54acf2e124b8d6b318dd4b9"
+    },
+    {
+      "path": "go/internal/game/enrollment_test.go",
+      "sha256": "05e1b6e05a60c49f0d84f96e333caefd56004d091fa856c23247afc478d19493"
+    },
+    {
+      "path": "go/internal/game/factory_command.go",
+      "sha256": "0e8a5d9473ba6335cf9884ed15dcf53164583567bb60fc87ba39285df8cd6a7c"
+    },
+    {
+      "path": "go/internal/game/factory_crash_test.go",
+      "sha256": "2ab72d6b3b9817dae7f29929af3d5ec6fa561845a2e83fe4f9ed891ec57364e1"
+    },
+    {
+      "path": "go/internal/game/factory_staging_test.go",
+      "sha256": "c53ef1c0a07a32d44eaf907896a68a6a47b663f152a10f969fc31242c1f20522"
+    },
+    {
+      "path": "go/internal/game/golden_test.go",
+      "sha256": "a79b4b58ec79c2abd4e4a57883caebd8ef25b82e122000f4fe8984e748b418ca"
+    },
+    {
+      "path": "go/internal/game/habitat_command.go",
+      "sha256": "5555ccab3cda9419ba8ab28654fa57b6403ad7c5096a0bb4b2d264f5b7cd719e"
+    },
+    {
+      "path": "go/internal/game/habitat_crash_test.go",
+      "sha256": "d5eacb088f7fd637de84a6143d3e7d3042da5d8e3a39568cdcb497662853b92a"
+    },
+    {
+      "path": "go/internal/game/habitat_staging_test.go",
+      "sha256": "a8f2a1cea96f8d2530f8233d747ab7ee6710c07d217f4a4c91fd74f05a42d6d5"
+    },
+    {
+      "path": "go/internal/game/helpers.go",
+      "sha256": "9208568b3f997e6e8275302e904a14d58151828cca93fdfeb05e7c2582238ad5"
+    },
+    {
+      "path": "go/internal/game/inventory_test.go",
+      "sha256": "8631b8af1446385e6e6d3b26b49aa479f5e599c3f0aaee517101098063f74ab2"
+    },
+    {
+      "path": "go/internal/game/lifecycle.go",
+      "sha256": "d4db53de8c360368251bb9497cae942c2787b53f3754f2a869115ec33df482f5"
+    },
+    {
+      "path": "go/internal/game/lifecycle_test.go",
+      "sha256": "815e75608c591765ed5d3445cbe6b5d09eed17bb47e481680e85b420bddf3d84"
+    },
+    {
+      "path": "go/internal/game/maintenance.go",
+      "sha256": "63c7e9bc97d626da6841be0598256d5cf29bb85eb46b4ef7e68ba5cdab8bd655"
+    },
+    {
+      "path": "go/internal/game/maintenance_test.go",
+      "sha256": "1fa3bf6768ea0bb9275b79906b4f612d6f4fd282c32895c01308b1d02f49069a"
+    },
+    {
+      "path": "go/internal/game/metrics.go",
+      "sha256": "8151b64dad08571155bf588fe4a4e7019c85263a1f28d75b54dd76990edcbda3"
+    },
+    {
+      "path": "go/internal/game/mode.go",
+      "sha256": "da8206ab005ea3b560f200dbb3c62054e90686c62b02691312099254c1e55e16"
+    },
+    {
+      "path": "go/internal/game/placement.go",
+      "sha256": "9e0b6fc5ce47a020d1e6b46c3f5fcc8ef3a10116ac0b2b5d75d19ef70e24fe4d"
+    },
+    {
+      "path": "go/internal/game/placement_test.go",
+      "sha256": "75f11fd7c1decdac60f60a2f2826bf04dcea5659b412b1b8b49fadfff2d8ac72"
+    },
+    {
+      "path": "go/internal/game/planet.go",
+      "sha256": "fb03e7c79af44883d8b161f78aed20c7b95b3e90029e85fd1901e1122045b018"
+    },
+    {
+      "path": "go/internal/game/planet_command.go",
+      "sha256": "e2bd9d50d4ad66bd15ae9d4cff1ac41cfa8e6ed46364d9bef2c682ba2bd37c23"
+    },
+    {
+      "path": "go/internal/game/planet_ownership_test.go",
+      "sha256": "b140e02cab2d227052b67149dddca03e53f2b0d6dcb955b59837388856850eaa"
+    },
+    {
+      "path": "go/internal/game/population_command.go",
+      "sha256": "6e2a3fded5ec0cc006fe2acfee37668beec6e3cb22b44061f72a88299722b55b"
+    },
+    {
+      "path": "go/internal/game/population_crash_test.go",
+      "sha256": "aa341768b71854a0e64ae8a5281642eb9da714adcf40f8e7269cd44af4f8cd26"
+    },
+    {
+      "path": "go/internal/game/population_gameplay_test.go",
+      "sha256": "3245770ad330b35200f76a81dd0b35fb775b1e3881ded8ce1f9a34667ba53a55"
+    },
+    {
+      "path": "go/internal/game/population_staging_test.go",
+      "sha256": "07b64615a71e4786349e79ed8a79e3d29688e80dfeaa0be4b9303615370419c7"
+    },
+    {
+      "path": "go/internal/game/population_test.go",
+      "sha256": "b574dea3e496a2837b7fc098de38be2cac72c489b5a18a15805a44c4960a10ca"
+    },
+    {
+      "path": "go/internal/game/rand.go",
+      "sha256": "e673b1ee1ccfb67eb64b062961cfd75d48a14aac7de401f3a5691a5838e75267"
+    },
+    {
+      "path": "go/internal/game/remediation_test.go",
+      "sha256": "242260738129ff7d6c8067fed5be38a2b1ccf9dc02730c8ef3a57a4162708a9d"
+    },
+    {
+      "path": "go/internal/game/schedule.go",
+      "sha256": "27c27720afbc7417dd93836750eb6d4c8b66a2be9d7789c13fa0e997a26dbacd"
+    },
+    {
+      "path": "go/internal/game/ship.go",
+      "sha256": "dc1f44c1a7f64b2fe158bfb2e70df3d8cf6c8a3d54d5eaaa28bc5b8a5659d53b"
+    },
+    {
+      "path": "go/internal/game/state.go",
+      "sha256": "8732a3b8b5c55153c9b34ae3429adc888834565c1727eec816d3f82a8a08a5f6"
+    },
+    {
+      "path": "go/internal/game/telescope_command.go",
+      "sha256": "6b6ce03b80d24a11ea37223206b0a322ce430471d8f27e6d7a487d4d8c3a8723"
+    },
+    {
+      "path": "go/internal/game/telescope_crash_test.go",
+      "sha256": "1d30cb7de0c4dbe90cf297ae3de91e20565d40a150331d6b1b88cc89672a2185"
+    },
+    {
+      "path": "go/internal/game/telescope_staging_test.go",
+      "sha256": "4b751ab64d33ca5a7b520445790f0d344fa75f2f634f9bae078c871872f36045"
+    },
+    {
+      "path": "go/internal/game/turn.go",
+      "sha256": "e178eaa927a3443cf138bef9f9f2a6a343a099852d4b2978fac54fa0096f25e2"
+    },
+    {
+      "path": "go/internal/game/vn.go",
+      "sha256": "0f86a0025355aee7fec4a3e55f7ee45ef8d20fabcf5ded5eb9e1db27aa4278ca"
+    },
+    {
+      "path": "go/internal/commandrules/cargo.go",
+      "sha256": "f08dd752131afbf419a4407943db59eea03a0d416cc789bbf250d95d85cfa5ca"
+    },
+    {
+      "path": "go/internal/commandrules/cargo_test.go",
+      "sha256": "baf67ee5ccb69b7a5c7276f8bb5adb8128cef8b64261a968b0c9cd49e71df54c"
+    },
+    {
+      "path": "go/internal/commandrules/habitat.go",
+      "sha256": "ef1d1fc68cb152cdc409c7f19a227247b4a55dd66870712fb974700ebea3986c"
+    },
+    {
+      "path": "go/internal/commandrules/habitat_test.go",
+      "sha256": "9dec34578ea82aff80708cfe2e9725ec144a0a5eaf4e76ddc9e1b208e3230ecd"
+    },
+    {
+      "path": "go/internal/commandrules/population.go",
+      "sha256": "159a3c03fc7029885c0952792e687121a4a832c42050e5cc9340e3821267f6d4"
+    },
+    {
+      "path": "go/internal/commandrules/population_test.go",
+      "sha256": "b4907cb4a03a9d57a61c57457b26c6370a1b1f65b34a4a489be8437d29a7190d"
+    },
+    {
+      "path": "go/internal/commandrules/telescope.go",
+      "sha256": "a049dc9c94d5507f4ab770d312e15fb46c4a7a0a7fde099c2502c38fcf1e7828"
+    },
+    {
+      "path": "go/internal/commandrules/telescope_test.go",
+      "sha256": "57e245bb9241be6cc6c93ce776e0514d4294d87142923bbfc4b80d32142accab"
+    },
+    {
+      "path": "go/internal/db/cargo.go",
+      "sha256": "57d383e5eb9efe40312ff0b1717f98cef5865900234517e7186274ad105e9c46"
+    },
+    {
+      "path": "go/internal/db/cargo_test.go",
+      "sha256": "70a7a5dbf433877258399a313d766ac88c72d8f4a556251c49b6836f433682f1"
+    },
+    {
+      "path": "go/internal/db/command.go",
+      "sha256": "e4bf3ebd414689f94040e53656e213ea11fa67c6aeb79e511181c162efb09c29"
+    },
+    {
+      "path": "go/internal/db/command_test.go",
+      "sha256": "ef5c96f2764d3ae45e47423dac537408cbb9a68c9bac7894ff07d812b906caba"
+    },
+    {
+      "path": "go/internal/db/commit.go",
+      "sha256": "0d3a4f639d060a470c3916eb6e115690bda756801ffce0bfe3c87decb5fcab6e"
+    },
+    {
+      "path": "go/internal/db/commit_test.go",
+      "sha256": "764dce8b110030abb76ca75574abdf87a622d8177cbce5a8d65aabfa48e81db1"
+    },
+    {
+      "path": "go/internal/db/enrollment.go",
+      "sha256": "6b1f43087633766950043b1616fbde0acb23ea2e00fb281ece0ca71331df61ee"
+    },
+    {
+      "path": "go/internal/db/enrollment_alloc.go",
+      "sha256": "f581ace1b09c4609a64a940d5f1cbbde7f4de08eb3ef47cc9ed98b120f09f7cb"
+    },
+    {
+      "path": "go/internal/db/enrollment_integration_test.go",
+      "sha256": "8476b1906e4dedf324cc90a4ee57a2abfa7a95000f2856e73b47b3d85edfcf7d"
+    },
+    {
+      "path": "go/internal/db/enrollment_test.go",
+      "sha256": "7b0686109edfab18da9d356d651e55e90a2a51c22a2b8e67a6bd32c4eeaf3464"
+    },
+    {
+      "path": "go/internal/db/factory.go",
+      "sha256": "fb12c66493f5eb91cb24d0297c5b0fce6b26a3a6c5bba17e57a9986087fac2df"
+    },
+    {
+      "path": "go/internal/db/factory_test.go",
+      "sha256": "7e1850650827daa408b075015df06e1343259baa5247e29ea80462a06283ef15"
+    },
+    {
+      "path": "go/internal/db/habitat.go",
+      "sha256": "d9973bda3fcdf3188957f46b12c40fecd596ee1c28eb88f5edba2dc7e645c566"
+    },
+    {
+      "path": "go/internal/db/habitat_test.go",
+      "sha256": "86ce3fdddbf264a6e22378831e6749bfd26f67cf2e93dba0ec4a8459335113a7"
+    },
+    {
+      "path": "go/internal/db/keys.go",
+      "sha256": "51fc66713c8138e2da12c5ae20d3de2e9f43b1325c49c2e5c25933946487d4f7"
+    },
+    {
+      "path": "go/internal/db/maintenance_test.go",
+      "sha256": "cc45013ea0f637bed7ec58a01ff2e644aac0314767af57c92a3ae317604e41d2"
+    },
+    {
+      "path": "go/internal/db/meta.go",
+      "sha256": "13ab4545883a4be4cb2bf4ef988c9571fb70ed1b568a2e5f7478cff9be9f0d58"
+    },
+    {
+      "path": "go/internal/db/population.go",
+      "sha256": "694990a23b5a53276271dd88dd0f6458eb40c9d5075c8ed84691f46ff063db54"
+    },
+    {
+      "path": "go/internal/db/population_test.go",
+      "sha256": "faeaed202a6a617903c953a9f668787a528670e4f95879f49d47d8a3f31ab69a"
+    },
+    {
+      "path": "go/internal/db/store.go",
+      "sha256": "7beb317bb3c8cd087366891563a8c1cb5044cd53e947f2820b21005f65b9eb2f"
+    },
+    {
+      "path": "go/internal/db/telescope.go",
+      "sha256": "34d17a67437beace1614795d564f67844d703e7a3000060f4e4e32cbb8400290"
+    },
+    {
+      "path": "go/internal/db/telescope_test.go",
+      "sha256": "5624346b94384bc8217c576233733cdc97a2ee9ed2192caabf1b97d18ef665df"
+    },
+    {
+      "path": "go/internal/db/testdata/cr07c_legacy_reader_test.go",
+      "sha256": "60152b0a28c4e90ae722dff359a02c6399c4a00239516c6c339c5d03190479a5"
+    },
+    {
+      "path": "go/internal/model/constants.go",
+      "sha256": "478354c9283e252e0d2830132fb4135617cf5d01e2fa83cff5ceeae20e3a6fc4"
+    },
+    {
+      "path": "go/internal/model/planet.go",
+      "sha256": "bf9092d803de9418318d785b2d0cc2f34ea826dc5c03d32138e49b994874075c"
+    },
+    {
+      "path": "go/internal/model/power.go",
+      "sha256": "8500ca9fb5ffca4a95aca3a51f98c6a96cebfa10a05edcf236057ecd14c431b7"
+    },
+    {
+      "path": "go/internal/model/race.go",
+      "sha256": "46de0971d9ee3bb9e0a73118968fd70a0494d41207347d565692cb6a06e3ccb7"
+    },
+    {
+      "path": "go/internal/model/ship.go",
+      "sha256": "8ddc530d2fea20a91aa16126c1cd5dab2e82a2d627b5a607cb6dc651adf77e6a"
+    },
+    {
+      "path": "go/internal/model/shipdata.go",
+      "sha256": "3ce5e1542ba9a760dc4c7828eb4b5ec789ad66ecb7686c8bbe034512f5a539c8"
+    },
+    {
+      "path": "go/internal/model/star.go",
+      "sha256": "80bd99290663b3e70d447ede457985c28affd0ff266e1e8917f96e991ed8aa65"
+    }
+  ],
+  "portable_replay": {
+    "runner_exit_code": 0,
+    "results": [
+      {
+        "name": "c-build",
+        "command": [
+          "gcc",
+          "-std=gnu89",
+          "-fcommon",
+          "-w",
+          "-O0",
+          "-g",
+          "-ffunction-sections",
+          "-fdata-sections",
+          "-Isource",
+          "-Itest/ctool/include",
+          "-I/tmp/cr17c-ground-assault-evidence",
+          "-Wl,--gc-sections",
+          "-o",
+          "/tmp/gb-assault-audit-replay-hr4bur4v/c-move-audit",
+          "/tmp/cr17c-ground-assault-evidence/c-move-audit.c",
+          "/tmp/cr17c-ground-assault-evidence/c-unreached-stubs.c",
+          "source/move.c",
+          "source/rand.c",
+          "-lm"
+        ],
+        "cwd": "/tmp/GB-cr17c-ground-assault",
+        "exit_code": 0,
+        "expected_exit": 0,
+        "elapsed_seconds": 0.214,
+        "out_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "archived_log_prefix": "replay-c-build"
+      },
+      {
+        "name": "c-civ",
+        "command": [
+          "/tmp/gb-assault-audit-replay-hr4bur4v/c-move-audit",
+          "civ"
+        ],
+        "cwd": "/tmp/GB-cr17c-ground-assault",
+        "exit_code": 0,
+        "expected_exit": 0,
+        "elapsed_seconds": 0.002,
+        "out_sha256": "97357f83acef51dd3cdd8851104cf71157c59edc30fa8ea69984ea05e59d57ef",
+        "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "archived_log_prefix": "replay-c-civ"
+      },
+      {
+        "name": "c-mil",
+        "command": [
+          "/tmp/gb-assault-audit-replay-hr4bur4v/c-move-audit",
+          "mil"
+        ],
+        "cwd": "/tmp/GB-cr17c-ground-assault",
+        "exit_code": 0,
+        "expected_exit": 0,
+        "elapsed_seconds": 0.001,
+        "out_sha256": "8b4361e055662cdc3e2d8412a79553daf37b3410c498cd63d4a2dabdccb73015",
+        "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "archived_log_prefix": "replay-c-mil"
+      },
+      {
+        "name": "c-mutual",
+        "command": [
+          "/tmp/gb-assault-audit-replay-hr4bur4v/c-move-audit",
+          "mutual"
+        ],
+        "cwd": "/tmp/GB-cr17c-ground-assault",
+        "exit_code": 0,
+        "expected_exit": 0,
+        "elapsed_seconds": 0.001,
+        "out_sha256": "6dbd5c95c12a6b818304aba0a433409327f7556cd26fbe3009faccec07314af3",
+        "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "archived_log_prefix": "replay-c-mutual"
+      },
+      {
+        "name": "cr19-actor-prefx",
+        "command": [
+          "go",
+          "test",
+          "-count=1",
+          "-race",
+          "-json",
+          "-overlay=/tmp/gb-assault-audit-replay-hr4bur4v/cr19-actor-prefx-overlay.json",
+          "-run",
+          "^TestAssaultAudit",
+          "./internal/game"
+        ],
+        "cwd": "/tmp/GB-cr17c-ground-assault/go",
+        "exit_code": 1,
+        "expected_exit": 1,
+        "elapsed_seconds": 4.873,
+        "out_sha256": "812a8327b4c602aa6187c3e35e3272cd2f02c5c942fd5e6dba183f56e814714e",
+        "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "archived_log_prefix": "replay-cr19-actor-prefx"
+      },
+      {
+        "name": "capture-causal-probe",
+        "command": [
+          "go",
+          "test",
+          "-count=1",
+          "-race",
+          "-json",
+          "-overlay=/tmp/gb-assault-audit-replay-hr4bur4v/capture-causal-probe-overlay.json",
+          "-run",
+          "^TestAssaultAuditCR19Capture$/military=/fence=false$",
+          "./internal/game"
+        ],
+        "cwd": "/tmp/GB-cr17c-ground-assault/go",
+        "exit_code": 0,
+        "expected_exit": 0,
+        "elapsed_seconds": 4.424,
+        "out_sha256": "21f233d9e37363bc25655fb2d6d8a50cda71e614bb4b334f0474702869f43c47",
+        "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "archived_log_prefix": "replay-capture-causal-probe"
+      },
+      {
+        "name": "ship-legacy-audit",
+        "command": [
+          "go",
+          "test",
+          "-count=1",
+          "-race",
+          "-json",
+          "-overlay=/tmp/gb-assault-audit-replay-hr4bur4v/ship-legacy-audit-overlay.json",
+          "-run",
+          "^TestAssaultAuditHostileUnload$",
+          "./internal/game"
+        ],
+        "cwd": "/tmp/GB-cr17c-ground-assault/go",
+        "exit_code": 0,
+        "expected_exit": 0,
+        "elapsed_seconds": 3.571,
+        "out_sha256": "9a59a358d4522501b9206bd3dac492219708ec15bf495d75a4c23b530630d8fd",
+        "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "archived_log_prefix": "replay-ship-legacy-audit"
+      },
+      {
+        "name": "accepted-population-regression",
+        "command": [
+          "go",
+          "test",
+          "-count=1",
+          "-race",
+          "-json",
+          "-run",
+          "^TestPopulation|^TestCommandFixture",
+          "./internal/commandrules",
+          "./internal/db",
+          "./internal/game"
+        ],
+        "cwd": "/tmp/GB-cr17c-ground-assault/go",
+        "exit_code": 0,
+        "expected_exit": 0,
+        "elapsed_seconds": 20.922,
+        "out_sha256": "ddc4273c6c8ea4bb28753eb46e6c43ca89b763c2e209a0a7f97036bb0ce47cb6",
+        "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "archived_log_prefix": "replay-accepted-population-regression"
+      },
+      {
+        "name": "c-fixtures",
+        "command": [
+          "make",
+          "-C",
+          "test/ctool",
+          "check"
+        ],
+        "cwd": "/tmp/GB-cr17c-ground-assault",
+        "exit_code": 0,
+        "expected_exit": 0,
+        "elapsed_seconds": 0.037,
+        "out_sha256": "12f21efee811cf0716e3213499e2abdb84da7c2b54c975b4455f60a7f5a2b3d3",
+        "err_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "archived_log_prefix": "replay-c-fixtures"
+      }
+    ],
+    "note": "Fresh complete Phase 0 replay. Expected-failing capture cases inspected by named JSON test outcomes, not only process exit.",
+    "checked_expected_capture_failure_leaves": 4,
+    "checked_accepted_pass_nodes": 355,
+    "checked_real_SIGKILL_boundary_leaves": 24
+  },
+  "reviews": [
+    {
+      "artifact": "independent-phase0-review.md",
+      "sha256": "954cc139d0852916d64649690daa411c6f8b6ef02d8d4391593f56bd4fa3b83b",
+      "scope": "read-only Phase 0 source/design"
+    },
+    {
+      "artifact": "independent-evidence-review.md",
+      "sha256": "dae11d8073eaa9566578c3298fb7bc5d1f15ed4b7246deb116fa8cef0c76d4c5",
+      "scope": "read-only source/test/recorded-evidence review; not independent test reexecution"
+    }
+  ]
+}

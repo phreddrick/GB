@@ -105,8 +105,29 @@ func newCommandEnrollmentActor(t *testing.T) (*actorEnrollmentFixture, db.Placem
 func commandFixtureRecords(t *testing.T, image string) map[string]string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "snapshot.db")
-	if err := os.WriteFile(path, []byte(image), 0600); err != nil {
+	// Snapshot bytes may originate in a crash child's fixture. They are data,
+	// never a pathname. Capability-rooted creation confines this new file to
+	// our own TempDir even when the inspected bytes are untrusted.
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
 		t.Fatal(err)
+	}
+	defer func() {
+		if err := root.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	file, err := root.OpenFile("snapshot.db", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, writeErr := file.Write([]byte(image))
+	closeErr := file.Close()
+	if writeErr != nil {
+		t.Fatal(writeErr)
+	}
+	if closeErr != nil {
+		t.Fatal(closeErr)
 	}
 	store, err := bolt.Open(path, 0600, &bolt.Options{ReadOnly: true})
 	if err != nil {
