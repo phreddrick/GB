@@ -33,8 +33,7 @@ func newHabitatFixture(t *testing.T) *habitatFixture {
 
 func newHabitatFixtureWithCarrierOwner(t *testing.T, carrierOwner uint8) *habitatFixture {
 	t.Helper()
-	f := newEnrollmentActor(t)
-	a := enrollActor(t, f, actorEnrollmentRequest("operator")).Placement
+	f, a := newCommandEnrollmentActor(t)
 	if carrierOwner == 2 {
 		// A real second empire is required for subsequent turns and restart,
 		// not just an otherwise dangling Owner=2 on the habitat.

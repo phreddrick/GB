@@ -23,8 +23,7 @@ type factoryFixture struct {
 
 func newFactoryFixture(t *testing.T) *factoryFixture {
 	t.Helper()
-	f := newEnrollmentActor(t)
-	a := enrollActor(t, f, actorEnrollmentRequest("operator")).Placement
+	f, a := newCommandEnrollmentActor(t)
 	x := &factoryFixture{f, a.Star, a.Planet, 77}
 	onEnrollmentActor(t, f, func() {
 		pl := f.state.planets[a.Star][a.Planet]
