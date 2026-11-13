@@ -1,0 +1,72 @@
+{
+  "repository": "phreddrick/GB",
+  "repository_id": 4607577,
+  "source": "7a17a1bc7edf75091386f30944a529a0ccf48d8d",
+  "run_id": 43451208400,
+  "attempt": 1,
+  "required_jobs": [
+    "build, test, lint (fresh checkout)",
+    "docker build from checkout (no push)",
+    "workflow policy (actionlint, shellcheck, permissions, helper tests)",
+    "manifests (render, mutations, safety check, kubeconform, sentinel)",
+    "image scan (trivy)",
+    "kind e2e (ci entry points, disposable cluster)",
+    "image sbom (syft)"
+  ],
+  "artifacts": {
+    "container-images": {
+      "id": 14049614280,
+      "sha256": "09cc296ced40ead00aaabc4044409d1fee36db1faa51bf2134523efb3a0ddd1c",
+      "bytes": 17274127,
+      "entries": [
+        "gb-server.docker.tar",
+        "gb-server.oci.tar",
+        "gbctl.docker.tar",
+        "gbctl.oci.tar"
+      ]
+    },
+    "image-build-record": {
+      "id": 14050462489,
+      "sha256": "a5b809e5cb6bf349d20ebc4a5c2b042eafc357330cb67b6c9c58e95bd1468375",
+      "bytes": 859,
+      "entries": [
+        "image-build-record.json"
+      ]
+    },
+    "trivy-reports": {
+      "id": 14051100529,
+      "sha256": "f6070e6aeef249d20d49075becc5a0c48c1a10e776b153f990c9dc6c1f9b622b",
+      "bytes": 39964,
+      "entries": [
+        "trivy-gb-server.json",
+        "trivy-gbctl.json",
+        "trivy-version.txt"
+      ]
+    },
+    "sboms": {
+      "id": 14050950671,
+      "sha256": "557b28faab43514335cb363b29fd68ac31e9e81a4d5f2288e0b1918bfe77c795",
+      "bytes": 214158,
+      "entries": [
+        "gb-server.spdx.json",
+        "gbctl.spdx.json",
+        "summary.txt",
+        "syft-version.txt"
+      ]
+    }
+  },
+  "images": {
+    "gb-server": {
+      "manifest_digest": "sha256:66b72b138dbeff1b79044f44548adef3dddc476e35b1e3d0deb9ee9db73da96a",
+      "config_digest": "sha256:caa992b29b60ab8e8cd560c2e55fc6ac02844b6605be8ae1573713cda9a78ac6",
+      "oci_tar_sha256": "cc59613a35ffb8cff138a155517ca64ddf7f9d2497ff1aed84042079197413b9",
+      "docker_tar_sha256": "2bca8b1ffae23dd825f588f87b5bcc04378c5ab987e7c91869b59466d17a09fc"
+    },
+    "gbctl": {
+      "manifest_digest": "sha256:0b388843751003312da6dee65672359d47a8bb06fbba7ce8037ae1de72dafedb",
+      "config_digest": "sha256:ce95fa4ff2c2cafb4ba8eb20a13912630f02a4efaf6dba438caf5e4cf5b79df0",
+      "oci_tar_sha256": "a72a7f114e3029c807c42014d44697fc96a392a23a3df4ff7d4382d79e84b43a",
+      "docker_tar_sha256": "513c8489e6001ce42d8c0e29a76259a3c2a3c3e4e5585d5d93989c0f8983b91a"
+    }
+  }
+}

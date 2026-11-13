@@ -1,0 +1,605 @@
+{
+  "kind": "pr78-promotion-validation-v1",
+  "generated_utc": "2026-11-13T22:08:41.070287+00:00",
+  "baseline_master": "1a31db4da30fa5953aeaf25ed7bcc3d5130f343c",
+  "approved_image_source": "7a17a1bc7edf75091386f30944a529a0ccf48d8d",
+  "original_ci_run": 43451208400,
+  "original_ci_attempt": 1,
+  "source_sha256": {
+    ".github/workflows/publish-images.yml": "b4d566d87b6fd83ad0cc1e5635f9b1fd5bb5da9a1f0706f2b3b0d70da55e4d22",
+    ".github/release/pr78.json": "e46f9bac1d354f1a55bb35149b1b2774e95b33735ebfaa016dbc239c2498950a",
+    ".github/scripts/pr78_artifacts.py": "747b5d68d9be2da4cff4c729ca9028b9f15ef935338a5399ba7153cc73e3f16a",
+    ".github/scripts/pr78_promotion.py": "41463d2fff09c846031c6381bd4879df00a8c496c8492bd13f4582a2d17ef2f4",
+    ".github/scripts/test_pr78_promotion.py": "020ea2ff0a406d11d0d662bbd159d5ab75ae473623054aef6205b3e4dfa846a0",
+    "docs/testing/pr78-artifact-promotion.md": "8542da809226792d4905915c1bd5684e156663e94754de892aca534d72acb6f3"
+  },
+  "commands": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-pr78-promotion/go",
+      "started_utc": "2026-11-13T21:33:28.864166+00:00",
+      "finished_utc": "2026-11-13T21:34:13.391023+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 44.527,
+      "name": "go-normal",
+      "command_record_sha256": "564d6c7398602583db1b32286252a4fc4371f4e66a453aef6fc89416aa1f46c1",
+      "output_sha256": "62a0734899fcf0de0dfc6369ce2a5ba29806d8a4fb16d33cd8219ab9e28c182b",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-pr78-promotion/go",
+      "started_utc": "2026-11-13T21:36:15.201675+00:00",
+      "finished_utc": "2026-11-13T21:41:41.573669+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 326.372,
+      "name": "go-race",
+      "command_record_sha256": "ff8a5f0b42a6165f486373c42221baa5fa62d1287dd589cc8bd4cce8fe4d02f4",
+      "output_sha256": "8a434aac1ae8f487f3a82642d2923aa97e1c6cc30fc8f5e15fdfdba6f864c991",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-pr78-promotion/go",
+      "started_utc": "2026-11-13T21:47:27.482293+00:00",
+      "finished_utc": "2026-11-13T21:53:21.091912+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 353.61,
+      "name": "go-long-race",
+      "command_record_sha256": "67a0c59cdf0d3aceb99ca4439280c27f48f739a2513b802c2e2103bd3d84cd97",
+      "output_sha256": "8aa8023bbd0f9b4c660d012215417ba9f5dc76446e480495a93ee5eca44c7111",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4",
+        "GB_LONG_TESTS": "1"
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-e",
+        "-c",
+        "go version; go build ./...; test -z \"$(gofmt -l .)\"; go vet ./...; go mod verify; go mod tidy -diff"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion/go",
+      "started_utc": "2026-11-13T21:36:15.761327+00:00",
+      "finished_utc": "2026-11-13T21:36:20.117101+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 4.356,
+      "name": "build-vet-mod",
+      "command_record_sha256": "d140a1b511049fe595955be89bb7da9b01797ec4693da155c4956623624985c3",
+      "output_sha256": "07b4e04eeb8f684093f094b33364d3540df3ac65e63e750d9071876a1da243e3",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "make",
+        "-C",
+        "test/ctool",
+        "check"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:47:26.666591+00:00",
+      "finished_utc": "2026-11-13T21:47:27.533789+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 0.867,
+      "name": "c-fixtures",
+      "command_record_sha256": "692b5a1440a12b111b061ac1afcec093b5e14db1c15386441edb8dc526b7fb6c",
+      "output_sha256": "af95fd865a3d8f84b3509778b07ccd97ec22aaad680ac3d02a356361aa2a2746",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "test/scripts/inventory-check.sh"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:47:27.563377+00:00",
+      "finished_utc": "2026-11-13T21:48:09.086155+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 41.523,
+      "name": "inventory",
+      "command_record_sha256": "2fef240de249090deabece544da85d972333702529aa426ed235af6f5eec4c38",
+      "output_sha256": "ca1bc8f5d5f2e329c46ec4fbeee1f35d81653c6c380e45f3db71b76edde9abc8",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "test/scripts/golden-mutations.sh"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:48:09.124793+00:00",
+      "finished_utc": "2026-11-13T21:56:30.347664+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 501.223,
+      "name": "golden-mutations",
+      "command_record_sha256": "1f6d0919245bf84540d2ec7e7b650d697b653e21a8e1ed70a5493e97d375f4f7",
+      "output_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "test/scripts/golden-mutations-selftest.sh"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:56:30.375426+00:00",
+      "finished_utc": "2026-11-13T21:58:08.199433+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 97.824,
+      "name": "golden-selftest",
+      "command_record_sha256": "6a28c151b75a1d3023d153b6f01c16bf378502e8a562ac88df35c62fad457772",
+      "output_sha256": "97c280045f4c80954a3ebf2f84dded376fa8e0bb927df473cb6f0c71880d6bd0",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "test/scripts/lint-gate-selftest.sh"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:58:08.228418+00:00",
+      "finished_utc": "2026-11-13T21:58:52.341147+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 44.113,
+      "name": "lint-selftest",
+      "command_record_sha256": "c23cd8f90fa4212e98a688ff53ffa219412d4f019488b816aaacfe40ad6e2339",
+      "output_sha256": "6399dd1f645d4f386b9b51f3cce2aeb7d1cd9e7e5c56dd6768a815af300bd8d0",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "test/scripts/gate-approval-selftest.sh"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:58:52.375114+00:00",
+      "finished_utc": "2026-11-13T21:58:57.202366+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 4.827,
+      "name": "gate-approval-selftest",
+      "command_record_sha256": "3c462feeec67b53fcd22f7c0b207f9f97249aa52d17ba00afa9aa19163955ceb",
+      "output_sha256": "0793630382f69a970efd2f3edf88526ac84ceb8872a21698f7a010f41e5001fc",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "test/scripts/lint-gate.sh",
+        "/home/steve/gb-evidence/pr78-promotion-implementation-20261113T212236Z/lint.json"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:58:57.230787+00:00",
+      "finished_utc": "2026-11-13T21:59:01.564587+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 4.334,
+      "name": "lint",
+      "command_record_sha256": "9406d68a40e4f2aedefec13f6f7531cef6d28b69ce7eb5e1de0ca68c8fed9258",
+      "output_sha256": "92940dbb367d0b1841928c26cbebcb51fd04a62ec248116fea63f02895148b58",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        ".github/scripts/workflow_policy_check.py"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:59:01.590911+00:00",
+      "finished_utc": "2026-11-13T21:59:01.705039+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 0.114,
+      "name": "workflow-policy",
+      "command_record_sha256": "6e397bf269810961dcb319ea688e7e34cf7a3d43c17b62e9a282bed9ab9b3c5d",
+      "output_sha256": "1015c29937e20b246a556a9fb77e9bd66a1835c17a882dd110bec18ab3c90eb2",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-e",
+        "-c",
+        "shellcheck .github/scripts/*.sh"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:59:01.737367+00:00",
+      "finished_utc": "2026-11-13T21:59:03.003853+00:00",
+      "exit_code": 1,
+      "elapsed_seconds": 1.266,
+      "name": "workflow-shellcheck",
+      "command_record_sha256": "5882bae0b10d232a1d43b7998492e772dc0a8db8ca539034f133aa3c2d9d4f05",
+      "output_sha256": "ea0416bb04c752dac54cb878f39ebaf36a08dad48dac890a29c2916218bfe6aa",
+      "interpretation": "initial stricter-than-CI invocation; existing informational findings, exact CI rerun passed",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-e",
+        "-c",
+        "shellcheck -S warning .github/scripts/*.sh"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T22:03:02.222022+00:00",
+      "finished_utc": "2026-11-13T22:03:03.438668+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 1.217,
+      "name": "workflow-shellcheck-ci",
+      "command_record_sha256": "d16578d4b9bc758f96f8ad3c512dd3bee1496f8ae4686b9dc308b37059d4a7b4",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "deploy/kustomize/tests/run.sh"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:59:03.031533+00:00",
+      "finished_utc": "2026-11-13T21:59:21.586890+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 18.555,
+      "name": "manifests",
+      "command_record_sha256": "14e377fa115a1bcd7adfa5dfbfb3b92980743a23489f9d00d871ef5e01066ee5",
+      "output_sha256": "2d4d41c9e37ff3d32b6c8b91066c377596696d7fd797406ed229ae4a137cb23d",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "/tmp/claude-1026/-home-steve-workspace-GB/ee9ebf80-502c-4ecf-ad67-736e8673c55c/scratchpad/p2c/bin/actionlint"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:51:42.196325+00:00",
+      "finished_utc": "2026-11-13T21:51:42.204031+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 0.008,
+      "name": "actionlint-final",
+      "command_record_sha256": "40c83d0e9428232f9b2bca6797e453b4ef9915010d4b92faa400c4da4466c349",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "interpretation": "PASS",
+      "environment": {
+        "note": "Python/mock or static workflow validation; no explicit Go toolchain prefix on this command."
+      }
+    },
+    {
+      "command": [
+        "go",
+        "run",
+        "golang.org/x/vuln/cmd/govulncheck@v1.9.0",
+        "./..."
+      ],
+      "cwd": "/tmp/GB-pr78-promotion/go",
+      "started_utc": "2026-11-13T21:47:28.904867+00:00",
+      "finished_utc": "2026-11-13T21:47:38.016282+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 9.111,
+      "name": "govulncheck",
+      "command_record_sha256": "730c17d39d709e2ce35aeea01893be677883c325fd1fac4f602a47bbb63ffecd",
+      "output_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "test/scripts/growth-gate.sh",
+        "origin/master"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:59:24.668612+00:00",
+      "finished_utc": "2026-11-13T21:59:24.933179+00:00",
+      "exit_code": 1,
+      "elapsed_seconds": 0.265,
+      "name": "growth-ack-required",
+      "command_record_sha256": "93ce8ad547b845bd97ec288c7b7880789b49a1c6b76a3400cab1940408555c14",
+      "output_sha256": "8f26f3ef37c122213aa3594803dad13c610bc9813551bf016ea29d97ed7c88b6",
+      "interpretation": "expected maintainer acknowledgment requirement",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:59:21.614798+00:00",
+      "finished_utc": "2026-11-13T21:59:21.630774+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 0.016,
+      "name": "diff-check",
+      "command_record_sha256": "e127467829ae0c11c5f024d99db2ad22c332d1ddd1eb0577ff03eea2eeae3ee3",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "interpretation": "PASS",
+      "environment": {
+        "GOTOOLCHAIN": "local",
+        "go_version": "go1.27.4"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".github/scripts",
+        "-p",
+        "test_pr78_promotion.py",
+        "-v"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:33:19.245828+00:00",
+      "finished_utc": "2026-11-13T21:33:19.760920+00:00",
+      "exit_code": 1,
+      "elapsed_seconds": 0.515,
+      "name": "promotion-tests-r2",
+      "command_record_sha256": "21d6e0d33f0a0d0337e742f734d64ed7c4c988083739efd30480215d2fcf1d32",
+      "output_sha256": "90a6796c27afd7966c10f6677454959c0bfc26e275795bfd2013bb2f3963a440",
+      "interpretation": "historical fixture-interface failure corrected and rerun",
+      "environment": {
+        "note": "Python/mock or static workflow validation; no explicit Go toolchain prefix on this command."
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".github/scripts",
+        "-p",
+        "test_pr78_promotion.py",
+        "-v"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:41:01.739214+00:00",
+      "finished_utc": "2026-11-13T21:41:02.254485+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 0.515,
+      "name": "promotion-tests-r4",
+      "command_record_sha256": "1092eb93c9d29af6563bd27aa2c8529f85fae7a0bb23738ce94960ac5f10ba80",
+      "output_sha256": "4f522038b61cb70bf0137fcc85067f3df918fe62de45d38cbfa4045aa54de7c4",
+      "interpretation": "PASS",
+      "environment": {
+        "note": "Python/mock or static workflow validation; no explicit Go toolchain prefix on this command."
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".github/scripts",
+        "-p",
+        "test_pr78_promotion.py",
+        "-v"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:44:13.059334+00:00",
+      "finished_utc": "2026-11-13T21:44:13.575077+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 0.516,
+      "name": "promotion-tests-r5",
+      "command_record_sha256": "7b82a70c21a1fc59d8e41026a5b7ae194bb52085e5fa39a008a7e40fa532a749",
+      "output_sha256": "475aac847a40c9455fd15869345f039dd56d58d34dd0621fa9666774069c3f64",
+      "interpretation": "PASS",
+      "environment": {
+        "note": "Python/mock or static workflow validation; no explicit Go toolchain prefix on this command."
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".github/scripts",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:34:28.650196+00:00",
+      "finished_utc": "2026-11-13T21:34:43.340748+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 14.691,
+      "name": "workflow-helpers-r3",
+      "command_record_sha256": "a05d59ef95cb3416b4316765fddff46aaf968a117541a5149f517ef2f5e41bf5",
+      "output_sha256": "b865dfe3225d51ca7de9d8e345e225b29e55baf5ca1378ab44a27e7176d6293e",
+      "interpretation": "PASS",
+      "environment": {
+        "note": "Python/mock or static workflow validation; no explicit Go toolchain prefix on this command."
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".github/scripts",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/tmp/GB-pr78-promotion",
+      "started_utc": "2026-11-13T21:48:32.558018+00:00",
+      "finished_utc": "2026-11-13T21:48:51.240078+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 18.682,
+      "name": "workflow-helpers-final",
+      "command_record_sha256": "e61ea8f49ac95786ae86135810bcec0c924062d28a706fb3ad7c2fc76dca64d7",
+      "output_sha256": "a09bde1b13a095ea3e0c40e0a626d4532bdda383a084ee2aa6c6a168f5ea1d97",
+      "interpretation": "PASS",
+      "environment": {
+        "note": "Python/mock or static workflow validation; no explicit Go toolchain prefix on this command."
+      }
+    }
+  ],
+  "go_suites": {
+    "normal": {
+      "tested_packages": 21,
+      "wall_seconds": 44.527,
+      "game_seconds": 31.024
+    },
+    "race": {
+      "tested_packages": 21,
+      "wall_seconds": 326.372,
+      "game_seconds": 315.152
+    },
+    "long_race": {
+      "GB_LONG_TESTS": "1",
+      "tested_packages": 21,
+      "wall_seconds": 353.61,
+      "game_seconds": 351.535,
+      "game_package_timeout_seconds": 600,
+      "headroom_percent": 41.4108
+    }
+  },
+  "workflow_tests": {
+    "new_promotion_tests": 28,
+    "total_existing_and_new": 216,
+    "independent_final_execution": "review-final-all-helpers.json"
+  },
+  "lint": {
+    "baseline": 1000,
+    "reported": 1000,
+    "new": 0,
+    "stale": 0,
+    "allowance_changes": false
+  },
+  "govulncheck": {
+    "exit_code": 0,
+    "affected_code": 0,
+    "imported_packages": 0,
+    "noncalled_required_module_findings": 17,
+    "policy_unchanged": true
+  },
+  "original_candidate_revalidated": {
+    "server_manifest": "sha256:66b72b138dbeff1b79044f44548adef3dddc476e35b1e3d0deb9ee9db73da96a",
+    "gbctl_manifest": "sha256:0b388843751003312da6dee65672359d47a8bb06fbba7ce8037ae1de72dafedb",
+    "production_profile_unchanged": true,
+    "fresh_authenticated_CI_proof": true,
+    "image_execution": false
+  },
+  "independent_review": {
+    "initial_blocker": "R1 validator-accepted complete journal after finalization failure",
+    "correction": "Distinct provisional journal type, explicit finalization failure and causal regression; completed registry effects preserved",
+    "additional_finding": "R2 explicit config/DB evidence completeness",
+    "additional_correction": "Recorded expected/observed configs and per-image DB snapshots, report/version hashes and times",
+    "final_verdict": "APPROVE FOR PR",
+    "history_preserved": true,
+    "review_file": "docs/testing/evidence/pr78-promotion-review.md",
+    "review_sha256": "0a923fde330382e44a33bd268b2a8e8d8ae0d06080b502f7f8a9b581ca1c23f0",
+    "final_promotion_tests": 28,
+    "final_all_helper_tests": 216,
+    "remaining_blockers": []
+  },
+  "acknowledgment": {
+    "required": [
+      "gate-change-reviewed"
+    ],
+    "applied_by_agent": false,
+    "known-defect-added_required": false,
+    "growth_ack_gate_expected_exit": 1
+  },
+  "operational_scope": {
+    "publication_executed": false,
+    "GHCR_modified": false,
+    "master_tags_changed": false,
+    "deployment_manifests_changed": false,
+    "cluster_or_live_database_access": false,
+    "credential_changes": false
+  },
+  "limitations": [
+    "No hosted promotion or real registry upload/pull was executed. Registry/API write tests are controlled mocks; actual preserved bytes were independently read-verified.",
+    "Future owner dispatch requires effective exclusive writer window and existing environment approvals; no registry compare-and-swap or two-image atomicity guarantee.",
+    "After original artifact expiry owner must separately prepare the pinned GitHub retention release; original CI evidence remains mandatory.",
+    "Hosted normal CI and maintainer acknowledgment follow PR opening; source builds in normal CI are control-code validation, not the PR78 release image."
+  ],
+  "execution_notes_sha256": "17db5d531e6703d6b9a8eb325025ff3d9f100cb0cd9a5499a8ac4aeec3b21d4f",
+  "validation_archive": {
+    "path": "docs/testing/evidence/pr78-promotion-validation.tar.gz",
+    "sha256": "af01bacad6e2c804acb490373f31fe650230715602067dfc5c8f55409d1b4cda",
+    "bytes": 45778,
+    "entries": 74,
+    "scope": "Root-level sanitized command/output/review records only; no image ZIPs/TARs/layer blobs or live data. Original failures and corrections retained."
+  }
+}

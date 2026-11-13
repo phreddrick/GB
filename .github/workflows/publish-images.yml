@@ -31,6 +31,13 @@
 #              server digest in the dev entry point as a pull request. It
 #              never merges, never deploys; Argo CD sync stays manual.
 #
+# PR78 promotion is an explicit second mode: exact historical ZIP/OCI identity,
+# original CI provenance plus control-code CI, fresh unchanged scan policy,
+# same environment/concurrency/ONE package writer. It never builds game code,
+# moves master tags or opens a digest PR. Expired originals require a separately
+# owner-prepared retained-release transfer; igor paths are never runner inputs.
+# See docs/testing/pr78-artifact-promotion.md and the separate promotion record.
+#
 # No remote build cache is used anywhere (nothing a pull request can poison).
 # No personal access token exists; GITHUB_TOKEN is the only credential. The
 # packages GHCR creates on the first push are PRIVATE until the owner makes
@@ -40,8 +47,19 @@ name: publish-images
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: "Build current master, or promote only the fixed PR #78 artifacts (no master-tag update)"
+        required: true
+        type: choice
+        default: build-current-master
+        options: [build-current-master, promote-pr78]
+      retained_release_id:
+        description: "Promotion only: optional owner-prepared GitHub GB release ID containing the four exact ZIPs; no automatic fallback"
+        required: false
+        type: string
+        default: ""
       confirm:
-        description: "Type `publish` to confirm publication of ghcr.io/phreddrick/gb-server and gbctl from this master commit"
+        description: "Build: type publish. Promotion: type promote-pr78-exclusive, attesting no other registry writers during this run"
         required: true
         type: string
       open_digest_pr:
@@ -84,9 +102,25 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Validate operation selection
+        env:
+          OPERATION: ${{ inputs.operation }}
+          CONFIRM: ${{ inputs.confirm }}
+          RETAINED_RELEASE_ID: ${{ inputs.retained_release_id }}
+          OPEN_DIGEST_PR: ${{ inputs.open_digest_pr }}
+        run: |
+          case "$OPERATION" in
+            build-current-master)
+              [ "$CONFIRM" = publish ] && [ -z "$RETAINED_RELEASE_ID" ] || exit 1 ;;
+            promote-pr78)
+              [ "$CONFIRM" = promote-pr78-exclusive ] && [ "$OPEN_DIGEST_PR" = false ] || exit 1 ;;
+            *) exit 1 ;;
+          esac
+
       - name: Preflight
         env:
-          CONFIRM: ${{ inputs.confirm }}
+          # For promotion this vouches for the CONTROL commit, not the image source.
+          CONFIRM: ${{ inputs.operation == 'promote-pr78' && 'publish' || inputs.confirm }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI_WORKFLOW_PATH: .github/workflows/ci.yml
           CI_BRANCH: master
@@ -101,10 +135,30 @@ jobs:
             kind e2e (ci entry points, disposable cluster)
         run: .github/scripts/publish-preflight.sh
 
+      - name: Admit fixed PR78 artifacts and original seven-job CI provenance (read-only)
+        if: inputs.operation == 'promote-pr78'
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          OPEN_DIGEST_PR: ${{ inputs.open_digest_pr }}
+          RETAINED_RELEASE_ID: ${{ inputs.retained_release_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/pr78_artifacts.py stage "$RUNNER_TEMP/pr78-input" "$RUNNER_TEMP/pr78-preflight"
+
+      - name: Handoff exact ZIPs within this workflow run (no rebuild)
+        if: inputs.operation == 'promote-pr78'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr78-input-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pr78-input/*.zip
+            ${{ runner.temp }}/pr78-input/provenance.json
+          if-no-files-found: error
+          retention-days: 90
+
   publish:
-    name: publish to GHCR (rebuild, scan, push scanned bytes, verify, tag, SBOM)
+    name: publish to GHCR (current build or fixed PR78 artifact promotion)
     needs: preflight
-    if: github.ref == 'refs/heads/master' && inputs.confirm == 'publish'
+    if: github.ref == 'refs/heads/master' && ((inputs.operation == 'build-current-master' && inputs.confirm == 'publish') || (inputs.operation == 'promote-pr78' && inputs.confirm == 'promote-pr78-exclusive' && inputs.open_digest_pr == false))
     environment: ghcr-publish
     runs-on: ubuntu-26.04
     timeout-minutes: 40
@@ -113,6 +167,8 @@ jobs:
       packages: write
     env:
       TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+      CONFIRM: ${{ inputs.confirm }}
+      OPEN_DIGEST_PR: ${{ inputs.open_digest_pr }}
     outputs:
       server_digest: ${{ steps.push.outputs.server_digest }}
       gbctl_digest: ${{ steps.push.outputs.gbctl_digest }}
@@ -128,6 +184,7 @@ jobs:
           cache: false
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: inputs.operation != 'promote-pr78'
 
       - name: Build metadata and tooling (crane pinned through the Go module proxy)
         id: meta
@@ -142,7 +199,21 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/crane" version
 
+      - name: Download only this run's admitted candidate
+        if: inputs.operation == 'promote-pr78'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pr78-input-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pr78-input
+
+      - name: Revalidate exact hashes, source, images and original SBOMs inside privileged job
+        if: inputs.operation == 'promote-pr78'
+        run: |
+          python3 .github/scripts/pr78_artifacts.py verify "$RUNNER_TEMP/pr78-input" "$RUNNER_TEMP/pr78-verified"
+          cp "$RUNNER_TEMP/pr78-verified/container-images/"*.tar "$RUNNER_TEMP/images/"
+
       - name: Build target server (no push; OCI archive is what gets published)
+        if: inputs.operation != 'promote-pr78'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
@@ -164,6 +235,7 @@ jobs:
           outputs: type=oci,dest=${{ runner.temp }}/images/gb-server.oci.tar,rewrite-timestamp=true
 
       - name: Build target gbctl (no push)
+        if: inputs.operation != 'promote-pr78'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
@@ -185,6 +257,7 @@ jobs:
           outputs: type=oci,dest=${{ runner.temp }}/images/gbctl.oci.tar,rewrite-timestamp=true
 
       - name: Archive identities (single linux/amd64 manifest each, revision label equals this commit)
+        if: inputs.operation != 'promote-pr78'
         env:
           IMAGES_DIR: ${{ runner.temp }}/images
         run: |
@@ -204,6 +277,7 @@ jobs:
           LAYOUT_DIR: ${{ runner.temp }}/layout
         run: |
           mkdir -p "$LAYOUT_DIR" "$RUNNER_TEMP/scan"
+          python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat())' > "$RUNNER_TEMP/pr78-scan-start.txt"
           for t in gb-server gbctl; do python3 .github/scripts/oci_layout_dir.py "$IMAGES_DIR/$t.oci.tar" "$LAYOUT_DIR/$t"; done
 
       - name: Trivy scan of the server archive (policy evaluated before anything is pushed)
@@ -219,6 +293,10 @@ jobs:
           exit-code: "0"
           version: ${{ env.TRIVY_VERSION }}
 
+      - name: Preserve scanner database evidence for server (promotion only)
+        if: inputs.operation == 'promote-pr78'
+        run: python3 .github/scripts/pr78_promotion.py db-evidence --cache "$GITHUB_WORKSPACE/.cache/trivy/db" --out "$RUNNER_TEMP/scan/db-gb-server.json"
+
       - name: Trivy scan of the gbctl archive
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -231,6 +309,10 @@ jobs:
           ignore-unfixed: false
           exit-code: "0"
           version: ${{ env.TRIVY_VERSION }}
+
+      - name: Preserve scanner database evidence for gbctl (promotion only)
+        if: inputs.operation == 'promote-pr78'
+        run: python3 .github/scripts/pr78_promotion.py db-evidence --cache "$GITHUB_WORKSPACE/.cache/trivy/db" --out "$RUNNER_TEMP/scan/db-gbctl.json"
 
       - name: Scan policy gate (CRITICAL fixable or secret fails; malformed report or wrong image fails; nothing is pushed on failure)
         env:
@@ -253,6 +335,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push the scanned bytes, verify by digest, tag master, write and validate the publish record
+        if: inputs.operation != 'promote-pr78'
         id: push
         env:
           IMAGES_DIR: ${{ runner.temp }}/images
@@ -261,13 +344,23 @@ jobs:
           SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
         run: .github/scripts/publish-push.sh "$IMAGES_DIR" "$RECORD_OUT"
 
+      - name: Promote only PR78 commit tags, retrieve immutable images, retain truthful record
+        if: inputs.operation == 'promote-pr78'
+        run: |
+          python3 .github/scripts/pr78_promotion.py promote \
+            --input "$RUNNER_TEMP/pr78-input" --images "$RUNNER_TEMP/images" \
+            --layout "$RUNNER_TEMP/layout" --scans "$RUNNER_TEMP/scan" \
+            --scan-start "$RUNNER_TEMP/pr78-scan-start.txt" --record "$RUNNER_TEMP/promotion-record.json"
+
       - name: Install syft (pinned)
+        if: inputs.operation != 'promote-pr78'
         id: syft
         uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           syft-version: ${{ env.SYFT_VERSION }}
 
       - name: SBOMs of the published bytes (SPDX JSON)
+        if: inputs.operation != 'promote-pr78'
         env:
           SYFT: ${{ steps.syft.outputs.cmd }}
           IMAGES_DIR: ${{ runner.temp }}/images
@@ -285,9 +378,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: publish-${{ github.sha }}
+          name: ${{ inputs.operation == 'promote-pr78' && format('promotion-pr78-{0}-{1}', github.run_id, github.run_attempt) || format('publish-{0}', github.sha) }}
           path: |
             ${{ runner.temp }}/publish-record.json
+            ${{ runner.temp }}/promotion-record.json
+            ${{ runner.temp }}/promotion-record.journal.jsonl
+            ${{ runner.temp }}/pr78-input/
+            ${{ runner.temp }}/pr78-verified/sboms/
             ${{ runner.temp }}/scan/
             ${{ runner.temp }}/sbom/
           if-no-files-found: error
@@ -296,7 +393,7 @@ jobs:
   digest-pr:
     name: digest-update pull request (optional, never merges)
     needs: publish
-    if: inputs.open_digest_pr == true
+    if: inputs.operation != 'promote-pr78' && inputs.open_digest_pr == true
     permissions:
       contents: write
       pull-requests: write
