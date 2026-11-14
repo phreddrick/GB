@@ -1,0 +1,34 @@
+# Temporary read-only PR78 admission diagnostic. No publishing or dispatch trigger.
+name: PR78 artifact HTTP diagnostic
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/scripts/pr78_artifacts.py
+      - .github/scripts/test_pr78_download_headers.py
+      - .github/workflows/pr78-artifact-diagnostic.yml
+      - .github/scripts/pr78_http_diagnostic.py
+      - .github/scripts/test_pr78_http_diagnostic.py
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: >-
+      github.repository == 'phreddrick/GB' &&
+      github.event.pull_request.head.repo.full_name == 'phreddrick/GB'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Probe fixed original PR78 admission requests (GET only, no retries)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/pr78_http_diagnostic.py
