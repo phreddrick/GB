@@ -54,6 +54,7 @@ PUBLISH_ENVIRONMENT = "ghcr-publish"
 READ_ONLY = {"contents": "read"}
 # (file, job id) -> exact permissions. Anything else must be READ_ONLY.
 PERMISSION_ALLOWLIST: dict[tuple[str, str], dict[str, str]] = {
+    ("pr78-artifact-diagnostic.yml", "diagnose"): {"contents": "read", "actions": "read"},  # fixed read-only PR78 GET probes
     (PUBLISH_FILE, "preflight"): {"contents": "read", "actions": "read"},  # workflow-runs API, read only (GB2C-02)
     (PUBLISH_FILE, PUBLISH_JOB): {"contents": "read", "packages": "write"},
     (PUBLISH_FILE, "digest-pr"): {"contents": "write", "pull-requests": "write", "packages": "read"},
