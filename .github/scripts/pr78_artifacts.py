@@ -102,7 +102,10 @@ class API:
     def get(self, endpoint, binary=False, limit=4_000_000):
         require(not endpoint.startswith('/') and '..' not in endpoint and ':' not in endpoint, 'invalid API endpoint')
         url = 'https://api.github.com/repos/' + PROFILE['repository'] + '/' + endpoint
-        headers = {'Accept': 'application/octet-stream' if binary else 'application/vnd.github+json',
+        # Actions ZIP APIs negotiate JSON before redirecting to raw bytes;
+        # only Release asset APIs need octet-stream to select binary content.
+        accept = 'application/octet-stream' if binary and endpoint.startswith('releases/assets/') else 'application/vnd.github+json'
+        headers = {'Accept': accept,
                    'X-GitHub-Api-Version': '2022-11-28', 'Authorization': 'Bearer ' + os.environ['GH_TOKEN']}
         try:
             with self.opener.open(urllib.request.Request(url, headers=headers), timeout=60) as r:
