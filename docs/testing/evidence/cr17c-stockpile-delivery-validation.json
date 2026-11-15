@@ -1,0 +1,213 @@
+{
+  "recorded_utc": "2026-11-15T22:33:12.867381+00:00",
+  "base": "471f92c6de9ceb84718f253a59e6d54f19c31eac",
+  "branch": "feature/cr17c-stockpile-transfer",
+  "scope": "one planet-stockpile transfer invocation; broader issue45/CR17 remains open",
+  "historical_ledger_unchanged": {
+    "sha256": "d9e43f831094b019a8439782176524aee09483c83a7059236c1800408d3e610b",
+    "bytes": 31994
+  },
+  "historical_external_sha256sums": {
+    "sha256": "f2279e2576c811458202e3feba538ed0a7e53a02182ef16fe47bf8ef69f1ea12",
+    "bytes": 5730
+  },
+  "independent_review": {
+    "verdict": "APPROVE for bounded PR; no actionable findings",
+    "report": {
+      "sha256": "4187639e16fdbdf37329c32bffa49a12d9052d59e7f8c5c5b942122ecd0d2be1",
+      "bytes": 7207
+    },
+    "fresh_race_pass_nodes": 195,
+    "skip_nodes": 0,
+    "fail_nodes": 0,
+    "db_seconds": 2.904,
+    "game_seconds": 126.428,
+    "real_SIGKILL_cases": 9,
+    "original_handler_control": "intended AP assertion fails",
+    "omit_star_control": "intended record-set assertion fails",
+    "external_evidence": "/tmp/gb-stockpile-independent-review",
+    "ledger": {
+      "sha256": "cbe2341808ee8c1320b074ceb4c7ed21ee4f4ba33cfcfdabc5c91ae7e7a1f36e",
+      "bytes": 1536
+    }
+  },
+  "fresh_final_source_long_race": {
+    "command": "GB_LONG_TESTS=1 go -C go test -json -count=1 -race ./...",
+    "toolchain": "go1.27.4 linux/amd64",
+    "GOTOOLCHAIN": "local",
+    "exit": 0,
+    "pass_nodes": 5089,
+    "skip_nodes": 0,
+    "fail_nodes": 0,
+    "game_seconds": 392.852,
+    "default_timeout_seconds": 600,
+    "all_go_hashes_unchanged": true,
+    "real_SIGKILL_tests": [
+      "TestStockpileTransferRealProcessCrash/stockpile.before",
+      "TestStockpileTransferRealProcessCrash/stockpile.check:1",
+      "TestStockpileTransferRealProcessCrash/stockpile.validated",
+      "TestStockpileTransferRealProcessCrash/stockpile.write:1",
+      "TestStockpileTransferRealProcessCrash/stockpile.write:2",
+      "TestStockpileTransferRealProcessCrash/stockpile.before-commit",
+      "TestStockpileTransferRealProcessCrash/stockpile.after-commit",
+      "TestStockpileTransferRealProcessCrash/stockpile.preinstall",
+      "TestStockpileTransferRealProcessCrash/stockpile.installed"
+    ],
+    "packages": [
+      {
+        "package": "github.com/phreddrick/GB/go/cmd/racegen",
+        "seconds": 1.03
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/cmd/makeuniv",
+        "seconds": 1.065
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/config",
+        "seconds": 1.029
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/enrollmentapi",
+        "seconds": 1.036
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/platform/logging",
+        "seconds": 1.023
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/commandrules",
+        "seconds": 1.328
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/platform/metrics",
+        "seconds": 1.098
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/universe",
+        "seconds": 1.6760000000000002
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/wirejson",
+        "seconds": 1.025
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/tools/growthgate",
+        "seconds": 1.093
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/racegen",
+        "seconds": 1.888
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/tools/inventorycheck",
+        "seconds": 1.023
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/tools/lintdiff",
+        "seconds": 1.058
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/testutil",
+        "seconds": 3.274
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/operatorenroll",
+        "seconds": 4.773
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/cmd/gbctl",
+        "seconds": 6.569
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/admin",
+        "seconds": 11.617
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/db",
+        "seconds": 33.854
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/net",
+        "seconds": 75.588
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/test/e2e",
+        "seconds": 163.659
+      },
+      {
+        "package": "github.com/phreddrick/GB/go/internal/game",
+        "seconds": 392.852
+      }
+    ]
+  },
+  "go_source_hashes": {
+    "go/internal/db/stockpile.go": {
+      "sha256": "7fa3f06a5b49d30f18167310d83575ebde75328036a731c1f37527d292e353d0",
+      "bytes": 7081
+    },
+    "go/internal/db/stockpile_test.go": {
+      "sha256": "e5dacbe6273d4d2f4600e4339af8f77f6f9439a879e56cd244d7f758cfe3f43d",
+      "bytes": 7498
+    },
+    "go/internal/game/command_records_test.go": {
+      "sha256": "5ca0b9e32b1d29d7d6d0ee85863949ad927737d8e704d5bf4b55f117f1d894a3",
+      "bytes": 25679
+    },
+    "go/internal/game/commands_load.go": {
+      "sha256": "c8b0464664c0dcfb7e7bff9937ac8cd0dbd2b6887914dcb73e1e2bb481094a22",
+      "bytes": 31125
+    },
+    "go/internal/game/factory_staging_test.go": {
+      "sha256": "d2d183f0939d81118c695e966ea9973a3c8aa1fb4db1e35d814045491a4b04be",
+      "bytes": 34620
+    },
+    "go/internal/game/habitat_staging_test.go": {
+      "sha256": "e299af428c07125e4b34e37b8d7a18f68e28bdb66844f4c739ad25a531b65c69",
+      "bytes": 49898
+    },
+    "go/internal/game/planet_ownership_test.go": {
+      "sha256": "5358461d1de7aa774849a06efa47042b5559a49ee9499d8ce2215b98544d1991",
+      "bytes": 21775
+    },
+    "go/internal/game/stockpile_command.go": {
+      "sha256": "b2117b6a0fc26d53d78fdbe4403f5a7bf2b92abac86175fc9f9ddd78446902d4",
+      "bytes": 3343
+    },
+    "go/internal/game/stockpile_crash_test.go": {
+      "sha256": "dbb42f2e30073f8f7d385d27258ec8c792f891ea3f01a521be035ae1f6e76878",
+      "bytes": 6139
+    },
+    "go/internal/game/stockpile_staging_test.go": {
+      "sha256": "d1133da72de006330b42252ca018717796a218aedddbecc4dd14c07a7e6e7d43",
+      "bytes": 13974
+    },
+    "go/internal/game/stockpile_transfer_test.go": {
+      "sha256": "bd8044f51684fd9def5cdb9b1e4c6a75c75c388bbde9b23acbaf33c785d30d8b",
+      "bytes": 1499
+    }
+  },
+  "new_external_evidence": {
+    "/tmp/gb-stockpile-transfer-delivery/long-race.exit": {
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    "/tmp/gb-stockpile-transfer-delivery/long-race.finished": {
+      "sha256": "e9f7db2bfa6ac52a42062e607b0042bf7d63e88d77f5b292f42f764bc5ee9b5d",
+      "bytes": 21
+    },
+    "/tmp/gb-stockpile-transfer-delivery/long-race.json": {
+      "sha256": "bf45a942ec171a2a2b13ea17a2bf18f1b297b72363d5899ca2f5a275703a517e",
+      "bytes": 5460833
+    },
+    "/tmp/gb-stockpile-transfer-delivery/long-race.started": {
+      "sha256": "b45fde2bd474838b2dd3779bd8b7772a56f3903a857cee9138a526bd6c6678fc",
+      "bytes": 21
+    },
+    "/tmp/gb-stockpile-transfer-delivery/source-before.json": {
+      "sha256": "25a0df95a026d07eb1c674e3649af8f4596ca65743bc2b703272451acd5de422",
+      "bytes": 22156
+    }
+  },
+  "acknowledgment_labels_required": [],
+  "hosted_acceptance": "pending PR creation; exact-head results recorded on PR and external delivery evidence; no publication or deployment"
+}

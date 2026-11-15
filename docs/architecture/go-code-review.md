@@ -583,3 +583,15 @@ Mechanical/targeted-transporter/reverse/mixed hostile variants remain refused;
 noncombat #41A and sector-origin PR78 contracts remain separate. See
 [implementation/evidence](../testing/cr17c-ship-ground-assault.md). This bounded
 change does not close CR-17, CR-11, CR-13, CR-20, #41 or #51.
+
+**CR-17C stockpile-transfer follow-up (#45):** the complete existing
+`transfer <player> r|x|&|f|d <amount>` invocation now proposes the planet balances
+and one star AP together. A separate closed Store operation checks full
+planet/star/caller/recipient preimages inside one bbolt transaction, preserves
+existing amount/self/zero/wrap semantics, installs both actor records coherently,
+and releases success only afterward. This supersedes the earlier CR-17A
+volatile-transfer-AP limitation for this invocation only. The enrollment
+pending-turn guard remains unchanged for unrelated volatile state. See
+[implementation, evidence and independent review](../testing/cr17c-stockpile-transfer.md).
+Independent bounded review approved; hosted acceptance is recorded on the PR and merge remains pending; #45/CR-17, CR-11 and CR-20 are not
+closed, and no general command durability or exactly-once claim is made.

@@ -671,7 +671,8 @@ func TestCR17BDumpEnrollmentAndAPBoundary(t *testing.T) {
 		t.Fatal("atomic dump left admission disagreement", e)
 	}
 	assertActorStoreAgreement(t, f.actorEnrollmentFixture)
-	// CR-17A stockpile transfer still has its documented separate AP boundary.
+	// Stockpile transfer now persists AP. Keep testing the admission guard
+	// against an explicitly staged, unrelated volatile AP debit.
 	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
 		p := f.state.planets[f.home][0]
 		p.Info[0].Resource = 100
@@ -682,6 +683,7 @@ func TestCR17BDumpEnrollmentAndAPBoundary(t *testing.T) {
 	if out := f.command(t, "transfer 2 r 1"); !strings.Contains(out, "transferred") {
 		t.Fatal(out)
 	}
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() { f.state.stars[f.home].AP[0]-- })
 	_, e := f.state.EnrollTrusted(ctxT(t, 10*time.Second), actorEnrollmentRequest("guest-operator"))
 	assertActorEnrollmentFailure(t, e, "ENROLLMENT_PENDING_TURN", db.EnrollmentNotCommitted)
 	if f.state.Mode() != ModeServing {

@@ -979,6 +979,8 @@ func TestCR17CFactoryRetainsPendingAPAdmission(t *testing.T) {
 	if out := f.command(t, "transfer 1 r 0"); !strings.Contains(out, "transferred") {
 		t.Fatal("existing transfer not exercised")
 	}
+	// The transfer itself is durable; create the volatile AP precondition explicitly.
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() { f.state.stars[f.star].AP[0]-- })
 	before := enrollmentDBSnapshot(t, f.actorEnrollmentFixture)
 	_, e := f.state.EnrollTrusted(ctxT(t, 10*time.Second), actorEnrollmentRequest("account-2"))
 	assertActorEnrollmentFailure(t, e, "ENROLLMENT_PENDING_TURN", db.EnrollmentNotCommitted)
