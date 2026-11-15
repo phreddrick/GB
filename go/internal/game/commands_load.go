@@ -611,6 +611,10 @@ func (s *State) cmdDump(p, g int, args []string, sess net.Responder) {
 // Moves planet-level stockpiles from the current player to another.
 // Mirrors transfer() in load.c.
 func (s *State) cmdTransfer(p, g int, args []string, sess net.Responder) {
+	if p < 1 || p > model.MaxPlayers || g < 0 || g > model.MaxGovernors {
+		_ = sess.Send("Invalid command authority.\n")
+		return
+	}
 	dir := s.dirs[p-1][g]
 
 	if dir.Level != model.LevelPlan {
@@ -618,12 +622,16 @@ func (s *State) cmdTransfer(p, g int, args []string, sess net.Responder) {
 		return
 	}
 
+	if int(dir.StarNum) >= len(s.stars) || int(dir.PlanetNum) >= model.MaxPlanets {
+		_ = sess.Send("Planet data not found.\n")
+		return
+	}
 	star := s.stars[dir.StarNum]
 	if star == nil || !s.enoughAP(p, g, star.AP[p-1], 1) {
 		return
 	}
 
-	if len(args) != 3 {
+	if len(args) != 3 || len(args[1]) == 0 {
 		_ = sess.Send("Usage: transfer <player> <commodity> <amount>\n")
 		return
 	}
@@ -679,13 +687,8 @@ func (s *State) cmdTransfer(p, g int, args []string, sess net.Responder) {
 	amount := uint16(give) //nolint:gosec // give is nonnegative and <= uint16 source
 	*from -= amount
 	*to += amount
-	if !s.commitPlanetEdit(planet, next, sess) {
-		return
-	}
-	s.deductAPs(p, g, 1, int(dir.StarNum), false)
 	msg := fmt.Sprintf("%s %d %s transferred from player %d to player #%d\n", location, give, units, p, target)
-	_ = sess.Send(msg)
-	s.warnRace(target, msg)
+	s.commitStockpileTransfer(p, g, target, commod, amount, dir, planet, next, star, msg, sess)
 }
 
 // cmdMount handles "mount <ships>" — mount a crystal on a ship.

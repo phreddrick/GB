@@ -52,7 +52,7 @@ func TestCR17ALegacyFuelLoadCannotBeOverwrittenByPlanetEdit(t *testing.T) {
 }
 
 func TestCR17APlanetEditWriteFailures(t *testing.T) {
-	for _, command := range []string{"route 1 activate", "transfer 2 x 7"} {
+	for _, command := range []string{"route 1 activate"} {
 		for _, stage := range []string{"before-error", "before-panic", "fence", "after-error", "after-panic"} {
 			t.Run(strings.Fields(command)[0]+"/"+stage, func(t *testing.T) {
 				f := newPlanetCommandFixture(t)
@@ -248,22 +248,10 @@ func TestCR17AEnrollmentAdmissionAfterPlanetEdit(t *testing.T) {
 		t.Run(strings.Fields(cmd)[0], func(t *testing.T) {
 			f := newPlanetCommandFixture(t)
 			f.command(t, cmd)
-			before := enrollmentDBSnapshot(t, f.actorEnrollmentFixture)
 			req := actorEnrollmentRequest("account-3")
 			_, e := f.state.EnrollTrusted(ctxT(t, 10*time.Second), req)
-			if strings.HasPrefix(cmd, "transfer") {
-				assertActorEnrollmentFailure(t, e, "ENROLLMENT_PENDING_TURN", db.EnrollmentNotCommitted)
-				if f.state.Mode() != ModeServing || enrollmentDBSnapshot(t, f.actorEnrollmentFixture) != before {
-					t.Fatal("AP-only deferral wrote or halted")
-				}
-				if e := f.state.TriggerUpdate(ctxT(t, 10*time.Second)); e != nil {
-					t.Fatal(e)
-				}
-				if _, e := f.state.EnrollTrusted(ctxT(t, 10*time.Second), req); e != nil {
-					t.Fatal(e)
-				}
-			} else if e != nil {
-				t.Fatal("route edit unnecessarily blocked enrollment", e)
+			if e != nil {
+				t.Fatal("durable planet/AP edit unnecessarily blocked enrollment", e)
 			}
 			assertActorStoreAgreement(t, f.actorEnrollmentFixture)
 		})
@@ -280,6 +268,19 @@ func TestCR17APlanetEditEffectsWaitForWrite(t *testing.T) {
 			unblock := func() { once.Do(func() { close(release) }) }
 			t.Cleanup(unblock)
 			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+				if strings.HasPrefix(command, "transfer") {
+					f.store.SetMetaFault(func(op string) error {
+						if op == "stockpile.before" {
+							if !reflect.DeepEqual(f.state.planets[f.star][f.planet], before) {
+								t.Error("premature actor mutation")
+							}
+							close(entered)
+							<-release
+						}
+						return nil
+					})
+					return
+				}
 				f.state.testHooks.planetCommandWrite = func(p *model.Planet) error {
 					original := f.state.planets[f.star][f.planet]
 					if p == original || &p.Sectors[0] == &original.Sectors[0] || !reflect.DeepEqual(original, before) {
@@ -339,6 +340,16 @@ func TestCR17AStartedEditFinishesBeforeShutdown(t *testing.T) {
 			unblock := func() { once.Do(func() { close(release) }) }
 			t.Cleanup(unblock)
 			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+				if strings.HasPrefix(text, "transfer") {
+					f.store.SetMetaFault(func(op string) error {
+						if op == "stockpile.before" {
+							close(entered)
+							<-release
+						}
+						return nil
+					})
+					return
+				}
 				f.state.testHooks.planetCommandWrite = func(p *model.Planet) error {
 					close(entered)
 					<-release
