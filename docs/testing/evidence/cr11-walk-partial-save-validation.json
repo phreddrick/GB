@@ -1,0 +1,813 @@
+{
+  "recorded_utc": "2026-11-17T05:23:53.065450+00:00",
+  "base": "93f613c33459dd433ae406d9cd7149c83ca3b4d6",
+  "branch": "feature/cr11-noncombat-walk",
+  "worktree": "/tmp/GB-cr11-noncombat-walk",
+  "status": "UNCOMMITTED/UNSTAGED; local Claude re-review only",
+  "decision": "Defer partial stored ship absence/membership supported by complete validated actor witnesses and no contradictory deletion evidence. No writes, success or HALT on deferral. Unknown gaps, malformed records, incompatible/cyclic roots or unlinked tails, invalid actor state and transactional CAS/uncertainty remain HALT.",
+  "toolchain": "go version go1.27.4 linux/amd64",
+  "GOTOOLCHAIN": "local",
+  "GOCACHE": "/tmp/cr07a-cache",
+  "TMPDIR": "/tmp/GB-cr11-noncombat-walk/test/ctool/obj/tmp",
+  "final_source_sha256": {
+    "go/internal/game/build.go": "b5fd358b53a125f0cd611a999d37484727fc2b2ce4fcc5b769c1daa750abe8bd",
+    "go/internal/game/state.go": "7003eb8c622f12572c5febe55bc04f7a40bfa86d2edbc618cd7bd01802f70cd6",
+    "go/internal/game/commands_move.go": "cb14d364654848332c8bbfb0c1e102b5b7557e231ed217bdff5880c1e490968f",
+    "go/internal/game/walk_partial_save_test.go": "1389c43f15137868f1d44bdcf094d17dd5945bf2d54b0f4ab4d96a8ad44b4b75",
+    "go/internal/game/walk_admission.go": "c7cf9bbc82048905e020aa518f521e2a8026d61448bac46f52076cb6d223ab8e",
+    "go/internal/game/walk_review_test.go": "30ff65a7c1edca25c4fd19ab6c6ab21ab96231e2e1dc72cff2c36b984b66edbf",
+    "go/internal/game/walk_crash_test.go": "afca6b83400a3b8cb2adaba4739745652462ee088cf0cfb9eaa039d1fc0c8bcf",
+    "go/internal/game/walk_staging_test.go": "a26728608df39fdaebc14e42a5408bccf95de3268c2d7c98a4fa14d12cd1c347",
+    "go/internal/game/walk_command.go": "1f18a1ba299a9d2c717612e860d802c6e2d43a77443161da7a68307a7041f170",
+    "go/internal/game/walk_test.go": "34a2c968af2d60336ac5a57c1188c6b452ce2ac5f7c22c9564f001c4efdc1690",
+    "go/internal/commandrules/walk_test.go": "81627a7225024a82514de5ebea867f9b4c1f9abc6df79fc4c884e6dae7536b33",
+    "go/internal/commandrules/walk.go": "e99ca92ee1da629096528b96e4c2d0e2211137fc1810c53a79390c0e006f3048",
+    "go/internal/db/walk_test.go": "d4bf314290783966d2e4174f9f6ec741a4689f4a68a84aadff190bf1da762bd2",
+    "go/internal/db/walk.go": "173f5f8e49a38f1e49d6683a2327dd534f29daf85407797c589e399443f8ec10"
+  },
+  "runs": {
+    "normal": {
+      "name": "normal",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "./..."
+      ],
+      "started_utc": "2026-11-17T05:05:13.563092+00:00",
+      "exit": 0,
+      "seconds": 46.251,
+      "GB_LONG_TESTS": "unset",
+      "pass_nodes": 5307,
+      "skip_nodes": 2,
+      "walk_nodes": 220,
+      "SIGKILL_cases": [
+        "TestWalkRealProcessCrash/walk.before",
+        "TestWalkRealProcessCrash/walk.check:1",
+        "TestWalkRealProcessCrash/walk.validated",
+        "TestWalkRealProcessCrash/walk.write:1",
+        "TestWalkRealProcessCrash/walk.write:2",
+        "TestWalkRealProcessCrash/walk.before-commit",
+        "TestWalkRealProcessCrash/walk.after-commit",
+        "TestWalkRealProcessCrash/walk.preinstall",
+        "TestWalkRealProcessCrash/walk.installed"
+      ],
+      "packages": [
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/makeuniv",
+          "seconds": 0.007
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/racegen",
+          "seconds": 0.009
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/config",
+          "seconds": 0.005
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/enrollmentapi",
+          "seconds": 0.006
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/commandrules",
+          "seconds": 0.035
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/gbctl",
+          "seconds": 0.386
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/logging",
+          "seconds": 0.004
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/wirejson",
+          "seconds": 0.005
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/metrics",
+          "seconds": 0.011
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/inventorycheck",
+          "seconds": 0.015
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/lintdiff",
+          "seconds": 0.024
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/growthgate",
+          "seconds": 0.071
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/universe",
+          "seconds": 0.075
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/racegen",
+          "seconds": 0.264
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/operatorenroll",
+          "seconds": 0.278
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/testutil",
+          "seconds": 1.166
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/admin",
+          "seconds": 3.174
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/db",
+          "seconds": 4.291
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/net",
+          "seconds": 7.426
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/test/e2e",
+          "seconds": 28.051
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/game",
+          "seconds": 41.666
+        }
+      ],
+      "output_sha256": "d5975308098ef2a5d4a86b7c06d07af2fa1e91ab38e49fa5d32bb5de50e37318",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "race": {
+      "name": "race",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-race",
+        "./..."
+      ],
+      "started_utc": "2026-11-17T05:05:59.852319+00:00",
+      "exit": 0,
+      "seconds": 443.403,
+      "GB_LONG_TESTS": "unset",
+      "pass_nodes": 5307,
+      "skip_nodes": 2,
+      "walk_nodes": 220,
+      "SIGKILL_cases": [
+        "TestWalkRealProcessCrash/walk.before",
+        "TestWalkRealProcessCrash/walk.check:1",
+        "TestWalkRealProcessCrash/walk.validated",
+        "TestWalkRealProcessCrash/walk.write:1",
+        "TestWalkRealProcessCrash/walk.write:2",
+        "TestWalkRealProcessCrash/walk.before-commit",
+        "TestWalkRealProcessCrash/walk.after-commit",
+        "TestWalkRealProcessCrash/walk.preinstall",
+        "TestWalkRealProcessCrash/walk.installed"
+      ],
+      "packages": [
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/racegen",
+          "seconds": 1.031
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/makeuniv",
+          "seconds": 1.049
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/logging",
+          "seconds": 1.029
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/config",
+          "seconds": 1.036
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/enrollmentapi",
+          "seconds": 1.054
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/metrics",
+          "seconds": 1.106
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/commandrules",
+          "seconds": 1.5390000000000001
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/universe",
+          "seconds": 1.6760000000000002
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/wirejson",
+          "seconds": 1.026
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/racegen",
+          "seconds": 1.9449999999999998
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/inventorycheck",
+          "seconds": 1.025
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/lintdiff",
+          "seconds": 1.069
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/growthgate",
+          "seconds": 1.104
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/testutil",
+          "seconds": 3.586
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/operatorenroll",
+          "seconds": 4.881
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/gbctl",
+          "seconds": 6.674
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/net",
+          "seconds": 8.68
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/admin",
+          "seconds": 12.06
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/db",
+          "seconds": 35.985
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/test/e2e",
+          "seconds": 95.107
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/game",
+          "seconds": 438.982
+        }
+      ],
+      "output_sha256": "89422ca583b8d589acbf497f5012b128c73c14f2dfd5c665a20b9d3d456fddaa",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "long-race": {
+      "name": "long-race",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-race",
+        "./..."
+      ],
+      "started_utc": "2026-11-17T05:13:23.285991+00:00",
+      "exit": 0,
+      "seconds": 461.208,
+      "GB_LONG_TESTS": "1",
+      "pass_nodes": 5309,
+      "skip_nodes": 0,
+      "walk_nodes": 220,
+      "SIGKILL_cases": [
+        "TestWalkRealProcessCrash/walk.before",
+        "TestWalkRealProcessCrash/walk.check:1",
+        "TestWalkRealProcessCrash/walk.validated",
+        "TestWalkRealProcessCrash/walk.write:1",
+        "TestWalkRealProcessCrash/walk.write:2",
+        "TestWalkRealProcessCrash/walk.before-commit",
+        "TestWalkRealProcessCrash/walk.after-commit",
+        "TestWalkRealProcessCrash/walk.preinstall",
+        "TestWalkRealProcessCrash/walk.installed"
+      ],
+      "packages": [
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/racegen",
+          "seconds": 1.033
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/config",
+          "seconds": 1.037
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/makeuniv",
+          "seconds": 1.056
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/enrollmentapi",
+          "seconds": 1.045
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/logging",
+          "seconds": 1.028
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/platform/metrics",
+          "seconds": 1.121
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/commandrules",
+          "seconds": 1.492
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/universe",
+          "seconds": 1.6600000000000001
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/wirejson",
+          "seconds": 1.022
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/racegen",
+          "seconds": 1.9020000000000001
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/growthgate",
+          "seconds": 1.078
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/inventorycheck",
+          "seconds": 1.041
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/tools/lintdiff",
+          "seconds": 1.068
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/testutil",
+          "seconds": 3.413
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/operatorenroll",
+          "seconds": 4.689
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/cmd/gbctl",
+          "seconds": 6.482
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/admin",
+          "seconds": 11.218
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/db",
+          "seconds": 35.312
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/net",
+          "seconds": 75.577
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/test/e2e",
+          "seconds": 164.982
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/game",
+          "seconds": 459.901
+        }
+      ],
+      "output_sha256": "b9781066b31158812108fb456fdb180c45fc09a309ee8ba8681e6b797e669281",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "focused-final": {
+      "name": "focused-final",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "-race",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game",
+        "-run",
+        "TestWalk"
+      ],
+      "started_utc": "2026-11-17T05:04:07.898366+00:00",
+      "exit": 0,
+      "seconds": 39.334,
+      "GB_LONG_TESTS": "unset",
+      "pass_nodes": 220,
+      "skip_nodes": 0,
+      "walk_nodes": 220,
+      "SIGKILL_cases": [
+        "TestWalkRealProcessCrash/walk.before",
+        "TestWalkRealProcessCrash/walk.check:1",
+        "TestWalkRealProcessCrash/walk.validated",
+        "TestWalkRealProcessCrash/walk.write:1",
+        "TestWalkRealProcessCrash/walk.write:2",
+        "TestWalkRealProcessCrash/walk.before-commit",
+        "TestWalkRealProcessCrash/walk.after-commit",
+        "TestWalkRealProcessCrash/walk.preinstall",
+        "TestWalkRealProcessCrash/walk.installed"
+      ],
+      "packages": [
+        {
+          "package": "github.com/phreddrick/GB/go/internal/commandrules",
+          "seconds": 1.155
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/db",
+          "seconds": 4.095
+        },
+        {
+          "package": "github.com/phreddrick/GB/go/internal/game",
+          "seconds": 30.346
+        }
+      ],
+      "output_sha256": "bc208ba1cb4b78e704bdaeb2674c81b798a5ecd9e01df6086ab4baead3e1ae7d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "gates": [
+    {
+      "name": "build",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "build",
+        "./..."
+      ],
+      "started_utc": "2026-11-17T05:08:14.756413+00:00",
+      "exit": 0,
+      "seconds": 0.652,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "gofmt",
+      "command": [
+        "bash",
+        "-c",
+        "files=$(rg --files go -g '*.go'); out=$(gofmt -l $files); if [ -n \"$out\" ]; then printf '%s\\n' \"$out\"; exit 1; fi"
+      ],
+      "started_utc": "2026-11-17T05:08:15.408962+00:00",
+      "exit": 0,
+      "seconds": 0.069,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "vet",
+        "./..."
+      ],
+      "started_utc": "2026-11-17T05:08:15.477929+00:00",
+      "exit": 0,
+      "seconds": 0.619,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "c-fixtures",
+      "command": [
+        "make",
+        "-C",
+        "test/ctool",
+        "check"
+      ],
+      "started_utc": "2026-11-17T05:08:16.096852+00:00",
+      "exit": 0,
+      "seconds": 0.028,
+      "output_sha256": "09d520269cf9e4745a6b0f7ed07e2fab711195373a7e9ea479c2ae1dd9c026f0"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "test/scripts/lint-gate.sh",
+        "/tmp/gb-cr11-walk-partial-save-review-20261117T043053Z/acceptance/lint.json"
+      ],
+      "started_utc": "2026-11-17T05:08:16.125212+00:00",
+      "exit": 0,
+      "seconds": 4.679,
+      "output_sha256": "92940dbb367d0b1841928c26cbebcb51fd04a62ec248116fea63f02895148b58"
+    },
+    {
+      "name": "golden-mutations",
+      "command": [
+        "test/scripts/golden-mutations.sh"
+      ],
+      "started_utc": "2026-11-17T05:08:20.805004+00:00",
+      "exit": 0,
+      "seconds": 651.469,
+      "output_sha256": "60652caa2d7867c54bee26debec03a9238444d06092a93d1b0acf2eb251b3927"
+    },
+    {
+      "name": "growth",
+      "command": [
+        "test/scripts/growth-gate.sh",
+        "93f613c33459dd433ae406d9cd7149c83ca3b4d6"
+      ],
+      "started_utc": "2026-11-17T05:19:12.274255+00:00",
+      "exit": 0,
+      "seconds": 0.295,
+      "output_sha256": "1eba5d3f91758b345e753778021efe27e8791bddcd060ec7763476c44525c7af"
+    },
+    {
+      "name": "gate-selftest",
+      "command": [
+        "test/scripts/gate-approval-selftest.sh"
+      ],
+      "started_utc": "2026-11-17T05:19:12.569156+00:00",
+      "exit": 0,
+      "seconds": 5.052,
+      "output_sha256": "0793630382f69a970efd2f3edf88526ac84ceb8872a21698f7a010f41e5001fc"
+    },
+    {
+      "name": "lint-selftest",
+      "command": [
+        "test/scripts/lint-gate-selftest.sh"
+      ],
+      "started_utc": "2026-11-17T05:19:17.621546+00:00",
+      "exit": 0,
+      "seconds": 26.933,
+      "output_sha256": "9c15f183fb4e3795cbc67aed267f39beb4efd2612907f0010aac248a990a3fec"
+    },
+    {
+      "name": "golden-helper-selftest",
+      "command": [
+        "test/scripts/golden-mutations-selftest.sh"
+      ],
+      "started_utc": "2026-11-17T05:19:44.554460+00:00",
+      "exit": 0,
+      "seconds": 121.4,
+      "output_sha256": "97c280045f4c80954a3ebf2f84dded376fa8e0bb927df473cb6f0c71880d6bd0"
+    },
+    {
+      "name": "workflow-policy",
+      "command": [
+        "python3",
+        ".github/scripts/workflow_policy_check.py"
+      ],
+      "started_utc": "2026-11-17T05:21:45.954500+00:00",
+      "exit": 0,
+      "seconds": 0.088,
+      "output_sha256": "b8e2eb6ffb78a1bf8fff60aaa84e7981748f3f4c2e3421a1e15b4460594e895d"
+    },
+    {
+      "name": "workflow-helpers",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".github/scripts",
+        "-p",
+        "test_*.py"
+      ],
+      "started_utc": "2026-11-17T05:21:46.043031+00:00",
+      "exit": 0,
+      "seconds": 16.047,
+      "output_sha256": "7a7c5fb186898eae8dab40eb42a8d1e789d8b1c19887149d97b8e039fc6b655b"
+    },
+    {
+      "name": "actionlint",
+      "command": [
+        "go",
+        "run",
+        "github.com/rhysd/actionlint/cmd/actionlint@v1.7.12"
+      ],
+      "started_utc": "2026-11-17T05:22:02.090505+00:00",
+      "exit": 0,
+      "seconds": 0.186,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "offline-manifests",
+      "command": [
+        "deploy/kustomize/tests/run.sh"
+      ],
+      "started_utc": "2026-11-17T05:22:02.276561+00:00",
+      "exit": 0,
+      "seconds": 23.421,
+      "output_sha256": "3fe1ace59dee010ef7b04958661756115e0c6ac8c7cde90c58f80a1f538de511"
+    },
+    {
+      "name": "govulncheck",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "run",
+        "golang.org/x/vuln/cmd/govulncheck@v1.9.0",
+        "./..."
+      ],
+      "started_utc": "2026-11-17T05:22:25.697989+00:00",
+      "exit": 0,
+      "seconds": 1.814,
+      "output_sha256": "47e5e4679330b7961e38fb054710f9537d4699e879233b8a54b3be6a71412994"
+    },
+    {
+      "name": "mod-verify",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "mod",
+        "verify"
+      ],
+      "started_utc": "2026-11-17T05:22:27.512304+00:00",
+      "exit": 0,
+      "seconds": 0.191,
+      "output_sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd"
+    },
+    {
+      "name": "mod-tidy",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "mod",
+        "tidy",
+        "-diff"
+      ],
+      "started_utc": "2026-11-17T05:22:27.704065+00:00",
+      "exit": 0,
+      "seconds": 0.024,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_utc": "2026-11-17T05:22:27.728214+00:00",
+      "exit": 0,
+      "seconds": 0.004,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "inventory": {
+    "command": [
+      "go",
+      "run",
+      "./tools/inventorycheck",
+      "-root",
+      "/tmp/GB-cr11-noncombat-walk",
+      "-records",
+      "/tmp/gb-cr11-walk-partial-save-review-20261117T043053Z/acceptance/inventory-records"
+    ],
+    "started_utc": "2026-11-17T05:19:53.153134+00:00",
+    "seconds": 0.2009445670992136,
+    "exit": 0,
+    "kind": "supplemental test overlay or inventory; production uses final source",
+    "output_sha256": "aee9f044f8dfe4316ecbbdfbaa894ac8c8d905db87cf9d1c2e20a56f32045748"
+  },
+  "prefixed_reproductions": {
+    "pre-fix": {
+      "name": "pre-fix",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "./internal/game",
+        "-run",
+        "^TestWalkAfterLegacyBuildPartialSave$"
+      ],
+      "started_utc": "2026-11-17T04:35:15.461675+00:00",
+      "exit": 1,
+      "seconds": 3.486,
+      "GB_LONG_TESTS": "unset",
+      "failing_nodes": [
+        "TestWalkAfterLegacyBuildPartialSave/planet-build",
+        "TestWalkAfterLegacyBuildPartialSave/ship-build",
+        "TestWalkAfterLegacyBuildPartialSave/actor-only-ship-probe",
+        "TestWalkAfterLegacyBuildPartialSave"
+      ],
+      "output_sha256": "68c36b2f418872c4f6d5a36632dc3f4478b8020c3a9e52e1b5c6f52a446a8536"
+    },
+    "orphan-tail-pre-fix": {
+      "name": "orphan-tail-pre-fix",
+      "command": [
+        "go",
+        "test",
+        "-json",
+        "-count=1",
+        "./internal/game",
+        "-run",
+        "^TestWalkStoredStructuralFailuresStillHalt/unlinked"
+      ],
+      "started_utc": "2026-11-17T04:44:57.683524+00:00",
+      "exit": 1,
+      "seconds": 3.924,
+      "GB_LONG_TESTS": "unset",
+      "failing_nodes": [
+        "TestWalkStoredStructuralFailuresStillHalt/unlinked-cycle",
+        "TestWalkStoredStructuralFailuresStillHalt/unlinked-missing-link",
+        "TestWalkStoredStructuralFailuresStillHalt"
+      ],
+      "output_sha256": "b800046879c90811e3c3e73f9785a04fdc38711797876e330e243109f2801fae"
+    }
+  },
+  "supplied_probe": {
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      "/tmp/gb-cr11-walk-partial-save-review-20261117T043053Z/acceptance/claude-probe-overlay.json",
+      "-count=1",
+      "-race",
+      "./internal/game",
+      "-run",
+      "^TestZZProbe$",
+      "-v"
+    ],
+    "started_utc": "2026-11-17T05:17:20.307410+00:00",
+    "seconds": 11.540335030294955,
+    "exit": 0,
+    "kind": "unchanged supplied probe functions appended via test-only overlay; not production changes or default suite",
+    "output_sha256": "f0cf01f4f7545c326e6dd28b2212d864e0064fcb07849aaac365035273d8e6cd"
+  },
+  "unsaved_record_observation": {
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      "/tmp/gb-cr11-walk-partial-save-review-20261117T043053Z/acceptance/probe-observation-overlay.json",
+      "-count=1",
+      "-race",
+      "./internal/game",
+      "-run",
+      "^TestZZProbe/actor-only-newship$",
+      "-v"
+    ],
+    "started_utc": "2026-11-17T05:19:39.641999+00:00",
+    "seconds": 9.805309503339231,
+    "exit": 0,
+    "kind": "supplemental test overlay or inventory; production uses final source",
+    "output_sha256": "f6495c6c2b71c1b956c1624512e23671b673ff151d67d47888464262d39f605a",
+    "observed": "after-segment actor88=false stored88=false root=1; retry success is not unsaved-ship retention"
+  },
+  "iteration_control": {
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      "/tmp/gb-cr11-walk-partial-save-review-20261117T043053Z/acceptance/iteration-overlay.json",
+      "-count=10",
+      "-race",
+      "./internal/game",
+      "-run",
+      "^TestWalkExtraStoredTailClassification$",
+      "-v"
+    ],
+    "started_utc": "2026-11-17T05:06:03.562868+00:00",
+    "seconds": 12.748032786883414,
+    "exit": 1,
+    "compiled_and_failed_intended_assertion": true,
+    "kind": "test-only overlay restores map mutation during range; no production mutation",
+    "output_sha256": "ec549363ab70857e7d33359b38371cb27bb5c63cf1d730f95e2f62955f94dac5"
+  },
+  "supplemental_late_delete_overlay": {
+    "command": [
+      "go",
+      "test",
+      "-overlay",
+      "/tmp/gb-cr11-walk-partial-save-review-20261117T043053Z/late-delete-overlay.json",
+      "-count=1",
+      "-race",
+      "./internal/game",
+      "-run",
+      "^TestWalkLateWriterStillHalts/delete-ship$",
+      "-v"
+    ],
+    "started_utc": "2026-11-17T05:19:49.447474+00:00",
+    "seconds": 3.7055087434127927,
+    "exit": 0,
+    "kind": "supplemental test overlay or inventory; production uses final source",
+    "output_sha256": "62db077fbb6a4ab4703b4286d0cb06dd6dceb13b006e18c232ef2c4c946c06e1",
+    "overlay_sha256": "dccd6206068101e4d8002a0030e4af66c2671b5c78d0cf22839f5f2407fd3547",
+    "test_overlay_source_sha256": "93473ccc36aa6e0dcb7f1079d5ad645ba74505730f5b609e8dd8b51cbd35472e"
+  },
+  "historical": {
+    "prior_directory": "/tmp/gb-cr11-walk-admission-review-20261116T021932Z",
+    "prior_SHA256SUMS_sha256": "d982ee80ca770d12bbc208d3b8021b9c1ea1f35c75e0b407ea2557f1e4bd6df0",
+    "prior_complete_patch_sha256": "76b76c6254900b84fe058ad75ba0c88e4ddaff862ca5627abbe833764f627acc",
+    "verification_sha256": "2c1462df9687e7223bcfddea16bc33b1dee70f02fc6dfaab6acdc94406346b51",
+    "claude_probe_sha256": "ed4913110f6f4159382b96e84dd108876109b7f60383436652178af0d7a71c05",
+    "pre_fix_admission_source_sha256": "a2fa41ca0c0c98f3f07bdbbe9e821fbf0c2f1720b5e7f13fd282621f0b12601d",
+    "preliminary": "root-level and final/ normal/race/gate and focused runs predate final participant-set hardening or span source revisions; preserved as historical, not final acceptance. acceptance/ runs alone establish final-source acceptance."
+  },
+  "review": "Owner-relayed Claude findings corrected; fresh independent Claude re-review pending, no new independent approval claimed",
+  "limits": [
+    "No proof of writer intent or global corruption detection: silent absence identical to an unsaved record cannot be distinguished without provenance",
+    "Permanent actor-only preservation probes complete fixture saves before reload; supplied-probe observation confirms never-saved88 is discarded despite successful retry",
+    "Real planet and ship build tests use disposable God-race/high-resource fixtures; broader construction/navigation remain excluded",
+    "ShellCheck unavailable including actionlint integration; hosted container/CI checks unrun",
+    "Supplemental late-delete scenario is a test-only overlay, not a new permanent default subcase"
+  ],
+  "acknowledgments": "No protected tooling or allowances changed; no maintainer acknowledgment label indicated or applied"
+}
