@@ -690,6 +690,9 @@ func (s *State) cmdDeploy(p, g int, args []string, sess net.Responder) {
 // Syntax: walk #shipno direction
 // Mirrors walk() in move.c.
 func (s *State) cmdWalk(p, g int, args []string, sess net.Responder) {
+	if s.handleNoncombatWalk(p, g, args, sess) {
+		return
+	}
 	if len(args) < 2 {
 		sess.Send("Usage: walk #ship direction\n")
 		return

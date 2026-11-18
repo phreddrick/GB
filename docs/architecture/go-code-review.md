@@ -595,3 +595,41 @@ pending-turn guard remains unchanged for unrelated volatile state. See
 [implementation, evidence and independent review](../testing/cr17c-stockpile-transfer.md).
 Independent bounded review approved; hosted acceptance is recorded on the PR and merge remains pending; #45/CR-17, CR-11 and CR-20 are not
 closed, and no general command durability or exactly-once claim is made.
+
+
+**Local CR-11 noncombat AFV walk follow-up (#50):** the ordinary one-step
+planet-surface noncombat walk now privately proposes position/fuel/mass and one
+star AP, checks complete ship/star/planet/race/orbit/defense preimages in a closed
+transaction, installs both actor records coherently and then releases existing
+registry-only notices. Neutral ownership is unchanged. Combat and alternate
+docking scopes retain their legacy paths and limitations; global ship reload,
+orders and carrier-landing code are not changed. This is a local, uncommitted
+review handoff, not independent approval or whole CR-11/CR-17 closure. See
+[scope, pre-fix evidence and validation](../testing/cr11-noncombat-walk.md).
+
+CR-11 local walk review correction (2026-11-16 UTC, uncommitted): actual landed
+location no longer depends on retained destination fields; dead linked ships are
+full readonly witnesses, excluded from defense. Proven legacy pending AP/ship
+changes defer walk until a persisted boundary without HALT; unexplained staleness
+and transaction uncertainty still HALT. See the walk implementation record for
+Claude review dispositions and new execution evidence. Combat, direct AFV landing
+capabilities and the carrier-landing graph defect remain outside this slice.
+
+CR-11 owner-approved walk admission revision (2026-11-16 UTC, uncommitted): this
+supersedes the provenance-only policy in the preceding local review note.
+Otherwise valid actor/store differences before transaction now defer with a
+retry-after-next-persisted-turn hint, without writes, success or HALT. Per-writer
+tracking and its AP/legacy-walk instrumentation are removed. Structural failures,
+in-transaction CAS failures and commit uncertainty retain HALT/no-stale-flush
+safeguards. This remains a bounded noncombat-walk fix awaiting Claude re-review;
+legacy combat persistence, unrelated navigation and full CR-11 remain open.
+
+CR-11 partial-save admission extension (2026-11-17 UTC, local/uncommitted): real
+planet and ship-scope build can persist a child before the actor-owned planet
+head. Walk now defers compatible stored membership/absence differences backed
+by the complete validated actor chain and no contradictory free-list marker.
+Decode errors, unknown links, cyclic/incompatible topology (including unlinked
+tails), invalid actor state, in-transaction CAS and uncertainty retain HALT.
+No build persistence, allocator or global reload change is included. See the
+walk implementation record for actual pre-fix dispatch and final-source tests;
+full CR-11/CR-17 acceptance remains open.
