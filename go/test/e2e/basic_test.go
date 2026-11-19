@@ -110,14 +110,31 @@ type server struct {
 }
 
 type logBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
+	mu      sync.Mutex
+	buf     bytes.Buffer
+	changed chan struct{}
 }
 
 func (l *logBuffer) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.buf.Write(p)
+	n, err := l.buf.Write(p)
+	if l.changed != nil {
+		close(l.changed)
+		l.changed = nil
+	}
+	return n, err
+}
+
+// snapshot subscribes under the same lock as Write, so a log waiter cannot
+// miss an append between inspecting the buffer and waiting for a change.
+func (l *logBuffer) snapshot() (string, <-chan struct{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.changed == nil {
+		l.changed = make(chan struct{})
+	}
+	return l.buf.String(), l.changed
 }
 
 func (l *logBuffer) String() string {
