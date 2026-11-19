@@ -6,6 +6,7 @@ package e2e
 // with temporary files and databases.
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -259,7 +260,11 @@ func TestGB104RealEngineLongTurnKeepsHealthyClient(t *testing.T) {
 	_ = conn.SetReadDeadline(time.Time{}) // readUntil leaves a client-side deadline behind
 
 	// Read continuously (which answers pings) and record how it ends.
-	msgs, errc := make(chan string, 64), make(chan error, 1)
+	type receivedMessage struct {
+		text string
+		at   time.Time
+	}
+	msgs, errc := make(chan receivedMessage, 64), make(chan error, 1)
 	go func() {
 		for {
 			_, b, err := conn.ReadMessage()
@@ -267,21 +272,37 @@ func TestGB104RealEngineLongTurnKeepsHealthyClient(t *testing.T) {
 				errc <- err
 				return
 			}
-			msgs <- string(b)
+			// Timestamp at receipt, not when the main test goroutine eventually
+			// consumes this channel: that must not hide genuinely early output.
+			msgs <- receivedMessage{string(b), time.Now()}
 		}
 	}()
+	// One existing 100-second observation budget, including admission and log
+	// collection. Do not infer admission from an arbitrary one-second sleep.
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Second)
+	defer cancel()
 	go func() { _, _ = s.gbctl("update") }()
-	time.Sleep(time.Second)
+	started, err := waitTurnLog(ctx, s.logs, "turn starting", 0)
+	if err != nil {
+		t.Fatalf("turn admission: %v\n%s", err, s.logs.String())
+	}
+	sent := time.Now()
 	if err := conn.WriteMessage(1, []byte("who")); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.After(100 * time.Second)
 	for {
 		select {
 		case m := <-msgs:
-			if strings.Contains(m, "Testers") {
-				if !s.hasLog("turn complete") {
-					t.Fatalf("command output arrived before the turn finished: %q", m)
+			if strings.Contains(m.text, "Testers") {
+				// Child logs and WebSocket frames travel through independent
+				// readers. Await collection, then compare the original log event
+				// time with receipt, rather than comparing channel delivery order.
+				finished, err := waitTurnLog(ctx, s.logs, "turn complete", started.Turn)
+				if err != nil {
+					t.Fatalf("turn completion: %v\n%s", err, s.logs.String())
+				}
+				if err := checkTurnObservation(started, finished, sent, m.at); err != nil {
+					t.Fatalf("%v: %q\n%s", err, m.text, s.logs.String())
 				}
 				if code := s.signal(syscall.SIGTERM, 30*time.Second); code != 0 {
 					t.Fatalf("exit %d", code)
@@ -290,7 +311,7 @@ func TestGB104RealEngineLongTurnKeepsHealthyClient(t *testing.T) {
 			}
 		case err := <-errc:
 			t.Fatalf("healthy client disconnected during the long turn: %v\n%s", err, s.logs.String())
-		case <-deadline:
+		case <-ctx.Done():
 			t.Fatalf("no command output within 100 s\n%s", s.logs.String())
 		}
 	}

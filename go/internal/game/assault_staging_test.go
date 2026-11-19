@@ -57,7 +57,11 @@ func newGroundAssaultFixture(t *testing.T, military bool) *factoryFixture {
 			p.Sectors[0].Popn = 0
 			p.Sectors[0].Troops = 1000
 		}
-		p.Sectors[1] = model.Sector{Owner: 2, Race: 2, Popn: 1, Mobilization: 7, Condition: 1, Type: 1, Fert: 100, Resource: 19, Crystals: 4}
+		// The captured sector must support the 1,000 arriving civilians through
+		// a real update. Eff 0 allowed total natural starvation (support 200
+		// after efficiency growth), unrelated to assault persistence. Eff 20
+		// provides ample support without plating or changing combat strength.
+		p.Sectors[1] = model.Sector{Owner: 2, Race: 2, Popn: 1, Mobilization: 7, Condition: 1, Type: 1, Eff: 20, Fert: 100, Resource: 19, Crystals: 4}
 		populationTotals(p)
 		st := f.state.stars[f.star]
 		st.AP[0] = 100
