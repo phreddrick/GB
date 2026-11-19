@@ -1,0 +1,318 @@
+{
+  "status": "F1_CORRECTED_LOCAL_VALIDATION_PASS_CLAUDE_REREVIEW_PENDING",
+  "base": "8da02c783fa72e4b16333754ce7675fec16e505c",
+  "branch": "feature/cr17c-planet-factory-build",
+  "worktree": "/tmp/GB-cr17c-planet-factory-build",
+  "created_utc": "2026-11-19T01:15:25.232374+00:00",
+  "scope": "Construction-specific structural reference policy only; one ordinary non-God planet-built factory, autoload off, one effective build, zero AP",
+  "prior_evidence_preserved": "/tmp/gb-planet-factory-build-validation-20261118T045600Z",
+  "prior_manifest_verified": true,
+  "new_evidence": "/tmp/gb-planet-factory-build-f1-20261119T005000Z",
+  "source_sha256": {
+    "go/internal/game/factory_build_refs_test.go": "8e3214214bb2ed6c096a499f4b9480cfe8e4b189dc5bb0bd4f4d2af49ce14953",
+    "go/internal/game/factory_build_crash_test.go": "8a48b739c2c5c0df5387f408ca5145b47ce6788a9e5cf051122fec1dd3462f01",
+    "go/internal/game/factory_build_test.go": "df5b3ad8fa193a4d52992077f52f9e132ead443d9d305ff26e4e74424d19fe5c",
+    "go/internal/game/factory_build_admission.go": "662713555cb9d432a963825c72b7ec2c0f276953fae90615458de9cfa29352cc",
+    "go/internal/game/factory_build_command.go": "e25409eedacc0960f2523c11c19212988552cfac9d174de1e7a3636fc6cc16bb",
+    "go/internal/db/factory_build_refs_test.go": "18f4e307f8cbec895cc249b445c817bacf2eeb4435695aa1b6ea1e62a26cbbcb",
+    "go/internal/db/factory_build_alloc.go": "175b3b3776ef242488711514f35f64a6567d9aeb7b2ddd7369e48cc99db2b9cf",
+    "go/internal/db/factory_build_test.go": "25fe5d82e05fcc781cfdc870c83a63aec039fe6ddeee85d3bb169a380b9e2058",
+    "go/internal/db/factory_build.go": "28a8b5d028c3b6420cfec6defc52ea6d60ded5357eb74a8ad7dc757347e658d0",
+    "go/internal/commandrules/factory_build_test.go": "0e7cc9ded41029884f69b1a6b08053610a5c56611a13cec0b8c3ee9c4a716e3e",
+    "go/internal/commandrules/factory_build.go": "0f3c662cbaaba30e2917709c6caf8290763ea8421c7d5a0dbc51829bd176fa05",
+    "go/internal/game/build.go": "bb4fdb45385ac013dd822cca455a6c42628fdf1ebc1f867769c66cc3e9e3e29e"
+  },
+  "suites": {
+    "focused-race": {
+      "pass_nodes": 271,
+      "skip_nodes": 0,
+      "game_seconds": 60.46,
+      "factory_SIGKILL_cases_passed": 20,
+      "output_sha256": "5e64f66463e272465301161fdd779b58538b43a1e5598e4b736bcfa771a38db8",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./internal/commandrules",
+        "./internal/db",
+        "./internal/game",
+        "-run",
+        "^TestPlanetFactory|^TestWalkAfterLegacyBuildPartialSave$"
+      ],
+      "exit": 0,
+      "started_utc": "2026-11-19T01:01:13.186408+00:00",
+      "wall_seconds": 67.582
+    },
+    "normal": {
+      "pass_nodes": 5574,
+      "skip_nodes": 2,
+      "game_seconds": 46.904,
+      "factory_SIGKILL_cases_passed": 20,
+      "output_sha256": "d84327eae408dbbb0fe8a748e41a3eabb3acacdf28a7c150db8394f1c1d7177d",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-json",
+        "./..."
+      ],
+      "exit": 0,
+      "started_utc": "2026-11-19T01:02:20.768733+00:00",
+      "wall_seconds": 48.043
+    },
+    "race": {
+      "pass_nodes": 5574,
+      "skip_nodes": 2,
+      "game_seconds": 519.367,
+      "factory_SIGKILL_cases_passed": 20,
+      "output_sha256": "56512ac82d1de33d5f99d9881516c1032a67a45116d2b47809929e39c2a42392",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-json",
+        "./..."
+      ],
+      "exit": 0,
+      "started_utc": "2026-11-19T01:03:08.812040+00:00",
+      "wall_seconds": 520.782
+    }
+  },
+  "gates": [
+    {
+      "name": "build",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "build",
+        "./..."
+      ],
+      "started_utc": "2026-11-19T01:05:30.983577+00:00",
+      "exit": 0,
+      "seconds": 0.992
+    },
+    {
+      "name": "gofmt",
+      "command": [
+        "bash",
+        "-c",
+        "files=$(rg --files go -g \"*.go\"); out=$(gofmt -l $files); if [ -n \"$out\" ]; then printf \"%s\\n\" \"$out\"; exit 1; fi"
+      ],
+      "started_utc": "2026-11-19T01:05:31.976411+00:00",
+      "exit": 0,
+      "seconds": 0.11
+    },
+    {
+      "name": "vet",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "vet",
+        "./..."
+      ],
+      "started_utc": "2026-11-19T01:05:32.086332+00:00",
+      "exit": 0,
+      "seconds": 0.692
+    },
+    {
+      "name": "c-fixtures",
+      "command": [
+        "make",
+        "-C",
+        "test/ctool",
+        "check"
+      ],
+      "started_utc": "2026-11-19T00:58:49.710866+00:00",
+      "exit": 0,
+      "seconds": 0.033
+    },
+    {
+      "name": "lint",
+      "command": [
+        "test/scripts/lint-gate.sh",
+        "/tmp/gb-planet-factory-build-f1-20261119T005000Z/final/lint-recheck.json"
+      ],
+      "started_utc": "2026-11-19T01:05:32.778769+00:00",
+      "exit": 0,
+      "seconds": 5.8
+    },
+    {
+      "name": "golden-mutations",
+      "command": [
+        "test/scripts/golden-mutations.sh"
+      ],
+      "started_utc": "2026-11-19T00:58:57.077174+00:00",
+      "exit": 0,
+      "seconds": 738.293
+    },
+    {
+      "name": "growth",
+      "command": [
+        "test/scripts/growth-gate.sh",
+        "8da02c783fa72e4b16333754ce7675fec16e505c"
+      ],
+      "started_utc": "2026-11-19T01:11:15.370160+00:00",
+      "exit": 0,
+      "seconds": 0.932
+    },
+    {
+      "name": "gate-selftest",
+      "command": [
+        "test/scripts/gate-approval-selftest.sh"
+      ],
+      "started_utc": "2026-11-19T01:11:16.302150+00:00",
+      "exit": 0,
+      "seconds": 13.811
+    },
+    {
+      "name": "lint-selftest",
+      "command": [
+        "test/scripts/lint-gate-selftest.sh"
+      ],
+      "started_utc": "2026-11-19T01:11:30.115039+00:00",
+      "exit": 0,
+      "seconds": 32.033
+    },
+    {
+      "name": "golden-helper-selftest",
+      "command": [
+        "test/scripts/golden-mutations-selftest.sh"
+      ],
+      "started_utc": "2026-11-19T01:12:02.148174+00:00",
+      "exit": 0,
+      "seconds": 103.436
+    },
+    {
+      "name": "workflow-policy",
+      "command": [
+        "python3",
+        ".github/scripts/workflow_policy_check.py"
+      ],
+      "started_utc": "2026-11-19T01:13:45.584271+00:00",
+      "exit": 0,
+      "seconds": 0.101
+    },
+    {
+      "name": "workflow-helpers",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".github/scripts",
+        "-p",
+        "test_*.py"
+      ],
+      "started_utc": "2026-11-19T01:13:45.685647+00:00",
+      "exit": 0,
+      "seconds": 15.678
+    },
+    {
+      "name": "actionlint",
+      "command": [
+        "go",
+        "run",
+        "github.com/rhysd/actionlint/cmd/actionlint@v1.7.12"
+      ],
+      "started_utc": "2026-11-19T01:14:01.364368+00:00",
+      "exit": 0,
+      "seconds": 0.204
+    },
+    {
+      "name": "offline-manifests",
+      "command": [
+        "deploy/kustomize/tests/run.sh"
+      ],
+      "started_utc": "2026-11-19T01:14:01.568888+00:00",
+      "exit": 0,
+      "seconds": 22.826
+    },
+    {
+      "name": "govulncheck",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "run",
+        "golang.org/x/vuln/cmd/govulncheck@v1.9.0",
+        "./..."
+      ],
+      "started_utc": "2026-11-19T01:14:24.395452+00:00",
+      "exit": 0,
+      "seconds": 2.055
+    },
+    {
+      "name": "mod-verify",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "mod",
+        "verify"
+      ],
+      "started_utc": "2026-11-19T01:14:26.450951+00:00",
+      "exit": 0,
+      "seconds": 0.252
+    },
+    {
+      "name": "mod-tidy",
+      "command": [
+        "go",
+        "-C",
+        "go",
+        "mod",
+        "tidy",
+        "-diff"
+      ],
+      "started_utc": "2026-11-19T01:14:26.703615+00:00",
+      "exit": 0,
+      "seconds": 0.024
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_utc": "2026-11-19T01:14:26.728277+00:00",
+      "exit": 0,
+      "seconds": 0.005
+    }
+  ],
+  "inventory_exit": 0,
+  "negative_control": {
+    "method": "read-only Go overlay restoring only original factory_build.go; worktree unchanged",
+    "exit": 1,
+    "compiled": true,
+    "intended_assertion_failures": 32,
+    "output_sha256": "0b356253422be5d05aebed4208cb0df1b8278bb247ced7521bab596c029b088f"
+  },
+  "initial_executions": {
+    "pre_fix": "All 32 new actor advisory-order cases failed with the intended construction-deferral assertion before correction.",
+    "compile_failure": "Initial new db tests used a nonexistent placement-prefix symbol; compile error retained; corrected to existing private placementPrefix.",
+    "lint": "Initial lint found two G115 test-only int-to-uint8 conversions; replaced by fixed uint8 player constants; unchanged baseline now matches 1000, new 0, stale 0.",
+    "interrupted": "Only owned superseded full-race runner tree terminated before final-source rerun; superseded logs/source hash retained under final/before-lint-fix."
+  },
+  "review": {
+    "claude_prior": "Owner-reported independent atomicity approval with blocking F-1 global indefinite deferral; corrected here.",
+    "current": "Pending fresh Claude re-review; no final independent approval claimed."
+  },
+  "limitations": [
+    "Full long opt-in suite not repeated for this focused revision; prior preserved final-source long-suite pass is historical, not fresh acceptance of these bytes.",
+    "Historical unchanged opt-in WebSocket timing assertion failure remains unresolved; no test, assertion or timeout was weakened.",
+    "Standalone ShellCheck unavailable; hosted Docker/Trivy/Syft/kind and GitHub CI not executed.",
+    "Unsupported build variants remain legacy; no general CR-11/CR-17/#44 acceptance, no durable command IDs or exactly-once claims."
+  ],
+  "acknowledgment_labels": [],
+  "staged": false,
+  "committed": false,
+  "pushed": false,
+  "live_operations": false
+}

@@ -725,6 +725,9 @@ func (s *State) deductAPs(playerNum, governor, n, starNum int, sdataLevel bool) 
 // cmdBuild handles the "build" player command.
 // Mirrors build() in build.c.
 func (s *State) cmdBuild(p, g int, args []string, sess net.Responder) {
+	if s.handlePlanetFactoryBuild(p, g, args, sess) {
+		return
+	}
 	race := s.raceByNum(p)
 	if race == nil {
 		sess.Send("Unknown player.\n")

@@ -213,6 +213,19 @@ Several of these are structural, not esoteric: `governors/appoint/revoke` and `g
 
 ### 4.7 Build (`build.go` versus `build.c`)
 
+**CR-17/#44 bounded local implementation (independent review pending):** one
+ordinary non-God planet-built factory with autoload off and one effective build
+uses private proposals and one checked ship/planet/allocator transaction, with
+zero AP and output after confirmed installation. Complete star/race/orbit and
+allocation witnesses protect append and free-ID reuse. Valid pending legacy
+state defers without writes or HALT; construction-specific allocation checks
+structural references without reserving IDs for advisory orders (CR-07's stricter
+enrollment policy is unchanged). Late CAS/uncertainty retains the conservative
+HALT/no-flush policy. All other build variants remain legacy, including autoload,
+multiple/God/special builds and ship/carrier construction. This does not close
+CR-11, CR-13, CR-17 or #44. See
+[scope and local evidence](../testing/cr17c-planet-factory-construction.md).
+
 - **CR-28, High, VERIFIED (read, agent).** New ships never get their type-specific `Special` data. No code constructs `model.PodSpecial` or `TerraformSpecial` at build time; `doPod` returns immediately when `Special.Pod == nil` (`ship.go:829`) and `moveShipOnPlanet` returns false when `Special.Terraform == nil` (`planet.go:1270`). Spore pods never decay, explode or infect; terraformers and plows do nothing until an explicit order.
 - Minor: a count of 0 or less is silently treated as 1 (`build.go:851-857`); C errors.
 - Matching: `shipCostFromDesign`, `complexityOf`, `systemCost`, `getshipDefaults`, `initializeNewShip`, `shipSize`, `getMass`, and all `tweakables.h` cost and mass constants.
