@@ -103,6 +103,7 @@ func cargoBuildExpected(t *testing.T, before map[string]string, in db.CargoCarri
 }
 
 func TestCargoBuildDispatch(t *testing.T) {
+	t.Parallel()
 	for _, level := range []uint8{model.LevelPlan, model.LevelStar, model.LevelUniv} {
 		for _, free := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%d/free=%v", level, free), func(t *testing.T) {
@@ -147,6 +148,7 @@ func TestCargoBuildDispatch(t *testing.T) {
 }
 
 func TestCargoBuildScheduledPersistence(t *testing.T) {
+	t.Parallel()
 	f := newCargoBuildFixture(t, false, model.LevelPlan)
 	f.command(t, "build X")
 	check := func() {
@@ -199,6 +201,7 @@ func TestCargoBuildScheduledPersistence(t *testing.T) {
 }
 
 func TestCargoBuildFailures(t *testing.T) {
+	t.Parallel()
 	for _, stage := range []string{"before", "validated", "write:1", "write:2", "write:3", "write:4", "before-commit", "commit-error", "after-commit"} {
 		t.Run(stage, func(t *testing.T) {
 			f := newCargoBuildFixture(t, true, model.LevelPlan)
@@ -240,6 +243,7 @@ func TestCargoBuildFailures(t *testing.T) {
 }
 
 func TestCargoBuildConflicts(t *testing.T) {
+	t.Parallel()
 	for _, which := range []string{"ticket", "builder", "proposal", "pending", "governor"} {
 		t.Run(which, func(t *testing.T) {
 			f := newCargoBuildFixture(t, false, model.LevelPlan)
@@ -284,6 +288,7 @@ func TestCargoBuildConflicts(t *testing.T) {
 	}
 }
 func TestCargoBuildRealProcessCrash(t *testing.T) {
+	t.Parallel()
 	for _, free := range []bool{false, true} {
 		for _, stage := range []string{"before", "write:1", "write:2", "write:3", "write:4", "before-commit", "after-commit", "preinstall", "installed"} {
 			t.Run(fmt.Sprintf("free=%v/%s", free, stage), func(t *testing.T) {
@@ -311,6 +316,7 @@ func TestCargoBuildRealProcessCrash(t *testing.T) {
 }
 
 func TestCargoBuildLegacyDesignAndLoading(t *testing.T) {
+	t.Parallel()
 	for _, god := range []bool{false, true} {
 		for _, autoload := range []bool{false, true} {
 			t.Run(fmt.Sprintf("god=%v/autoload=%v", god, autoload), func(t *testing.T) {
@@ -359,6 +365,7 @@ func TestCargoBuildLegacyDesignAndLoading(t *testing.T) {
 }
 
 func TestCargoBuildLateWriter(t *testing.T) {
+	t.Parallel()
 	f := newCargoBuildFixture(t, false, model.LevelPlan)
 	var after map[string]string
 	f.store.SetMetaFault(func(op string) error {
@@ -379,6 +386,7 @@ func TestCargoBuildLateWriter(t *testing.T) {
 }
 
 func TestCargoBuildAuthorityAndLocation(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"foreign owner", "wrong governor", "assigned governor", "broken actor orbit"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newCargoBuildFixture(t, false, model.LevelPlan)
@@ -428,6 +436,7 @@ func TestCargoBuildAuthorityAndLocation(t *testing.T) {
 }
 
 func TestCargoBuildLateWitnessWriter(t *testing.T) {
+	t.Parallel()
 	for _, witness := range []string{"race", "orbit-ship"} {
 		t.Run(witness, func(t *testing.T) {
 			f := newCargoBuildFixture(t, true, model.LevelPlan)
