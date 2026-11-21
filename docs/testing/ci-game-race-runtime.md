@@ -183,3 +183,52 @@ No merge, deployment, image publication, live database or Kubernetes operation
 is part of this work. No maintainer acknowledgment label is expected because no
 protected tooling or allowance changes are included; the unchanged growth gate
 must confirm that result.
+
+## PR #88 follow-up — bound the game race processes
+
+PR #88 and its master merge have the same Git tree,
+`8b5a6e312c6672cc52a1a1b013c88fb2fb75fa6c`. The successful PR run took
+37.433 s for the normal game suite and 365.764 s under race. The master run
+took 54.710 s normally and reached the 600 s game-package alarm under race
+(600.072 s). The active ground-assault crash group had run for 12 s and its
+current subtest for less than a second. The log contains no earlier assertion
+failure or data-race report. These runs establish a cumulative runtime
+problem; they do not identify the cause of the runner-to-runner variation.
+[Successful PR job](https://github.com/phreddrick/GB/actions/runs/44876577062/job/136762484806)
+and [master timeout](https://github.com/phreddrick/GB/actions/runs/44880103074/job/136773297947).
+
+Run `test/scripts/race-check.sh` to reproduce the CI race step. Go discovers
+all packages with race build constraints. Packages other than `internal/game`
+run once without a filter. The driver runs game twice, selecting the CR17,
+cargo and planet-factory test families with `-run` and their
+complement with `-skip` using the same anchored top-level expression. Each
+family keeps its full subtest tree and existing parallel/serial scheduling.
+New test names enter exactly one group. Each invocation uses `-count=1 -race`
+and Go's existing default timeout. All three invocations run even if an
+earlier one fails, and any failure fails the required build/test/lint job.
+
+Game fixtures use disposable stores and actors. The immutable enrolled-world
+seed initializes once per test process. Real crash children are launched by
+their parent test with their own boundary and database. Tests that share
+inventory accounting in process (`TestGolden` and `TestCEWCallSite`) run
+together in the complement, which has no `-run` filter. Its TestMain still
+validates the inventory. The normal suite and record reconciliation stay
+unfiltered. The driver preserves `GB_LONG_TESTS` from the caller.
+
+The groups run sequentially on the same runner. This preserves all seven
+hosted job names, their permission boundaries and the existing CI provenance
+contract. The objective is headroom within each package deadline. Total
+workflow duration can vary with runner speed and process startup.
+
+The first local partition also selected the stockpile and walk families. Its
+race processes took 271.349 s and 137.419 s. Stockpile and walk contributed
+65.050 s of serial top-level tests to the longer process; the final expression
+leaves them in the complement. Compare `(package, full test name, outcome)`
+from `go test -json` events when changing the partition. Counts alone cannot
+detect one omitted subtest replaced by a duplicate.
+
+A disposable two-package Go module exercised failure propagation through the
+driver. Each of the three invocations was made to fail in turn, in a real
+race-enabled nested subtest. In every case the driver exited 1, the other
+invocations still ran, and each expected test and subtest ran exactly once.
+With the failure disabled the same fixture exited 0.
