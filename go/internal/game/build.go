@@ -35,6 +35,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/phreddrick/GB/go/internal/commandrules"
 	"github.com/phreddrick/GB/go/internal/model"
 	"github.com/phreddrick/GB/go/internal/net"
 )
@@ -42,16 +43,6 @@ import (
 // --- Cost constants (from tweakables.h) ---
 
 const (
-	gunCost     = 1.00
-	crewCost    = 0.05
-	cargoCost   = 0.05
-	fuelCostBld = 0.05 // building fuel cost per unit
-	ammoCost    = 0.05
-	speedCost   = 0.50
-	cewCost     = 0.003
-	armorCost   = 3.50
-	hangerCost  = 0.50
-
 	// upBid is now loaded from config.UpBid (was hardcoded to 0.10)
 	merchantLength = 200000.0
 )
@@ -66,32 +57,7 @@ func (s *State) shipCostFromDesign(ship *model.Ship) float64 {
 		i = int(ship.Type)
 	}
 	factor := float64(model.Shipdata[model.ShipType(i)][model.AbilCost])
-	factor += gunCost * float64(ship.Primary)
-	factor += gunCost * float64(ship.Secondary)
-	factor += crewCost * float64(ship.MaxCrew)
-	factor += cargoCost * float64(ship.MaxResource)
-	factor += fuelCostBld * float64(ship.MaxFuel)
-	factor += ammoCost * float64(ship.MaxDestruct)
-	factor += speedCost * float64(ship.MaxSpeed) * math.Sqrt(float64(ship.MaxSpeed))
-	factor += hangerCost * float64(ship.MaxHanger)
-	factor += armorCost * float64(ship.Armor) * math.Sqrt(float64(ship.Armor))
-	factor += cewCost * float64(int(ship.CEW)*int(ship.CEWRange))
-
-	advantage := 0.0
-	if ship.HyperDrive.Has {
-		advantage += 0.5
-	}
-	if ship.Laser != 0 {
-		advantage += 0.5
-	}
-	if ship.Cloak != 0 {
-		advantage += 0.5
-	}
-	if ship.Mount != 0 {
-		advantage += 0.5
-	}
-	factor *= math.Sqrt(1.0 + advantage)
-	return factor
+	return commandrules.ComponentCost(ship, factor)
 }
 
 // systemCost computes the fractional advantage/disadvantage for one ship
@@ -725,7 +691,7 @@ func (s *State) deductAPs(playerNum, governor, n, starNum int, sdataLevel bool) 
 // cmdBuild handles the "build" player command.
 // Mirrors build() in build.c.
 func (s *State) cmdBuild(p, g int, args []string, sess net.Responder) {
-	if s.handlePlanetFactoryBuild(p, g, args, sess) {
+	if s.handleCargoBuild(p, g, args, sess) || s.handlePlanetFactoryBuild(p, g, args, sess) {
 		return
 	}
 	race := s.raceByNum(p)

@@ -13,8 +13,8 @@ import (
 
 // Classification precedes every legacy mutation. Preserve legacy first-letter,
 // Sscanf coordinates, ignored extra arguments and effective-count semantics.
-// Other types, God/autoload/multiple builds and every ship-scope build remain
-// explicitly legacy, WITHOUT the new durability guarantee.
+// This handler covers only the planet factory. Ship-scope cargo construction
+// is classified separately by cmdBuild.
 func (s *State) handlePlanetFactoryBuild(p, g int, args []string, sess net.Responder) bool {
 	if p < 1 || p > model.MaxPlayers || g < 0 || g > model.MaxGovernors || len(args) < 2 || len(args[0]) == 0 || args[0][0] != 'F' {
 		return false

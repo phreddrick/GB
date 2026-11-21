@@ -45,68 +45,76 @@ type PlanetFactoryBuild struct {
 }
 type preparedFactoryBuild struct{ checks, writes []commandRecord }
 
+func (out *preparedFactoryBuild) add(bucket, key []byte, before, after any, write bool) error {
+	var b, a []byte
+	var e error
+	if before != nil {
+		b, e = json.Marshal(before)
+		if e != nil {
+			return e
+		}
+	}
+	if after != nil {
+		a, e = json.Marshal(after)
+		if e != nil {
+			return e
+		}
+	}
+	r := commandRecord{bucket, key, b, a}
+	out.checks = append(out.checks, r)
+	if write {
+		out.writes = append(out.writes, r)
+	}
+	return nil
+}
+
 func prepareFactoryBuild(in PlanetFactoryBuild) (preparedFactoryBuild, error) {
 	var out preparedFactoryBuild
 	want, e := commandrules.PlanPlanetFactory(in.Input)
 	if e != nil || in.Input.Number != in.Allocation.Number || !reflect.DeepEqual(want, in.Proposed) {
 		return out, commandError(CommandInvalid)
 	}
-	add := func(bucket, key []byte, before, after any, write bool) error {
-		var b, a []byte
-		var e error
-		if before != nil {
-			b, e = json.Marshal(before)
-			if e != nil {
-				return e
-			}
-		}
-		if after != nil {
-			a, e = json.Marshal(after)
-			if e != nil {
-				return e
-			}
-		}
-		r := commandRecord{bucket, key, b, a}
-		out.checks = append(out.checks, r)
-		if write {
-			out.writes = append(out.writes, r)
-		}
-		return nil
-	}
 	f, p, st, r := in.Proposed.Ship, in.Input.Planet, in.Input.Star, in.Input.Race
-	if e := add(BucketShips, ShipKey(f.Number), nil, f, true); e != nil {
+	if e := out.add(BucketShips, ShipKey(f.Number), nil, f, true); e != nil {
 		return out, commandError(CommandInvalid)
 	}
-	if e := add(BucketPlanets, PlanetKey(p.StarNum, p.PlanetNum), p, in.Proposed.Planet, true); e != nil {
+	if e := out.add(BucketPlanets, PlanetKey(p.StarNum, p.PlanetNum), p, in.Proposed.Planet, true); e != nil {
 		return out, commandError(CommandInvalid)
 	}
-	if e := add(BucketStars, StarKey(st.Number), st, st, false); e != nil {
+	if e := out.add(BucketStars, StarKey(st.Number), st, st, false); e != nil {
 		return out, commandError(CommandInvalid)
 	}
-	if e := add(BucketRaces, RaceKey(r.PlayerNum), r, r, false); e != nil {
+	if e := out.add(BucketRaces, RaceKey(r.PlayerNum), r, r, false); e != nil {
 		return out, commandError(CommandInvalid)
 	}
 	ships := append([]*model.Ship(nil), in.Input.Ships...)
 	sort.Slice(ships, func(i, j int) bool { return ships[i].Number < ships[j].Number })
 	for _, sh := range ships {
-		if e := add(BucketShips, ShipKey(sh.Number), sh, sh, false); e != nil {
+		if e := out.add(BucketShips, ShipKey(sh.Number), sh, sh, false); e != nil {
 			return out, commandError(CommandInvalid)
 		}
 	}
-	if in.Allocation.FreeKey != 0 {
-		value := make([]byte, 4)
-		binary.BigEndian.PutUint32(value, in.Allocation.Number)
-		out.checks = append(out.checks, commandRecord{BucketShipFree, enrollmentFreeKey(in.Allocation.FreeKey), value, nil})
-	}
+	out.checkFree(in.Allocation)
 	return out, nil
+}
+func (out *preparedFactoryBuild) checkFree(ticket FactoryAllocation) {
+	if ticket.FreeKey != 0 {
+		value := make([]byte, 4)
+		binary.BigEndian.PutUint32(value, ticket.Number)
+		out.checks = append(out.checks, commandRecord{BucketShipFree, enrollmentFreeKey(ticket.FreeKey), value, nil})
+	}
 }
 
 // Faults factory-build.before/check:N/validated/write:1 (ship)/write:2
 // (planet)/write:3 (allocator)/before-commit abort; commit-error is uncertain,
 // after-commit is confirmed. Readback is diagnostic, never fsync evidence.
 func (s *Store) CommitPlanetFactory(in PlanetFactoryBuild) (outcome CommandOutcome, err error) {
+	return s.commitConstruction("CommitPlanetFactory", "factory-build", in.Allocation, func() (preparedFactoryBuild, error) { return prepareFactoryBuild(in) })
+}
+
+func (s *Store) commitConstruction(method, operation string, allocation FactoryAllocation, prepare func() (preparedFactoryBuild, error)) (outcome CommandOutcome, err error) {
 	outcome = CommandNotCommitted
-	if e := s.writeAllowed("CommitPlanetFactory"); e != nil {
+	if e := s.writeAllowed(method); e != nil {
 		return outcome, commandError(CommandFenced)
 	}
 	s.commandMu.Lock()
@@ -136,16 +144,16 @@ func (s *Store) CommitPlanetFactory(in PlanetFactoryBuild) (outcome CommandOutco
 		}
 	}()
 	var e error
-	prepared, e = prepareFactoryBuild(in)
+	prepared, e = prepare()
 	if e != nil {
 		return outcome, e
 	}
-	if e = s.metaFault("factory-build.before"); e != nil {
+	if e = s.metaFault(operation + ".before"); e != nil {
 		return outcome, commandError(CommandIO)
 	}
 	e = s.db.Update(func(tx *bolt.Tx) error {
 		phase = 1
-		if e := s.writeAllowed("CommitPlanetFactory"); e != nil {
+		if e := s.writeAllowed(method); e != nil {
 			return commandError(CommandFenced)
 		}
 		meta := tx.Bucket(BucketMeta)
@@ -166,7 +174,7 @@ func (s *Store) CommitPlanetFactory(in PlanetFactoryBuild) (outcome CommandOutco
 			if !bytes.Equal(b.Get(r.key), r.before) {
 				return commandError(CommandStale)
 			}
-			if e := s.metaFault(fmt.Sprintf("factory-build.check:%d", i+1)); e != nil {
+			if e := s.metaFault(fmt.Sprintf(operation+".check:%d", i+1)); e != nil {
 				return commandError(CommandIO)
 			}
 		}
@@ -174,29 +182,29 @@ func (s *Store) CommitPlanetFactory(in PlanetFactoryBuild) (outcome CommandOutco
 		if e != nil {
 			return e
 		}
-		if ticket != in.Allocation {
+		if ticket != allocation {
 			return commandError(CommandStale)
 		}
-		if e := s.metaFault("factory-build.validated"); e != nil {
+		if e := s.metaFault(operation + ".validated"); e != nil {
 			return commandError(CommandIO)
 		}
 		for i, r := range prepared.writes {
 			if e := tx.Bucket(r.bucket).Put(r.key, r.after); e != nil {
 				return commandError(CommandIO)
 			}
-			if e := s.metaFault(fmt.Sprintf("factory-build.write:%d", i+1)); e != nil {
+			if e := s.metaFault(fmt.Sprintf(operation+".write:%d", i+1)); e != nil {
 				return commandError(CommandIO)
 			}
 		}
-		if in.Allocation.FreeKey != 0 {
-			if e := tx.Bucket(BucketShipFree).Delete(enrollmentFreeKey(in.Allocation.FreeKey)); e != nil {
+		if allocation.FreeKey != 0 {
+			if e := tx.Bucket(BucketShipFree).Delete(enrollmentFreeKey(allocation.FreeKey)); e != nil {
 				return commandError(CommandIO)
 			}
 		}
-		if e := s.metaFault("factory-build.write:3"); e != nil {
+		if e := s.metaFault(fmt.Sprintf("%s.write:%d", operation, len(prepared.writes)+1)); e != nil {
 			return commandError(CommandIO)
 		}
-		if e := s.metaFault("factory-build.before-commit"); e != nil {
+		if e := s.metaFault(operation + ".before-commit"); e != nil {
 			return commandError(CommandIO)
 		}
 		phase = 2
@@ -212,12 +220,12 @@ func (s *Store) CommitPlanetFactory(in PlanetFactoryBuild) (outcome CommandOutco
 		}
 		return outcome, commandError(CommandIO)
 	}
-	if e = s.metaFault("factory-build.commit-error"); e != nil {
+	if e = s.metaFault(operation + ".commit-error"); e != nil {
 		return CommandUncertain, &CommandError{Code: CommandIO, Outcome: CommandUncertain}
 	}
 	phase = 3
 	outcome = CommandCommitted
-	if e = s.metaFault("factory-build.after-commit"); e != nil {
+	if e = s.metaFault(operation + ".after-commit"); e != nil {
 		return outcome, &CommandError{Code: CommandIO, Outcome: outcome}
 	}
 	return outcome, nil

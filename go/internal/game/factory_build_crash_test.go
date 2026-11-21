@@ -35,14 +35,20 @@ func TestPlanetFactoryBuildCrashChild(t *testing.T) {
 	if e != nil || state.Mode() != ModeServing {
 		t.Fatal("child not serving", e)
 	}
+	command := "build F 0,0"
 	boundary := func() { fmt.Println("GB_FACTORY_BUILD_BOUNDARY"); <-make(chan struct{}) }
 	onEnrollmentActor(t, &actorEnrollmentFixture{state: state}, func() {
 		gov := state.races[0].Governor[0]
 		state.dirs[0][0] = model.Directory{Level: model.LevelPlan, StarNum: gov.HomeSystem, PlanetNum: gov.HomePlanetNum}
+		if strings.HasPrefix(stage, "cargo-build.") {
+			state.dirs[0][0].Level = model.LevelShip
+			state.dirs[0][0].ShipNo = 77
+			command = "build X"
+		}
 		switch stage {
-		case "factory-build.preinstall":
+		case "factory-build.preinstall", "cargo-build.preinstall":
 			state.testHooks = &testHooks{beforeCommandInstall: boundary}
-		case "factory-build.installed":
+		case "factory-build.installed", "cargo-build.installed":
 			state.testHooks = &testHooks{afterCommandInstall: boundary}
 		}
 	})
@@ -52,7 +58,7 @@ func TestPlanetFactoryBuildCrashChild(t *testing.T) {
 		}
 		return nil
 	})
-	if e := state.HandleCommand(ctxT(t, 20*time.Second), 1, 0, "build F 0,0", &recordingResponder{}); e != nil {
+	if e := state.HandleCommand(ctxT(t, 20*time.Second), 1, 0, command, &recordingResponder{}); e != nil {
 		t.Fatal(e)
 	}
 	t.Fatal("escaped selected crash boundary")
@@ -72,68 +78,7 @@ func TestPlanetFactoryBuildRealProcessCrash(t *testing.T) {
 				}
 				before := commandFixtureRecords(t, commandFixtureImageStopped(t, &planetCommandFixture{actorEnrollmentFixture: f.actorEnrollmentFixture}))
 				want := factoryBuildExpected(t, before, in)
-				if e := f.store.Close(); e != nil {
-					t.Fatal(e)
-				}
-				exe, e := os.Executable()
-				if e != nil {
-					t.Fatal(e)
-				}
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-				child := exec.CommandContext(ctx, exe, "-test.run=^TestPlanetFactoryBuildCrashChild$", "-test.v") //nolint:gosec // own Go test executable and fixed arguments
-				child.Env = append(os.Environ(), "GB_FACTORY_BUILD_CHILD=1", "GB_FACTORY_BUILD_PATH="+f.path, "GB_FACTORY_BUILD_STAGE="+stage, "GB_FACTORY_BUILD_NOW="+schedule.SavedAt.Format(time.RFC3339Nano))
-				stdout, e := child.StdoutPipe()
-				if e != nil {
-					t.Fatal(e)
-				}
-				stderr := &walkChildStderr{}
-				child.Stderr = stderr
-				if e := child.Start(); e != nil {
-					t.Fatal(e)
-				}
-				t.Cleanup(func() { _ = child.Process.Kill() })
-				ready, readDone := make(chan struct{}), make(chan struct{})
-				go func() {
-					defer close(readDone)
-					scan := bufio.NewScanner(stdout)
-					for scan.Scan() {
-						if strings.TrimSpace(scan.Text()) == "GB_FACTORY_BUILD_BOUNDARY" {
-							close(ready)
-						}
-					}
-				}()
-				select {
-				case <-ready:
-				case <-readDone:
-					_ = child.Wait()
-					t.Fatal("child exited before boundary", stderr.String())
-				case <-ctx.Done():
-					_ = child.Process.Kill()
-					<-readDone
-					_ = child.Wait()
-					t.Fatal("child did not reach boundary", stderr.String())
-				}
-				if e := child.Process.Signal(syscall.SIGKILL); e != nil {
-					t.Fatal(e)
-				}
-				<-readDone
-				e = child.Wait()
-				var exit *exec.ExitError
-				if !errors.As(e, &exit) {
-					t.Fatal("not a killed process", e)
-				}
-				status, ok := exit.Sys().(syscall.WaitStatus)
-				if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
-					t.Fatal("real SIGKILL not observed", stderr.String())
-				}
-				if strings.Contains(stderr.String(), "DATA RACE") || stderr.overflow {
-					t.Fatal("child race report or truncated stderr", stderr.String())
-				}
-				f.store, e = db.Open(f.path)
-				if e != nil {
-					t.Fatal(e)
-				}
+				killConstructionAt(t, f, stage, schedule.SavedAt)
 				got := commandFixtureRecords(t, commandFixtureImageStopped(t, &planetCommandFixture{actorEnrollmentFixture: f.actorEnrollmentFixture}))
 				committed := stage == "factory-build.after-commit" || stage == "factory-build.preinstall" || stage == "factory-build.installed"
 				if committed {
@@ -167,5 +112,71 @@ func TestPlanetFactoryBuildRealProcessCrash(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func killConstructionAt(t *testing.T, f *factoryFixture, stage string, saved time.Time) {
+	t.Helper()
+	if e := f.store.Close(); e != nil {
+		t.Fatal(e)
+	}
+	exe, e := os.Executable()
+	if e != nil {
+		t.Fatal(e)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	child := exec.CommandContext(ctx, exe, "-test.run=^TestPlanetFactoryBuildCrashChild$", "-test.v") //nolint:gosec // own Go test executable and fixed arguments
+	child.Env = append(os.Environ(), "GB_FACTORY_BUILD_CHILD=1", "GB_FACTORY_BUILD_PATH="+f.path, "GB_FACTORY_BUILD_STAGE="+stage, "GB_FACTORY_BUILD_NOW="+saved.Format(time.RFC3339Nano))
+	stdout, e := child.StdoutPipe()
+	if e != nil {
+		t.Fatal(e)
+	}
+	stderr := &walkChildStderr{}
+	child.Stderr = stderr
+	if e := child.Start(); e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = child.Process.Kill() })
+	ready, readDone := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(readDone)
+		scan := bufio.NewScanner(stdout)
+		for scan.Scan() {
+			if strings.TrimSpace(scan.Text()) == "GB_FACTORY_BUILD_BOUNDARY" {
+				close(ready)
+			}
+		}
+	}()
+	select {
+	case <-ready:
+	case <-readDone:
+		_ = child.Wait()
+		t.Fatal("child exited before boundary", stderr.String())
+	case <-ctx.Done():
+		_ = child.Process.Kill()
+		<-readDone
+		_ = child.Wait()
+		t.Fatal("child did not reach boundary", stderr.String())
+	}
+	if e := child.Process.Signal(syscall.SIGKILL); e != nil {
+		t.Fatal(e)
+	}
+	<-readDone
+	e = child.Wait()
+	var exit *exec.ExitError
+	if !errors.As(e, &exit) {
+		t.Fatal("not a killed process", e)
+	}
+	status, ok := exit.Sys().(syscall.WaitStatus)
+	if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+		t.Fatal("real SIGKILL not observed", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "DATA RACE") || stderr.overflow {
+		t.Fatal("child race report or truncated stderr", stderr.String())
+	}
+	f.store, e = db.Open(f.path)
+	if e != nil {
+		t.Fatal(e)
 	}
 }
