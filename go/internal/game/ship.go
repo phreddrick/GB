@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/phreddrick/GB/go/internal/commandrules"
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
@@ -113,26 +114,13 @@ func shipBody(ship *model.Ship) int {
 // getMass returns the base structural mass of a ship (without cargo).
 // Mirrors getmass() in build.c.
 func (s *State) getMass(ship *model.Ship) float64 {
-	return 1.0 +
-		s.cfg.MassArmor*float64(ship.Armor) +
-		s.cfg.MassSize*float64(shipBody(ship)) +
-		s.cfg.MassHanger*float64(ship.MaxHanger) +
-		s.cfg.MassGuns*float64(ship.Primary)*float64(ship.PrimType) +
-		s.cfg.MassGuns*float64(ship.Secondary)*float64(ship.SecType)
+	return commandrules.DesignMass(s.cfg, ship)
 }
 
 // shipSize computes the current size of a ship from its components.
 // Mirrors ship_size() in build.c.  Called once per turn (for debugging in C).
 func (s *State) shipSize(ship *model.Ship) int {
-	size := 1.0 +
-		s.cfg.SizeGuns*float64(ship.Primary) +
-		s.cfg.SizeGuns*float64(ship.Secondary) +
-		s.cfg.SizeCrew*float64(ship.MaxCrew) +
-		s.cfg.SizeResource*float64(ship.MaxResource) +
-		s.cfg.SizeFuel*float64(ship.MaxFuel) +
-		s.cfg.SizeDestruct*float64(ship.MaxDestruct) +
-		float64(ship.MaxHanger)
-	return int(size)
+	return commandrules.DesignSize(s.cfg, ship)
 }
 
 // ---- Planet gravity helper -------------------------------------------------

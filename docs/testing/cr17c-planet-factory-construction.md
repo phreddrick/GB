@@ -18,9 +18,10 @@ There is **zero AP cost**: C build ignores its AP argument; Go also has no
 AP check/debit. The complete star (including AP) is an immutable witness.
 
 Autoload, God builds, multiple effective builds, every other type (including
-special types), ship-scope factory production, cargo/carrier builders, upgrades,
-make/mod and commodities remain on their existing legacy handlers. The
-classifier returns before staging for those cases. They retain existing CR-17
+special types), ship-scope factory production, upgrades, make/mod and commodities
+are outside this planet-factory handler. A separate transaction covers
+[one Carrier built by a cargo ship](cr17c-cargo-carrier-construction.md).
+Other cargo-ship builds and construction by a Carrier remain on legacy handlers. They retain existing CR-17
 risks; this PR does not make all factory construction or all build transactional.
 No prefix of an eligible one-build command passes through the old writer.
 
