@@ -154,9 +154,8 @@ jobs:
           GB_INVENTORY_RECORDS: ${{ runner.temp }}/inventory-records
         run: test/scripts/inventory-check.sh 2>&1 | tee "$RUNNER_TEMP/inventory.txt"
 
-      - name: go test -race
-        working-directory: go
-        run: go test -count=1 -race ./...
+      - name: go test -race (all packages, two complementary game groups)
+        run: test/scripts/race-check.sh
 
       - name: Golden mutation self-checks (temporary copies)
         run: test/scripts/golden-mutations.sh
