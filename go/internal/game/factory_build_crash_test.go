@@ -40,15 +40,18 @@ func TestPlanetFactoryBuildCrashChild(t *testing.T) {
 	onEnrollmentActor(t, &actorEnrollmentFixture{state: state}, func() {
 		gov := state.races[0].Governor[0]
 		state.dirs[0][0] = model.Directory{Level: model.LevelPlan, StarNum: gov.HomeSystem, PlanetNum: gov.HomePlanetNum}
-		if strings.HasPrefix(stage, "cargo-build.") {
+		if strings.HasPrefix(stage, "cargo-build.") || strings.HasPrefix(stage, "probe-build.") {
 			state.dirs[0][0].Level = model.LevelShip
 			state.dirs[0][0].ShipNo = 77
 			command = "build X"
+			if strings.HasPrefix(stage, "probe-build.") {
+				command = "build :"
+			}
 		}
 		switch stage {
-		case "factory-build.preinstall", "cargo-build.preinstall":
+		case "factory-build.preinstall", "cargo-build.preinstall", "probe-build.preinstall":
 			state.testHooks = &testHooks{beforeCommandInstall: boundary}
-		case "factory-build.installed", "cargo-build.installed":
+		case "factory-build.installed", "cargo-build.installed", "probe-build.installed":
 			state.testHooks = &testHooks{afterCommandInstall: boundary}
 		}
 	})

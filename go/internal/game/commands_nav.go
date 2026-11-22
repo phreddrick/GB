@@ -70,6 +70,23 @@ func (s *State) doLandOnShip(p, g int, sh *model.Ship, shipNoStr string, sess ne
 		sess.Send("Can't land on factories.\n")
 		return
 	}
+	// A legacy landed child can still claim a planet orbit while linked inside
+	// another ship. Require the destination to belong to its declared orbit.
+	var targetHead uint32
+	switch s2.WhatOrbits {
+	case model.LevelPlan:
+		if pl := s.planet(int(s2.StOrbits), int(s2.PNumOrbits)); pl != nil {
+			targetHead = pl.Ships
+		}
+	case model.LevelStar:
+		if int(s2.StOrbits) < len(s.stars) && s.stars[s2.StOrbits] != nil {
+			targetHead = s.stars[s2.StOrbits].Ships
+		}
+	}
+	if _, found := s.shipPredecessor(targetHead, s2.Number); sh.Number == s2.Number || !found {
+		_ = sess.Send("Cannot land on that ship here.\n")
+		return
+	}
 
 	if landed(sh) {
 		// Ship-to-ship loading while both are on a planet surface
@@ -93,20 +110,20 @@ func (s *State) doLandOnShip(p, g int, sh *model.Ship, shipNoStr string, sess ne
 			sendf(sess, "%s must be turned off before loading.\n", shipDisplayName(sh))
 			return
 		}
-		hangerNeeded := s.shipSize(sh)
+		hangerNeeded := int(sh.Size)
 		if int(s2.Hanger)+hangerNeeded > int(s2.MaxHanger) {
 			sendf(sess, "Mothership does not have %d hanger space available to load ship.\n", hangerNeeded)
 			return
 		}
 		// Remove from planet, insert into carrier
 		pl := s.planet(int(sh.StOrbits), int(sh.PNumOrbits))
-		if pl != nil {
-			s.removeShipPlan(pl, sh)
-			s.savePlanet(pl)
+		if pl == nil || !s.removeShipPlan(pl, sh) {
+			_ = sess.Send("Cannot locate this ship in its orbit.\n")
+			return
 		}
+		s.savePlanet(pl)
 		s.insertShipInShip(sh, s2)
 		s2.Mass += sh.Mass
-		s2.Hanger += uint16(hangerNeeded)
 		sh.Docked = true
 		sendf(sess, "%s loaded onto %s using 0 fuel.\n", shipDisplayName(sh), shipDisplayName(s2))
 		s.saveShip(sh)
@@ -135,31 +152,32 @@ func (s *State) doLandOnShip(p, g int, sh *model.Ship, shipNoStr string, sess ne
 		sess.Send("Not enough fuel.\n")
 		return
 	}
-	hangerNeeded := s.shipSize(sh)
+	hangerNeeded := int(sh.Size)
 	if int(s2.Hanger)+hangerNeeded > int(s2.MaxHanger) {
 		sendf(sess, "Mothership does not have %d hanger space available to load ship.\n", hangerNeeded)
 		return
 	}
-	s.useFuel(sh, fuel)
-
 	// Remove from current scope
 	if sh.WhatOrbits == model.LevelPlan {
-		if pl := s.planet(int(sh.StOrbits), int(sh.PNumOrbits)); pl != nil {
-			s.removeShipPlan(pl, sh)
-			s.savePlanet(pl)
+		pl := s.planet(int(sh.StOrbits), int(sh.PNumOrbits))
+		if pl == nil || !s.removeShipPlan(pl, sh) {
+			_ = sess.Send("Cannot locate this ship in its orbit.\n")
+			return
 		}
+		s.savePlanet(pl)
 	} else if sh.WhatOrbits == model.LevelStar {
-		if int(sh.StOrbits) < len(s.stars) && s.stars[sh.StOrbits] != nil {
-			s.removeShipStar(s.stars[sh.StOrbits], sh)
-			s.saveStar(s.stars[sh.StOrbits])
+		if int(sh.StOrbits) >= len(s.stars) || s.stars[sh.StOrbits] == nil || !s.unlinkShip(&s.stars[sh.StOrbits].Ships, sh) {
+			_ = sess.Send("Cannot locate this ship in its orbit.\n")
+			return
 		}
+		s.saveStar(s.stars[sh.StOrbits])
 	} else {
 		sess.Send("Ship is not in planet or star scope.\n")
 		return
 	}
+	s.useFuel(sh, fuel)
 	s.insertShipInShip(sh, s2)
 	s2.Mass += sh.Mass
-	s2.Hanger += uint16(hangerNeeded)
 	sendf(sess, "%s landed on %s using %.1f fuel.\n",
 		shipDisplayName(sh), shipDisplayName(s2), fuel)
 	sh.Docked = true
@@ -510,7 +528,12 @@ func (s *State) doLaunchOne(p, g int, sh *model.Ship, sess net.Responder) {
 
 // launchFromCarrier handles the case where a ship is inside a carrier.
 func (s *State) launchFromCarrier(p, g int, sh, carrier *model.Ship, apCount int, sess net.Responder) {
-	s.removeShipShip(sh, carrier)
+	if carrier.WhatOrbits == model.LevelShip || sh.Size > carrier.Hanger || !s.unlinkShip(&carrier.Ships, sh) {
+		_ = sess.Send("Cannot launch from this hangar.\n")
+		return
+	}
+	sh.WhatOrbits = carrier.WhatOrbits
+	sh.StOrbits, sh.PNumOrbits = carrier.StOrbits, carrier.PNumOrbits
 
 	if landed(carrier) {
 		// Carrier is on a planet — place ship on same planet surface
@@ -575,7 +598,7 @@ func (s *State) launchFromCarrier(p, g int, sh, carrier *model.Ship, apCount int
 	}
 
 	carrier.Mass -= sh.Mass
-	carrier.Hanger -= uint16(s.shipSize(sh))
+	carrier.Hanger -= sh.Size
 	s.saveShip(sh)
 	s.saveShip(carrier)
 }
@@ -611,6 +634,13 @@ func (s *State) doScrapOne(p, g int, sh *model.Ship, sess net.Responder) {
 		return
 	}
 
+	if sh.WhatOrbits == model.LevelShip {
+		carrier := s.ships[sh.DestShipNo]
+		if carrier == nil || carrier.Hanger < sh.Size {
+			_ = sess.Send("Cannot scrap from this hangar.\n")
+			return
+		}
+	}
 	if sh.WhatOrbits == model.LevelPlan && sh.Type == model.OtypeToxWC && sh.Special.Waste != nil {
 		sendf(sess, "WARNING: This will release %d toxin points back into the atmosphere!!\n",
 			sh.Special.Waste.Toxic)
@@ -733,7 +763,7 @@ func (s *State) doScrapOne(p, g int, sh *model.Ship, sess net.Responder) {
 	// Adjust carrier hanger if inside a ship
 	if sh.WhatOrbits == model.LevelShip {
 		if carrier, ok := s.ships[sh.DestShipNo]; ok {
-			carrier.Hanger -= uint16(s.shipSize(sh))
+			carrier.Hanger -= sh.Size
 			s.saveShip(carrier)
 		}
 	}

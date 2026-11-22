@@ -55,79 +55,41 @@ func dist(x1, y1, x2, y2 float64) float64 {
 
 // ---- Orbit chain removal -------------------------------------------------
 
-// removeShipPlan removes a ship from a planet's orbit linked list.
-// Mirrors remove_sh_plan() in GB_server.c.
-func (s *State) removeShipPlan(planet *model.Planet, ship *model.Ship) {
-	shipNum := ship.Number
-	if planet.Ships == shipNum {
-		planet.Ships = ship.NextShip
-		ship.NextShip = 0
-		return
-	}
-	for cur := planet.Ships; cur != 0; {
-		carrier, ok := s.ships[cur]
-		if !ok {
+// shipPredecessor checks membership before moving a ship. A nil predecessor
+// denotes the head. Bound traversal even if an old list contains a cycle.
+func (s *State) shipPredecessor(head, id uint32) (*model.Ship, bool) {
+	var prev *model.Ship
+	for n, steps := head, 0; n != 0 && steps < len(s.ships); steps++ {
+		cur := s.ships[n]
+		if cur == nil || cur.Number != n {
 			break
 		}
-		if carrier.NextShip == shipNum {
-			carrier.NextShip = ship.NextShip
-			ship.NextShip = 0
-			return
+		if n == id {
+			return prev, true
 		}
-		cur = carrier.NextShip
+		prev, n = cur, cur.NextShip
 	}
+	return nil, false
 }
 
-// removeShipStar removes a ship from a star's orbit linked list.
-// Mirrors remove_sh_star() in GB_server.c.
-func (s *State) removeShipStar(star *model.Star, ship *model.Ship) {
-	shipNum := ship.Number
-	if star.Ships == shipNum {
-		star.Ships = ship.NextShip
-		ship.NextShip = 0
-		return
+// The caller saves the root; a non-head removal also changes a separate ship.
+func (s *State) unlinkShip(head *uint32, ship *model.Ship) bool {
+	prev, ok := s.shipPredecessor(*head, ship.Number)
+	if !ok {
+		return false
 	}
-	for cur := star.Ships; cur != 0; {
-		carrier, ok := s.ships[cur]
-		if !ok {
-			break
-		}
-		if carrier.NextShip == shipNum {
-			carrier.NextShip = ship.NextShip
-			ship.NextShip = 0
-			return
-		}
-		cur = carrier.NextShip
+	if prev == nil {
+		*head = ship.NextShip
+	} else {
+		prev.NextShip = ship.NextShip
+		s.saveShip(prev)
 	}
+	ship.NextShip = 0
+	return true
 }
 
-// removeShipShip removes a ship from its carrier's docked-ships list.
-// Mirrors remove_sh_ship() in GB_server.c.
-func (s *State) removeShipShip(ship, carrier *model.Ship) {
-	shipNum := ship.Number
-	if carrier.Ships == shipNum {
-		carrier.Ships = ship.NextShip
-		ship.NextShip = 0
-		ship.WhatOrbits = carrier.WhatOrbits
-		ship.StOrbits = carrier.StOrbits
-		ship.PNumOrbits = carrier.PNumOrbits
-		return
-	}
-	for cur := carrier.Ships; cur != 0; {
-		prev, ok := s.ships[cur]
-		if !ok {
-			break
-		}
-		if prev.NextShip == shipNum {
-			prev.NextShip = ship.NextShip
-			ship.NextShip = 0
-			ship.WhatOrbits = carrier.WhatOrbits
-			ship.StOrbits = carrier.StOrbits
-			ship.PNumOrbits = carrier.PNumOrbits
-			return
-		}
-		cur = prev.NextShip
-	}
+func (s *State) removeShipPlan(planet *model.Planet, ship *model.Ship) bool {
+	return s.unlinkShip(&planet.Ships, ship)
 }
 
 // ---- Crash check ---------------------------------------------------------

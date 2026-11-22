@@ -174,6 +174,11 @@ func TestCargoBuildScheduledPersistence(t *testing.T) {
 		}
 	}
 	check()
+	scheduledBuildTurnsAndRestart(t, f, check)
+}
+
+func scheduledBuildTurnsAndRestart(t *testing.T, f *factoryFixture, check func()) {
+	t.Helper()
 	for _, update := range []bool{false, true} {
 		before := f.state.Status()
 		onEnrollmentActor(t, f.actorEnrollmentFixture, func() {

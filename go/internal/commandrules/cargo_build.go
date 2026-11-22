@@ -95,7 +95,7 @@ func PlanCargoBuild(in CargoBuild, number uint32, cfg *config.Config) (*model.Sh
 	if !r.God && r.Tech < float64(sd[model.AbilTech]) {
 		return nil, &FactoryBuildRefusal{fmt.Sprintf("You are not advanced enough to build this ship.\n%.1f engineering technology needed. You have %.1f.\n", float64(sd[model.AbilTech]), r.Tech)}
 	}
-	child, e := carrierDesign(cfg, r)
+	child, e := constructionDesign(cfg, r, model.StypeCarrier)
 	if e != nil {
 		return nil, e
 	}

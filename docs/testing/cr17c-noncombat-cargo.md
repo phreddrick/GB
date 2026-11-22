@@ -248,8 +248,9 @@ fuel/destruct, transporter #42, jettison/mount, stockpile transfer AP, navigatio
 repair, construction/allocators, broad staging, durable IDs/dedup/outbox and
 failure-aware client result contracts. Supported r/x/& requests that require
 excluded effects fail closed; they cannot escape through the unsafe legacy
-writer. Existing land/dock commands can produce incomplete carrier links; this
-operation refuses those worlds instead of repairing them. CR-11 ship reload and
+writer. Worlds saved by older land/dock commands can contain incomplete carrier links;
+the cargo command refuses those worlds. Corrected hangar insertion and turn
+accounting are described in the [Carrier probe construction record](cr17c-carrier-probe-construction.md). CR-11 ship reload and
 CR-13 turn/ownership/mass behavior remain independently open. Cross-owner cargo
 is valid at commit/restart; this migration does not promise whole-turn C parity
 for a carrier whose owner can later be recomputed from contained ships. CR-17,

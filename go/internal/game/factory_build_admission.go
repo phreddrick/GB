@@ -11,6 +11,10 @@ import (
 // Both stored and actor topology are validated, including stored tails omitted
 // by a partial save. CAS remains strict inside the eventual write transaction.
 func (s *State) factoryBuildAdmission(w *commandWorkspace) (bool, error) {
+	return s.constructionAdmission(w, 0)
+}
+
+func (s *State) constructionAdmission(w *commandWorkspace, carrier uint32) (bool, error) {
 	bad := commandrules.ErrFactoryBuildInput
 	pending := false
 	storedShips := map[uint32]*model.Ship{}
@@ -62,6 +66,15 @@ func (s *State) factoryBuildAdmission(w *commandWorkspace) (bool, error) {
 		storedShips[id] = sh
 		return sh, nil
 	}
+	// A persisted link in a probe build must resolve to a persisted record.
+	// Actor-only records may still explain an unpersisted change of head.
+	readLinked := func(id uint32) (*model.Ship, error) {
+		sh, err := readShip(id)
+		if carrier != 0 && missing[id] {
+			return nil, bad
+		}
+		return sh, err
+	}
 	for id, r := range w.races {
 		q, e := s.store.GetRace(id)
 		if e != nil {
@@ -92,7 +105,7 @@ func (s *State) factoryBuildAdmission(w *commandWorkspace) (bool, error) {
 				return false, bad
 			}
 			seen[n] = true
-			sh, e := readShip(n)
+			sh, e := readLinked(n)
 			if e != nil {
 				return false, e
 			}
@@ -110,13 +123,52 @@ func (s *State) factoryBuildAdmission(w *commandWorkspace) (bool, error) {
 		}
 		pending = pending || !reflect.DeepEqual(sh, a.before)
 	}
+	// Follow the stored hold even when an older/different head is absent from
+	// the actor's witnesses. A broken stored tail is not an ordinary deferral.
 	roots := map[walkStoredRoot]map[uint32]bool{}
+	var landedInHold map[uint32]bool
+	if carrier != 0 {
+		b, e := readShip(carrier)
+		if e != nil {
+			return false, e
+		}
+		children, e := constructionChain(b.Ships, readLinked)
+		if e != nil {
+			return false, e
+		}
+		hold, err := commandrules.ProbeChildren(b, children)
+		if err != nil && err != commandrules.ErrProbeHoldUnsettled {
+			return false, err
+		}
+		if err == commandrules.ErrProbeHoldUnsettled {
+			if err := checkOtherLandingOrbits(b, children, s.store.GetStar, s.store.GetPlanet, readLinked); err != nil {
+				return false, err
+			}
+			// Check the Carrier's own persisted planet chain. A child still
+			// linked there as well as in the hold is structural corruption.
+			if err := s.walkStoredLocation(b, readShip, roots, map[uint32]bool{}, acceptPartial); err != nil {
+				return false, err
+			}
+			exterior := roots[walkStoredRoot{level: model.LevelPlan, star: b.StOrbits, planet: b.PNumOrbits}]
+			landedInHold = map[uint32]bool{}
+			for _, child := range children {
+				if exterior[child.Number] {
+					return false, bad
+				}
+				if child.WhatOrbits == model.LevelPlan {
+					landedInHold[child.Number] = true
+				}
+			}
+			// The entire hold was checked above, including ordinary siblings.
+			roots[walkStoredRoot{level: model.LevelShip, parent: b.Number}] = hold
+		}
+	}
 	ids := make([]uint32, 0, len(storedShips))
 	for id := range storedShips {
 		ids = append(ids, id)
 	}
 	for _, id := range ids {
-		if !missing[id] {
+		if !missing[id] && !landedInHold[id] {
 			if e := s.walkStoredLocation(storedShips[id], readShip, roots, map[uint32]bool{}, acceptPartial); e != nil {
 				return false, e
 			}

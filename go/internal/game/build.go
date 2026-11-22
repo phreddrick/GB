@@ -587,11 +587,8 @@ func (s *State) createShipByShip(playerNum, governor int, race *model.Race,
 			s.insertShipUniv(newship)
 		}
 	} else {
-		newship.WhatOrbits = model.LevelShip
-		newship.WhatDest = model.LevelShip
 		newship.DestStar = builder.DestStar
 		newship.DestPNum = builder.DestPNum
-		newship.DestShipNo = builder.Number
 		newship.StOrbits = builder.StOrbits
 		newship.PNumOrbits = builder.PNumOrbits
 		newship.Docked = true
@@ -639,6 +636,8 @@ func (s *State) insertShipUniv(ship *model.Ship) {
 
 // insertShipInShip docks a ship inside another ship's hanger.
 func (s *State) insertShipInShip(newship, carrier *model.Ship) {
+	newship.WhatOrbits, newship.WhatDest = model.LevelShip, model.LevelShip
+	newship.DestShipNo = carrier.Number
 	newship.NextShip = carrier.Ships
 	carrier.Ships = newship.Number
 	carrier.Hanger += newship.Size
@@ -691,7 +690,7 @@ func (s *State) deductAPs(playerNum, governor, n, starNum int, sdataLevel bool) 
 // cmdBuild handles the "build" player command.
 // Mirrors build() in build.c.
 func (s *State) cmdBuild(p, g int, args []string, sess net.Responder) {
-	if s.handleCargoBuild(p, g, args, sess) || s.handlePlanetFactoryBuild(p, g, args, sess) {
+	if s.handleCarrierProbe(p, g, args, sess) || s.handleCargoBuild(p, g, args, sess) || s.handlePlanetFactoryBuild(p, g, args, sess) {
 		return
 	}
 	race := s.raceByNum(p)

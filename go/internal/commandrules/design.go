@@ -48,9 +48,9 @@ func ComponentCost(ship *model.Ship, factor float64) float64 {
 	return factor
 }
 
-// Default carrier design, using the same component arithmetic as Getship.
-func carrierDesign(cfg *config.Config, r *model.Race) (*model.Ship, error) {
-	sd := model.Shipdata[model.StypeCarrier]
+// Shared default design for the closed Carrier and probe construction rules.
+func constructionDesign(cfg *config.Config, r *model.Race, kind model.ShipType) (*model.Ship, error) {
+	sd := model.Shipdata[kind]
 	// Bounds-check the static design fields at their eventual storage widths.
 	var small [model.NumAbils]uint8
 	for _, i := range []model.Ability{model.AbilArmor, model.AbilGuns, model.AbilPrimary, model.AbilSecondary, model.AbilMount} {
@@ -69,7 +69,7 @@ func carrierDesign(cfg *config.Config, r *model.Race) (*model.Ship, error) {
 		capacity[i] = uint16(v)
 	}
 	sh := &model.Ship{
-		Type: model.StypeCarrier, BuildType: uint16(model.StypeCarrier), Armor: small[model.AbilArmor],
+		Type: kind, BuildType: uint16(kind), Armor: small[model.AbilArmor],
 		Primary: small[model.AbilGuns], Secondary: small[model.AbilGuns], PrimType: small[model.AbilPrimary], SecType: small[model.AbilSecondary],
 		MaxCrew: capacity[model.AbilMaxCrew], MaxResource: capacity[model.AbilCargo], MaxHanger: capacity[model.AbilHanger],
 		MaxDestruct: capacity[model.AbilDestCap], MaxFuel: capacity[model.AbilFuelCap], MaxSpeed: capacity[model.AbilSpeed],
