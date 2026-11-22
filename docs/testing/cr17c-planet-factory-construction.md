@@ -1,23 +1,24 @@
 # CR-17C #44: one durable planet-built factory
 
-Local implementation for independent review, **not accepted or committed**.
-Base: `8da02c783fa72e4b16333754ce7675fec16e505c` (PR #85 merge).
+The autoload-OFF construction transaction merged in [PR #86](https://github.com/phreddrick/GB/pull/86).
+The local autoload-ON extension is pending independent review against
+`e5215611ba2dc7f35e031b789b0a4ec209132eca` (PR #91 merge).
 Tracking: #44, #50, parent #38 remain open. No live operation or schema change.
 
 ## Exact scope and compatibility
 
-One ordinary non-God planet-scope `build F x,y`, autoload OFF, with one
+One ordinary non-God planet-scope `build F x,y`, with either autoload setting and one
 effective build. Existing Go first-character type selection, `fmt.Sscanf`
 coordinate behavior, ignored trailing arguments, and effective-count parsing
 are preserved. Omitted count, explicit 1, nonpositive or invalid counts yielding
 the legacy default 1 enter staging. C rejects nonpositive counts; this unit
 does not silently change the existing Go behavior. Factory design, resource
 cost truncation, mass/size, location, damage 75, inactive factory repair rules,
-empty complement, class and all initialization notices match the legacy path.
+class and all initialization notices match the legacy path.
 There is **zero AP cost**: C build ignores its AP argument; Go also has no
 AP check/debit. The complete star (including AP) is an immutable witness.
 
-Autoload, God builds, multiple effective builds, every other type (including
+God builds, multiple effective builds, every other type (including
 special types), ship-scope factory production, upgrades, make/mod and commodities
 are outside this planet-factory handler. A separate transaction covers
 [one Carrier built by a cargo ship](cr17c-cargo-carrier-construction.md).
@@ -25,6 +26,54 @@ Another bounded transaction covers [one probe built inside a Carrier](cr17c-carr
 Other cargo-ship and Carrier builds remain on legacy handlers. They retain existing CR-17
 risks; this PR does not make all factory construction or all build transactional.
 No prefix of an eligible one-build command passes through the old writer.
+
+## Planet autoload
+
+The factory costs 23 resources and has room for 20 civilians and zero fuel.
+Autoload OFF leaves the factory empty. With the acting governor's toggle ON,
+the factory takes the lesser of 20 and the civilians in the build sector. Its
+mass increases by that number times the authenticated race's mass. The final
+notice reports the actual crew. No troops or fuel move.
+
+The loading amount, factory design and notice follow `source/build.c`
+(`autoload_at_planet` and `initialize_new_ship`). The extension uses the
+checked civilian accounting from #41A: the sector, owning player's planet
+total and global planet total all lose the crew placed aboard. If civilians
+and troops are both exhausted, the sector becomes neutral and the player
+loses one owned sector and its mobilization points. Troops remaining in the
+sector preserve ownership and mobilization.
+
+Before autoload spends civilians, the planner compares the planet civilian total
+and the builder’s civilian, owned-sector and mobilization totals with the sectors.
+A settled mismatch refuses the command and leaves the engine SERVING, including
+when the recorded balances would allow the debit. The factory consumes no ship
+ID or resources and produces no build notices. Autoload OFF does not spend
+population and keeps the existing balances. Other players’ summaries and troop
+totals are outside this civilian check.
+
+Two ordinary sources are homeworld placement (the capital starts populated
+before the player’s civilian total is recounted) and scrapping a crewed ship
+on an owned sector (sector and global population increase without the player
+total). A movement segment can persist the discrepancy. A player can retry
+after a full update if the balances then agree. Actor/store differences at
+admission retain the separate pending-state refusal. Malformed structure,
+invalid mass and late persisted changes still follow the HALT safeguards.
+
+A full update now records each owner’s mobilization balance in the final sector
+recount, alongside population and ownership. Previously the stored balance came
+from sectors visited by production. Migration into an already-visited sector can
+add land with retained mobilization; environmental damage can remove land after
+production. The two passes legitimately see different sectors. Combat readiness
+and guns still use the original report calculation from `source/doplanet.c`.
+The intentional change is to the persisted `MobPoints` used by ownership debits.
+Movement segments do not recount planet interiors. Existing discrepancies still
+take the documented refusal path until the relevant balances agree.
+
+On the PR #91 baseline, real `toggle autoload` then `build F 0,0` produced
+a durable seven-person factory from a seven-civilian sector. Its stored planet
+still had all seven civilians, the original ship-list head and 10,000 resources.
+The actor had 9,977 resources and a neutral sector, but still counted the
+seven civilians in both totals. Append and freed-ID reuse exhibited the split.
 
 ## Original defect and evidence
 
@@ -45,7 +94,7 @@ Intentional defects remain external negative-control files, never source edits.
 ## Closed transaction and ownership
 
 `commandrules.PlanPlanetFactory` is pure and reconstructs the entire permitted
-factory and planet proposal. It validates authority, non-God/autoload scope,
+factory and planet proposal. It validates authority, non-God planet scope,
 star/planet identity, slaving, governor assignment, owned populated nonwasted
 sector, checked size/mass/cost/coordinate widths and the complete planet-root
 chain. Dead ships awaiting cleanup are permitted immutable witnesses. Stale
@@ -55,17 +104,18 @@ The result owns its sector slice; no actor mutation occurs during planning.
 `db.PlanetFactoryBuild` / `CommitPlanetFactory` can write only:
 
 1. The absent/new factory record, with its exact validated ID and fields.
-2. The complete planet: only caller resources and the ship-list head differ.
+2. The complete planet, including the caller’s resource debit and ship-list head.
+   Autoload also writes the build sector and the related population and ownership totals.
 3. The exact consumed free-list entry, if allocation reuses a free ID.
 
 Race, star/AP and every existing planet-root ship are full immutable persisted
 preimages. Actor directory and authenticated player/governor context remain
 actor-owned; storage independently checks the supplied exact scope and race
 authority. Config coefficients are trusted immutable server inputs, as in the
-existing cargo contracts. No sector, population, race, AP, schedule, CR-18
-record, news, telegram, enrollment record or allocator sequence is rewritten.
-Existing inconsistent aggregates are not silently repaired; this operation
-neither reads them for cost nor changes them (autoload is excluded).
+existing cargo contracts. Race, AP, other sectors, schedule, CR-18 records, news,
+telegrams, enrollment records and allocator sequence are preserved. Autoload
+checks the relevant stored totals against a sector recount and writes only the
+approved deltas. It never repairs a discrepancy.
 
 The read-only allocator ticket uses construction-specific validation in
 `db/factory_build_alloc.go`: free-list sequence/content digest, widths/duplicates,
@@ -133,7 +183,21 @@ panic boundaries, uncertainty/readback failure, installation/delivery failure,
 real legacy fuel-load deferral, maintenance/fencing, scheduled segment/update,
 shutdown/restart, and stable actor object addresses.
 
-There are **20 new real SIGKILL scenarios**: append and free allocation across
+The autoload-ON regressions cover partial and capped crews, last civilians with
+and without troops, governor-specific toggles, stored toggle and sector changes
+after admission, and rollback or HALT without stale flushing. Dispatch tests
+cover both toggles at a newly enrolled capital, scrap followed by a scheduled
+segment, manual retry after the full update, and agreed overcounts and
+undercounts across all four balances. A direct storage test attempts a build
+with matching preimages and a forged, arithmetically affordable debit.
+A deterministic full update visits a colony source last, allowing real migration
+in any direction into an already-visited 60-point sector. Only the source
+produces. The update persists 120 owned points; an autoload build on the new
+colony leaves 60. The crewed factory and complete planet survive restart.
+Environmental-loss tests cover losing one of two sectors and losing the last
+sector after production. Scheduled segment, full update and restart checks verify a reachable crewed factory and sector totals.
+
+There are **40 real SIGKILL scenarios**: each toggle setting, append and free allocation across
 before admission, preimage checking, validated proposal, ship write, planet write,
 allocator pop, precommit, confirmed postcommit, preinstallation and installed
 before effect release. Full logical database snapshots require complete old or

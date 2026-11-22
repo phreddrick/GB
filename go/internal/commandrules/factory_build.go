@@ -14,7 +14,7 @@ type FactoryBuildRefusal struct{ Message string }
 
 func (e *FactoryBuildRefusal) Error() string { return e.Message }
 
-// PlanetFactoryInput is one ordinary, non-God, autoload-off planet factory.
+// PlanetFactoryInput is one ordinary, non-God planet factory.
 // Size/mass coefficients are trusted immutable server configuration, as in cargo.
 // AP, race, star and existing ships are read-only witnesses, not write proposals.
 type PlanetFactoryInput struct {
@@ -62,7 +62,7 @@ func FactoryBuildChain(st *model.Star, p *model.Planet, ships []*model.Ship) err
 }
 
 // PlanPlanetFactory reproduces Getship/create_ship_by_planet/initialize_new_ship
-// for ONLY an ordinary factory with no autoload. It neither allocates nor emits
+// for one ordinary factory. It neither allocates nor emits
 // output, and never borrows mutable planet sectors into its result.
 func PlanPlanetFactory(in PlanetFactoryInput) (PlanetFactoryChange, error) {
 	bad := func() (PlanetFactoryChange, error) { return PlanetFactoryChange{}, ErrFactoryBuildInput }
@@ -73,7 +73,7 @@ func PlanPlanetFactory(in PlanetFactoryInput) (PlanetFactoryChange, error) {
 	if in.Player < 1 || in.Player > model.MaxPlayers || in.Governor < 0 || in.Governor > model.MaxGovernors || r == nil || r.PlayerNum != in.Player || in.Number == 0 || FactoryBuildChain(st, p, in.Ships) != nil {
 		return bad()
 	}
-	if in.Scope.Level != model.LevelPlan || in.Scope.StarNum != p.StarNum || in.Scope.PlanetNum != p.PlanetNum || r.God || r.Governor[in.Governor].Toggle.AutoLoad {
+	if in.Scope.Level != model.LevelPlan || in.Scope.StarNum != p.StarNum || in.Scope.PlanetNum != p.PlanetNum || r.God {
 		return bad()
 	}
 	if r.Dissolved || !r.Governor[in.Governor].Active {
@@ -162,6 +162,27 @@ func PlanPlanetFactory(in PlanetFactoryInput) (PlanetFactoryChange, error) {
 	f.Damage = uint8(damage)
 	next := *p
 	next.Sectors = append([]model.Sector(nil), p.Sectors...)
+	if r.Governor[in.Governor].Toggle.AutoLoad {
+		// Legacy scrap and homeworld placement can persist sector balances that
+		// disagree with the planet summaries. Never spend or repair those totals.
+		totals, popn, _, err := assaultTotals(p)
+		if err != nil || !finite(r.Mass) || r.Mass < 0 {
+			return bad()
+		}
+		recorded, counted := p.Info[in.Player-1], totals[in.Player-1]
+		if p.Popn != popn || recorded.Popn != counted.Popn || recorded.NumSectsOwned != counted.NumSectsOwned || recorded.MobPoints != counted.MobPoints {
+			return refuse("Factory autoload refused: planet population or ownership totals disagree with its sectors.\n")
+		}
+		// A new factory has no fuel capacity. Loading its complement uses the
+		// same checked population, mass and evacuation rules as loading civilians.
+		load, err := PlanPopulation(f, nil, p, r, PopulationRequest{Commodity: 'c'})
+		if err != nil {
+			return bad()
+		}
+		f.Popn, f.Mass = load.Selected, load.SelectedMass
+		*next.SectorAt(in.X, in.Y) = load.Sector
+		next.Info[in.Player-1], next.Popn = load.Info, load.PlanetPopn
+	}
 	next.Info[in.Player-1].Resource -= f.BuildCost
 	next.Ships = f.Number
 	return PlanetFactoryChange{f, &next}, nil

@@ -67,10 +67,23 @@ func TestPlanetFactoryBuildCrashChild(t *testing.T) {
 	t.Fatal("escaped selected crash boundary")
 }
 func TestPlanetFactoryBuildRealProcessCrash(t *testing.T) {
+	checkPlanetFactoryCrashes(t, false)
+}
+
+func TestPlanetFactoryBuildAutoloadRealProcessCrash(t *testing.T) {
+	t.Parallel()
+	checkPlanetFactoryCrashes(t, true)
+}
+
+func checkPlanetFactoryCrashes(t *testing.T, autoload bool) {
+	t.Helper()
 	for _, free := range []bool{false, true} {
 		for _, stage := range []string{"factory-build.before", "factory-build.check:1", "factory-build.validated", "factory-build.write:1", "factory-build.write:2", "factory-build.write:3", "factory-build.before-commit", "factory-build.after-commit", "factory-build.preinstall", "factory-build.installed"} {
 			t.Run(fmt.Sprintf("free=%t/%s", free, stage), func(t *testing.T) {
 				f := newFactoryBuildFixture(t, free)
+				if autoload {
+					enableFactoryAutoload(t, f, 7, 0)
+				}
 				in := factoryBuildInput(t, f)
 				if e := f.state.Stop(ctxT(t, 10*time.Second)); e != nil {
 					t.Fatal(e)

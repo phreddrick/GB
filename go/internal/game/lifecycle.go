@@ -463,6 +463,8 @@ func (s *State) request(ctx context.Context, op adminOp, fn func() error) error 
 
 // testHooks are set only by tests in this package.
 type testHooks struct {
+	// Choose a legal visitation order in real update tests without replacing any gameplay draws.
+	orderPlanetSectors     func(*model.Planet, []sectorCoord)
 	afterLegacyPlanetWrite func(*model.Planet) // private population baseline reproduction after successful PutPlanet
 	afterLegacyShipWrite   func(uint32)        // isolated cargo baseline reproduction; never configured in production
 	beforeCommandInstall   func()              // private CR-17B confirmed-commit installation fault
