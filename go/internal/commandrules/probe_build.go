@@ -95,7 +95,7 @@ func PlanProbeBuild(in ProbeBuild, number uint32, cfg *config.Config) (*model.Sh
 		return nil, e
 	}
 	p, g, r := in.Player, in.Governor, in.Race
-	if number == 0 || cfg == nil || p < 1 || p > model.MaxPlayers || g < 0 || g > model.MaxGovernors || r == nil || r.PlayerNum != p || r.God || r.Governor[g].Toggle.AutoLoad {
+	if number == 0 || cfg == nil || p < 1 || p > model.MaxPlayers || g < 0 || g > model.MaxGovernors || r == nil || r.PlayerNum != p || r.God {
 		return nil, ErrFactoryBuildInput
 	}
 	for _, sh := range in.Orbit {
@@ -141,6 +141,20 @@ func PlanProbeBuild(in ProbeBuild, number uint32, cfg *config.Config) (*model.Sh
 	c.XPos, c.YPos = b.XPos, b.YPos
 	c.LandX, c.LandY = b.LandX, b.LandY
 	c.Mass = c.BaseMass
+	if r.Governor[g].Toggle.AutoLoad {
+		// Space Probes have no crew capacity. Fuel moves from the Carrier
+		// to its hold without changing the Carrier's aggregate mass.
+		if !finiteCargoMass(b.Fuel) || !finiteCargoMass(cfg.MassFuel) {
+			return nil, ErrFactoryBuildInput
+		}
+		c.Fuel = min(float64(c.MaxFuel), b.Fuel)
+		// A malformed, very large balance may round away part of the debit.
+		remaining := b.Fuel - c.Fuel
+		if b.Fuel-remaining != c.Fuel {
+			return nil, ErrFactoryBuildInput
+		}
+		c.Mass += c.Fuel * cfg.MassFuel
+	}
 	if !finiteCargoMass(c.Mass) || c.MaxSpeed > 255 {
 		return nil, ErrFactoryBuildInput
 	}
@@ -151,6 +165,7 @@ func PlanProbeBuild(in ProbeBuild, number uint32, cfg *config.Config) (*model.Sh
 // InstallProbeDebits applies only fields derived by PlanProbeBuild.
 func InstallProbeDebits(b, c *model.Ship) {
 	b.Resource -= c.BuildCost
+	b.Fuel -= c.Fuel
 	b.Hanger += c.Size
 	b.Ships = c.Number
 }

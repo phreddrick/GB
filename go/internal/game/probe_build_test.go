@@ -47,6 +47,20 @@ func newProbeFixture(t *testing.T, free bool) *factoryFixture {
 	return f
 }
 
+func enableProbeAutoload(t *testing.T, f *factoryFixture, fuel float64) {
+	t.Helper()
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		b := f.state.ships[77]
+		b.Fuel = fuel
+		if err := f.store.PutShip(b); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if msg := f.command(t, "toggle autoload"); msg != "autoload is now ON\n" {
+		t.Fatalf("toggle autoload: %q", msg)
+	}
+}
+
 // Compute expected records using the legacy design/initialization helpers, independently of the transaction planner.
 func expectedProbe(t *testing.T, f *factoryFixture, id uint32) (model.Ship, model.Ship) {
 	t.Helper()
@@ -56,7 +70,12 @@ func expectedProbe(t *testing.T, f *factoryFixture, id uint32) (model.Ship, mode
 		carrier = *f.state.ships[77]
 		legacy := &State{cfg: f.cfg}
 		legacy.getshipDefaults(&probe, model.OtypeProbe, r)
-		legacy.initializeNewShip(1, 0, r, &probe, 0, 0)
+		var crew int
+		var fuel float64
+		if r.Governor[0].Toggle.AutoLoad {
+			autoloadAtShip(1, &probe, &carrier, &crew, &fuel)
+		}
+		legacy.initializeNewShip(1, 0, r, &probe, fuel, crew)
 		probe.Number = id
 		probe.Class = "Standard"
 		probe.Tech = r.Tech
@@ -88,52 +107,91 @@ func TestCarrierProbeDispatch(t *testing.T) {
 	t.Parallel()
 	for _, free := range []bool{false, true} {
 		t.Run(fmt.Sprintf("free=%v", free), func(t *testing.T) {
-			f := newProbeFixture(t, free)
-			id := uint32(78)
-			if free {
-				id = 70
-			}
-			probe, carrier := expectedProbe(t, f, id)
-			want := factoryBuildRecords(t, f)
-			expectProbeRecords(t, want, probe, carrier, free)
-			var ptr *model.Ship
-			reg := &factoryBuildRegistry{}
-			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
-				ptr = f.state.ships[77]
-				reg.at = func(string) {
-					b, e := f.store.GetShip(77)
-					c, ce := f.store.GetShip(id)
-					if e != nil || ce != nil || !reflect.DeepEqual(b, &carrier) || !reflect.DeepEqual(c, &probe) || !reflect.DeepEqual(ptr, b) || !reflect.DeepEqual(f.state.ships[id], c) || ptr != f.state.ships[77] {
-						t.Error("notice before durable actor and store installation")
-					}
-				}
-				f.state.SetRegistry(reg)
+			checkProbeDispatch(t, newProbeFixture(t, free), free, 0)
+		})
+	}
+}
+
+func TestCarrierProbeAutoloadDispatch(t *testing.T) {
+	t.Parallel()
+	for _, free := range []bool{false, true} {
+		for _, tc := range []struct{ available, loaded float64 }{{0, 0}, {7.125, 7.125}, {20, 20}, {29.375, 20}} {
+			t.Run(fmt.Sprintf("free=%v/fuel=%g", free, tc.available), func(t *testing.T) {
+				f := newProbeFixture(t, free)
+				enableProbeAutoload(t, f, tc.available)
+				checkProbeDispatch(t, f, free, tc.loaded)
 			})
-			msg := f.command(t, "build :")
+		}
+	}
+}
+
+func checkProbeDispatch(t *testing.T, f *factoryFixture, free bool, loaded float64) {
+	t.Helper()
+	id := uint32(78)
+	if free {
+		id = 70
+	}
+	original, err := f.store.GetShip(77)
+	if err != nil || original == nil {
+		t.Fatal("missing original Carrier", err)
+	}
+	probe, carrier := expectedProbe(t, f, id)
+	if probe.Fuel != loaded || probe.Mass != probe.BaseMass+loaded*f.cfg.MassFuel || probe.Popn != 0 ||
+		carrier.Fuel != original.Fuel-loaded || carrier.Mass != original.Mass || carrier.Popn != original.Popn {
+		t.Fatal("incorrect expected fuel, mass or complement", probe, carrier)
+	}
+	want := factoryBuildRecords(t, f)
+	expectProbeRecords(t, want, probe, carrier, free)
+	var ptr *model.Ship
+	reg := &factoryBuildRegistry{}
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		ptr = f.state.ships[77]
+		reg.at = func(string) {
 			b, e := f.store.GetShip(77)
 			c, ce := f.store.GetShip(id)
-			if e != nil || ce != nil || b == nil || c == nil {
-				t.Fatalf("missing construction: %q, %v %v", msg, e, ce)
+			if e != nil || ce != nil || !reflect.DeepEqual(b, &carrier) || !reflect.DeepEqual(c, &probe) || !reflect.DeepEqual(ptr, b) || !reflect.DeepEqual(f.state.ships[id], c) || ptr != f.state.ships[77] {
+				t.Error("notice before durable actor and store installation")
 			}
-			if !reflect.DeepEqual(b, &carrier) || !reflect.DeepEqual(c, &probe) || !reflect.DeepEqual(factoryBuildRecords(t, f), want) {
-				t.Fatalf("stored child #%d, carrier resource/hangar/head=%d/%d/%d, want %d/%d/%d", c.Number, b.Resource, b.Hanger, b.Ships, carrier.Resource, carrier.Hanger, carrier.Ships)
-			}
-			wantNotices := strings.Join([]string{
-				fmt.Sprintf("gov:1/0::%d built at a cost of 24 resources.\n", id),
-				"gov:1/0:Technology 1000.0.\n",
-				"gov:1/0:This ship is robotic, and may not repair itself.\n",
-				"gov:1/0:Loaded with 0 crew and 0.0 fuel.\n",
-			}, "\n")
-			if reg.all() != wantNotices || msg != "" {
-				t.Fatalf("unexpected notices or response: %q %q", reg.all(), msg)
-			}
-		})
+		}
+		f.state.SetRegistry(reg)
+	})
+	msg := f.command(t, "build :")
+	b, e := f.store.GetShip(77)
+	c, ce := f.store.GetShip(id)
+	if e != nil || ce != nil || b == nil || c == nil {
+		t.Fatalf("missing construction: %q, %v %v", msg, e, ce)
+	}
+	if !reflect.DeepEqual(b, &carrier) || !reflect.DeepEqual(c, &probe) || !reflect.DeepEqual(factoryBuildRecords(t, f), want) {
+		t.Fatalf("stored child #%d matches=%t; Carrier resource/fuel/hangar/head=%d/%g/%d/%d, want %d/%g/%d/%d",
+			c.Number, reflect.DeepEqual(c, &probe), b.Resource, b.Fuel, b.Hanger, b.Ships,
+			carrier.Resource, carrier.Fuel, carrier.Hanger, carrier.Ships)
+	}
+	wantNotices := strings.Join([]string{
+		fmt.Sprintf("gov:1/0::%d built at a cost of 24 resources.\n", id),
+		"gov:1/0:Technology 1000.0.\n",
+		"gov:1/0:This ship is robotic, and may not repair itself.\n",
+		fmt.Sprintf("gov:1/0:Loaded with 0 crew and %.1f fuel.\n", loaded),
+	}, "\n")
+	if reg.all() != wantNotices || msg != "" {
+		t.Fatalf("unexpected notices or response: %q %q", reg.all(), msg)
 	}
 }
 
 func TestCarrierProbeScheduledPersistence(t *testing.T) {
 	t.Parallel()
+	for _, autoload := range []bool{false, true} {
+		t.Run(fmt.Sprintf("autoload=%t", autoload), func(t *testing.T) {
+			checkScheduledProbe(t, autoload)
+		})
+	}
+}
+
+func checkScheduledProbe(t *testing.T, autoload bool) {
+	t.Helper()
 	f := newProbeFixture(t, false)
+	if autoload {
+		enableProbeAutoload(t, f, 29.375)
+	}
 	probe, carrier := expectedProbe(t, f, 78)
 	f.command(t, "build :")
 	check := func() {
@@ -144,6 +202,9 @@ func TestCarrierProbeScheduledPersistence(t *testing.T) {
 		old, oe := f.store.GetShip(76)
 		if e != nil || ce != nil || oe != nil || b == nil || c == nil || old == nil || b.Resource != carrier.Resource || b.Hanger != carrier.Hanger || c.WhatOrbits != model.LevelShip || !c.Docked || c.DestShipNo != 77 || c.Size != probe.Size {
 			t.Fatal("lost Carrier debit, probe or original child chain", b, c, old)
+		}
+		if b.Fuel != carrier.Fuel || c.Fuel != probe.Fuel || c.Mass != probe.Mass || c.Popn != 0 {
+			t.Fatal("scheduled turn or restart changed build fuel or probe mass", b.Fuel, c.Fuel, c.Mass, c.Popn)
 		}
 		// Turn processing rebuilds lists in ship-number order. Either order
 		// must reach precisely both children, once, with the exact accounting.
@@ -182,10 +243,23 @@ func TestCarrierProbeScheduledPersistence(t *testing.T) {
 
 func TestCarrierProbeRealProcessCrash(t *testing.T) {
 	t.Parallel()
+	checkProbeCrashes(t, false)
+}
+
+func TestCarrierProbeAutoloadRealProcessCrash(t *testing.T) {
+	t.Parallel()
+	checkProbeCrashes(t, true)
+}
+
+func checkProbeCrashes(t *testing.T, autoload bool) {
+	t.Helper()
 	for _, free := range []bool{false, true} {
 		for _, stage := range []string{"before", "validated", "write:1", "write:2", "write:3", "before-commit", "after-commit", "preinstall", "installed"} {
 			t.Run(fmt.Sprintf("free=%t/%s", free, stage), func(t *testing.T) {
 				f := newProbeFixture(t, free)
+				if autoload {
+					enableProbeAutoload(t, f, 29.375)
+				}
 				id := uint32(78)
 				if free {
 					id = 70
@@ -213,14 +287,27 @@ func TestCarrierProbeRealProcessCrash(t *testing.T) {
 
 func TestCarrierProbeFailures(t *testing.T) {
 	t.Parallel()
-	for _, stage := range []string{"carrier writer", "child writer", "orbit writer", "race writer", "write:1", "write:2", "write:3", "commit-error", "after-commit"} {
+	checkProbeFailures(t, false, []string{"carrier writer", "child writer", "orbit writer", "race writer", "write:1", "write:2", "write:3", "commit-error", "after-commit"})
+}
+
+func TestCarrierProbeAutoloadFailures(t *testing.T) {
+	t.Parallel()
+	checkProbeFailures(t, true, []string{"toggle writer", "fuel writer", "before-commit", "commit-error", "after-commit"})
+}
+
+func checkProbeFailures(t *testing.T, autoload bool, stages []string) {
+	t.Helper()
+	for _, stage := range stages {
 		t.Run(stage, func(t *testing.T) {
 			f := newProbeFixture(t, true)
+			if autoload {
+				enableProbeAutoload(t, f, 7.125)
+			}
 			want := factoryBuildRecords(t, f)
 			c, b := expectedProbe(t, f, 70)
 			point := "probe-build." + stage
 			var external func() error
-			if stage == "carrier writer" || stage == "child writer" || stage == "orbit writer" {
+			if stage == "carrier writer" || stage == "child writer" || stage == "orbit writer" || stage == "fuel writer" {
 				id := uint32(77)
 				if stage == "child writer" {
 					id = 76
@@ -235,17 +322,25 @@ func TestCarrierProbeFailures(t *testing.T) {
 				if e != nil || sh == nil {
 					t.Fatal(e)
 				}
-				sh.Name += " changed"
+				if stage == "fuel writer" {
+					sh.Fuel += 0.25
+				} else {
+					sh.Name += " changed"
+				}
 				external = func() error { return f.store.PutShip(sh) }
 				want[fmt.Sprintf("%x/%x", db.BucketShips, db.ShipKey(id))] = factoryBuildJSON(t, sh)
 				point = "probe-build.before"
 			}
-			if stage == "race writer" {
+			if stage == "race writer" || stage == "toggle writer" {
 				r, err := f.store.GetRace(1)
 				if err != nil || r == nil {
 					t.Fatal("missing race", err)
 				}
-				r.Governor[0].Active = false
+				if stage == "toggle writer" {
+					r.Governor[0].Toggle.AutoLoad = false
+				} else {
+					r.Governor[0].Active = false
+				}
 				external = func() error { return f.store.PutRace(r) }
 				want[fmt.Sprintf("%x/%x", db.BucketRaces, db.RaceKey(1))] = factoryBuildJSON(t, r)
 				point = "probe-build.before"
@@ -345,9 +440,12 @@ func TestCarrierProbeAdmission(t *testing.T) {
 
 func TestCarrierProbeStoreContract(t *testing.T) {
 	t.Parallel()
-	for _, which := range []string{"omit child", "omit carrier", "forged probe", "autoload", "God", "wrong governor", "insufficient capacity", "allocator changed", "star changed", "fence"} {
+	for _, which := range []string{"omit child", "omit carrier", "forged probe", "forged autoload toggle", "forged fuel", "forged mass", "negative carrier fuel", "God", "wrong governor", "insufficient capacity", "allocator changed", "star changed", "fence"} {
 		t.Run(which, func(t *testing.T) {
 			f := newProbeFixture(t, true)
+			if which == "forged fuel" || which == "forged mass" || which == "negative carrier fuel" {
+				enableProbeAutoload(t, f, 7.125)
+			}
 			var in db.CarrierProbeBuild
 			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
 				var e error
@@ -364,7 +462,13 @@ func TestCarrierProbeStoreContract(t *testing.T) {
 				in.Input.Orbit = in.Input.Orbit[1:]
 			case "forged probe":
 				in.Child.Resource = 123
-			case "autoload":
+			case "forged fuel":
+				in.Child.Fuel--
+			case "forged mass":
+				in.Child.Mass = in.Child.BaseMass
+			case "negative carrier fuel":
+				in.Input.Orbit[0].Fuel = -1
+			case "forged autoload toggle":
 				in.Input.Race.Governor[0].Toggle.AutoLoad = true
 			case "God":
 				in.Input.Race.God = true
@@ -430,13 +534,13 @@ func TestCarrierProbeEmptyHold(t *testing.T) {
 
 func TestCarrierProbeGovernorDispatch(t *testing.T) {
 	t.Parallel()
-	for _, which := range []string{"assigned", "unassigned", "foreign owner"} {
+	for _, which := range []string{"assigned", "assigned autoload", "unassigned", "foreign owner"} {
 		t.Run(which, func(t *testing.T) {
 			f := newProbeFixture(t, false)
 			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
 				r := f.state.races[0]
 				r.Governor[1].Active = true
-				r.Governor[1].Toggle.AutoLoad = false
+				r.Governor[1].Toggle.AutoLoad = which == "assigned autoload"
 				b := f.state.ships[77]
 				b.Governor = 1
 				if which == "unassigned" {
@@ -461,9 +565,12 @@ func TestCarrierProbeGovernorDispatch(t *testing.T) {
 			if e != nil || f.state.Mode() != ModeServing {
 				t.Fatal("authority admission", e, reply.text())
 			}
-			if which == "assigned" {
+			if which == "assigned" || which == "assigned autoload" {
 				if c == nil || c.Owner != 1 || c.Governor != 1 {
 					t.Fatal("authorized governor build refused", reply.text())
+				}
+				if which == "assigned autoload" && c.Fuel != 20 {
+					t.Fatal("assigned governor's autoload setting ignored", c.Fuel)
 				}
 			} else if c != nil || reply.text() == "" || !reflect.DeepEqual(before, factoryBuildRecords(t, f)) {
 				t.Fatal("unauthorized construction", reply.text())
@@ -708,6 +815,53 @@ func checkRefusedProbe(t *testing.T, f *factoryFixture, text string, mode Mode) 
 	if !strings.Contains(msg, text) || f.state.Mode() != mode || strings.Contains(reg.all(), "gov:") || !reflect.DeepEqual(before, factoryBuildRecords(t, f)) || actor != actorEnrollmentSnapshot(t, f.actorEnrollmentFixture) {
 		t.Fatalf("refusal %q (%v) wanted %q (%v) without proposal, write or notice", msg, f.state.Mode(), text, mode)
 	}
+}
+
+func TestCarrierProbeAutoloadHoldAdmission(t *testing.T) {
+	t.Parallel()
+	f := newProbeFixture(t, true)
+	enableProbeAutoload(t, f, 7.125)
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		f.state.ships[76].Name = "pending"
+	})
+	checkRefusedProbe(t, f, "retry after the next persisted turn", ModeServing)
+
+	// A pre-#90 landing left a planet-orbit child inside this hold.
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		sh := f.state.ships[76]
+		sh.WhatOrbits, sh.WhatDest, sh.DestShipNo = model.LevelPlan, model.LevelUniv, 0
+		if err := f.store.PutShip(sh); err != nil {
+			t.Fatal(err)
+		}
+	})
+	checkRefusedProbe(t, f, "hangar records are unsettled", ModeServing)
+
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		sh := f.state.ships[76]
+		sh.WhatOrbits, sh.WhatDest, sh.DestShipNo = model.LevelShip, model.LevelShip, 99
+		if err := f.store.PutShip(sh); err != nil {
+			t.Fatal(err)
+		}
+	})
+	checkRefusedProbe(t, f, "halted", ModeHalted)
+	if err := f.state.Stop(ctxT(t, 10*time.Second)); !errors.Is(err, ErrHaltedNotFlushed) {
+		t.Fatal("corrupt hold allowed a shutdown flush", err)
+	}
+}
+
+func TestCarrierProbeAutoloadNegativeFuel(t *testing.T) {
+	t.Parallel()
+	f := newProbeFixture(t, true)
+	enableProbeAutoload(t, f, -1)
+	checkRefusedProbe(t, f, "halted", ModeHalted)
+}
+
+func TestCarrierProbeAutoloadUnrepresentableDebit(t *testing.T) {
+	t.Parallel()
+	f := newProbeFixture(t, true)
+	// In this malformed stored balance subtracting 20 would only debit 16.
+	enableProbeAutoload(t, f, 1<<56)
+	checkRefusedProbe(t, f, "halted", ModeHalted)
 }
 
 func TestCarrierProbeHoldValidation(t *testing.T) {

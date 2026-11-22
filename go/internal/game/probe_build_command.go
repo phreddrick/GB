@@ -18,7 +18,7 @@ func (s *State) handleCarrierProbe(p, g int, args []string, sess net.Responder) 
 		return false
 	}
 	b, r := s.ships[dir.ShipNo], s.raceByNum(p)
-	if b == nil || b.Type != model.StypeCarrier || b.WhatOrbits != model.LevelPlan || r == nil || r.God || r.Governor[g].Toggle.AutoLoad {
+	if b == nil || b.Type != model.StypeCarrier || b.WhatOrbits != model.LevelPlan || r == nil || r.God {
 		return false
 	}
 	if len(args) > 1 {
