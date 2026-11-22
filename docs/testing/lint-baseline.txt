@@ -597,12 +597,8 @@ go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> 
 go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).cmdCapture	target.Popn -= uint16(defCivLoss)
 go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).cmdCapture	target.Troops -= uint16(defTroopLoss)
 go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).doLandOnPlanet	planet.Info[i-1].Destruct -= uint16(strength)
-go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).doLandOnShip	s2.Hanger += uint16(hangerNeeded)
-go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).doLandOnShip	s2.Hanger += uint16(hangerNeeded)
 go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).doLaunchOne	if landed(sh) && sh.Resource > uint16(shipMaxResource(sh)) {
-go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).doScrapOne	carrier.Hanger -= uint16(s.shipSize(sh))
 go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).doScrapOne	planet.Info[p-1].Resource += uint16(scrapval)
-go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint16	func (*State).launchFromCarrier	carrier.Hanger -= uint16(s.shipSize(sh))
 go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint32	func (*State).cmdCapture	targetNo := uint32(atoi(trimmed))
 go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint32	func (*State).doLandOnShip	shipNo := uint32(atoi(shipNoStr))
 go/internal/game/commands_nav.go	gosec	G115: integer overflow conversion int -> uint8	func (*State).cmdCapture	target.Governor = uint8(g)

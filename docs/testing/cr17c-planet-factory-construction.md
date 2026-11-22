@@ -21,7 +21,8 @@ Autoload, God builds, multiple effective builds, every other type (including
 special types), ship-scope factory production, upgrades, make/mod and commodities
 are outside this planet-factory handler. A separate transaction covers
 [one Carrier built by a cargo ship](cr17c-cargo-carrier-construction.md).
-Other cargo-ship builds and construction by a Carrier remain on legacy handlers. They retain existing CR-17
+Another bounded transaction covers [one probe built inside a Carrier](cr17c-carrier-probe-construction.md).
+Other cargo-ship and Carrier builds remain on legacy handlers. They retain existing CR-17
 risks; this PR does not make all factory construction or all build transactional.
 No prefix of an eligible one-build command passes through the old writer.
 

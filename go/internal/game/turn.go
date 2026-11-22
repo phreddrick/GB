@@ -487,10 +487,15 @@ func (s *State) doTurn(update bool) error {
 // re-inserts every alive ship into the appropriate orbit list.
 // Mirrors the orbit rebuild block in do_turn() in doturn.c.
 func (s *State) rebuildOrbitChains() {
+	// Track Carrier occupancy from the same live members as the rebuilt lists.
+	carrierSpace := make(map[*model.Ship]uint64)
 	// Clear all pointers.
 	for _, ship := range s.ships {
 		if ship == nil {
 			continue
+		}
+		if ship.Alive && ship.Type == model.StypeCarrier {
+			carrierSpace[ship] = 0
 		}
 		ship.NextShip = 0
 		ship.Ships = 0
@@ -557,7 +562,17 @@ func (s *State) rebuildOrbitChains() {
 			if parent != nil {
 				ship.NextShip = parent.Ships
 				parent.Ships = ship.Number
+				if _, ok := carrierSpace[parent]; ok {
+					carrierSpace[parent] += uint64(ship.Size)
+				}
 			}
+		}
+	}
+	for carrier, occupied := range carrierSpace {
+		// An unrepresentable hold remains ineligible for construction. Never
+		// turn an overflow into a small, apparently available hangar.
+		if occupied <= math.MaxUint16 {
+			carrier.Hanger = uint16(occupied)
 		}
 	}
 }

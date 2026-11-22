@@ -35,7 +35,7 @@ func (s *State) handleCargoBuild(p, g int, args []string, sess net.Responder) bo
 	if s.buildAtShip(p, g, s.raceByNum(p), b, &st, &pl) < 0 {
 		return false
 	}
-	s.runCargoBuild(p, g, sess)
+	s.runShipConstruction(p, g, sess, s.stageCargoCarrier)
 	return true
 }
 
@@ -124,16 +124,9 @@ func (s *State) cargoBuildStage(p, g int) (*commandWorkspace, db.CargoCarrierBui
 			return w, in, true, nil
 		}
 	}
-	ticket, e := s.store.PlanetFactoryCandidate()
-	var ce *db.CommandError
-	if errors.As(e, &ce) && ce.Code == db.CommandStale {
-		return w, in, true, nil
-	}
-	if e != nil {
-		return w, in, false, e
-	}
-	if s.ships[ticket.Number] != nil {
-		return w, in, true, nil
+	ticket, pending, e := s.shipBuildCandidate()
+	if pending || e != nil {
+		return w, in, pending, e
 	}
 	child, e := commandrules.PlanCargoBuild(ctx, ticket.Number, s.cfg)
 	if e != nil {
@@ -143,11 +136,36 @@ func (s *State) cargoBuildStage(p, g int) (*commandWorkspace, db.CargoCarrierBui
 	return w, in, false, nil
 }
 
-func (s *State) runCargoBuild(p, g int, sess net.Responder) {
+// The actor can install either kind of ship construction through the same
+// commit-outcome path. The store entry points themselves stay closed and typed.
+type stagedShipBuild struct {
+	workspace *commandWorkspace
+	child     *model.Ship
+	commit    func() (db.CommandOutcome, error)
+}
+
+func (s *State) shipBuildCandidate() (db.FactoryAllocation, bool, error) {
+	ticket, e := s.store.PlanetFactoryCandidate()
+	var ce *db.CommandError
+	if errors.As(e, &ce) && ce.Code == db.CommandStale {
+		return ticket, true, nil
+	}
+	return ticket, e == nil && s.ships[ticket.Number] != nil, e
+}
+
+func (s *State) stageCargoCarrier(p, g int) (stagedShipBuild, bool, error) {
+	w, in, pending, e := s.cargoBuildStage(p, g)
+	if e != nil || pending {
+		return stagedShipBuild{}, pending, e
+	}
+	return stagedShipBuild{w, in.Child, func() (db.CommandOutcome, error) { return s.store.CommitCargoCarrier(in) }}, false, nil
+}
+
+func (s *State) runShipConstruction(p, g int, sess net.Responder, stage func(int, int) (stagedShipBuild, bool, error)) {
 	outcome := db.CommandNotCommitted
 	defer func() {
 		if recover() != nil {
-			s.halt(fmt.Sprintf("cargo construction %s; panic; no shutdown flush; reconciliation required", outcome), "")
+			s.halt(fmt.Sprintf("ship construction %s; panic; no shutdown flush; reconciliation required", outcome), "")
 			func() {
 				defer func() { _ = recover() }()
 				_ = sess.Send("Construction failed; engine halted for reconciliation.\n")
@@ -155,7 +173,7 @@ func (s *State) runCargoBuild(p, g int, sess net.Responder) {
 		}
 	}()
 	fail := func() {
-		s.halt(fmt.Sprintf("cargo construction %s; persistence/installation/reporting failed; no shutdown flush; reconciliation required", outcome), "")
+		s.halt(fmt.Sprintf("ship construction %s; persistence/installation/reporting failed; no shutdown flush; reconciliation required", outcome), "")
 		_ = sess.Send(fmt.Sprintf("Construction %s; engine halted for reconciliation.\n", outcome))
 	}
 	if s.Mode() != ModeServing {
@@ -166,7 +184,7 @@ func (s *State) runCargoBuild(p, g int, sess net.Responder) {
 		fail()
 		return
 	}
-	w, in, pending, e := s.cargoBuildStage(p, g)
+	build, pending, e := stage(p, g)
 	var refusal *commandrules.FactoryBuildRefusal
 	if errors.As(e, &refusal) {
 		_ = sess.Send(refusal.Message)
@@ -180,27 +198,31 @@ func (s *State) runCargoBuild(p, g int, sess net.Responder) {
 		_ = sess.Send("Construction deferred: actor and stored records differ or allocation is pending; retry after the next persisted turn.\n")
 		return
 	}
+	w, c := build.workspace, build.child
 	if !w.owns() {
 		fail()
 		return
 	}
-	outcome, e = s.store.CommitCargoCarrier(in)
+	outcome, e = build.commit()
 	if outcome == db.CommandCommitted {
 		if s.testHooks != nil && s.testHooks.beforeCommandInstall != nil {
 			s.testHooks.beforeCommandInstall()
 		}
-		if !w.owns() || s.ships[in.Allocation.Number] != nil {
+		if !w.owns() || s.ships[c.Number] != nil {
 			fail()
 			return
 		}
 		// One actor: no callbacks or fallible gameplay between installs. Existing
 		// objects retain addresses; the new identity has never been published.
-		c := in.Child
-		builder := w.ships[in.Input.Scope.ShipNo].actor
-		builder.Resource -= c.BuildCost
-		if !in.Input.Race.God {
-			builder.Popn -= c.Popn
-			builder.Fuel -= c.Fuel
+		builder := w.ships[w.scope.before.ShipNo].actor
+		if c.WhatOrbits == model.LevelShip {
+			commandrules.InstallProbeDebits(builder, c)
+		} else {
+			builder.Resource -= c.BuildCost
+			if !w.races[p].before.God {
+				builder.Popn -= c.Popn
+				builder.Fuel -= c.Fuel
+			}
 		}
 		switch c.WhatOrbits {
 		case model.LevelPlan:
@@ -215,14 +237,18 @@ func (s *State) runCargoBuild(p, g int, sess net.Responder) {
 			s.testHooks.afterCommandInstall()
 		}
 		if e == nil {
-			s.notify(p, g, fmt.Sprintf("X%d built at a cost of %d resources.\n", c.Number, c.BuildCost))
+			s.notify(p, g, fmt.Sprintf("%c%d built at a cost of %d resources.\n", model.ShipLetters[c.Type], c.Number, c.BuildCost))
 			s.notify(p, g, fmt.Sprintf("Technology %.1f.\n", c.Tech))
 			if c.Damage > 0 {
 				s.notify(p, g, fmt.Sprintf("Warning: This ship is constructed with a %d%% damage level.\n", c.Damage))
 			}
-			s.notify(p, g, "This ship does not need resources to repair.\n")
+			if c.Type == model.OtypeProbe {
+				s.notify(p, g, "This ship is robotic, and may not repair itself.\n")
+			} else {
+				s.notify(p, g, "This ship does not need resources to repair.\n")
+			}
 			crew, fuel := c.Popn, c.Fuel
-			if in.Input.Race.God {
+			if w.races[p].before.God {
 				crew, fuel = 0, 0
 			}
 			s.notify(p, g, fmt.Sprintf("Loaded with %d crew and %.1f fuel.\n", crew, fuel))
