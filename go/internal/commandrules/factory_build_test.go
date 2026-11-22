@@ -71,3 +71,27 @@ func TestPlanetFactoryRulesNumericAndWitnesses(t *testing.T) {
 		})
 	}
 }
+
+func TestPlanetFactoryRulesGovernorAutoload(t *testing.T) {
+	in := factoryPlanFixture()
+	in.Governor = 1
+	in.Star.Governor[0] = 1
+	in.Race.Governor[1].Active = true
+	in.Planet.Popn, in.Planet.Info[0].Popn, in.Planet.Info[0].NumSectsOwned = 20, 20, 1
+	in.Race.Mass = 1.25
+	for _, on := range []bool{true, false} {
+		in.Race.Governor[0].Toggle.AutoLoad = !on
+		in.Race.Governor[1].Toggle.AutoLoad = on
+		q, e := PlanPlanetFactory(in)
+		if e != nil {
+			t.Fatal(e)
+		}
+		var crew uint16
+		if on {
+			crew = 20
+		}
+		if q.Ship.Popn != crew || q.Ship.Mass != q.Ship.BaseMass+float64(crew)*1.25 || q.Planet.Popn != 20-uint64(crew) || in.Planet.Sectors[0].Popn != 20 || in.Planet.Info[0].Popn != 20 || in.Planet.Popn != 20 {
+			t.Fatal("wrong governor toggle or mutated preimage", on)
+		}
+	}
+}

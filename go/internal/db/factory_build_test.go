@@ -22,6 +22,8 @@ func planetFactoryFixture(t *testing.T, free bool) (*Store, string, PlanetFactor
 	p.Info[0].Resource = 10000
 	p.SectorAt(0, 0).Owner = 1
 	p.SectorAt(0, 0).Popn = 20
+	p.Popn, p.Info[0].Popn, p.Info[0].NumSectsOwned = 20, 20, 1
+	p.Info[0].MobPoints = uint64(p.SectorAt(0, 0).Mobilization)
 	r := &model.Race{PlayerNum: 1, Tech: 1000}
 	r.Governor[0].Active = true
 	for _, e := range []error{s.PutPlanet(p), s.PutStar(st), s.PutRace(r)} {
@@ -146,7 +148,12 @@ func TestPlanetFactoryContractProposalRestrictions(t *testing.T) {
 			case "authority":
 				in.Input.Governor = 1
 			case "autoload":
+				// The complete preimages agree on autoload ON; the forged proposal
+				// still contains the original uncrewed factory and unchanged sector.
 				in.Input.Race.Governor[0].Toggle.AutoLoad = true
+				if err := s.PutRace(in.Input.Race); err != nil {
+					t.Fatal(err)
+				}
 			case "God":
 				in.Input.Race.God = true
 			case "wrong-ID":
@@ -164,6 +171,33 @@ func TestPlanetFactoryContractProposalRestrictions(t *testing.T) {
 		})
 	}
 }
+
+// The forged result spends 20 crew from a stored total of 21 in a
+// 20-civilian sector. All ordinary deltas fit and its preimages match.
+func TestPlanetFactoryContractAutoloadAgreedMiscount(t *testing.T) {
+	s, _, in := planetFactoryFixture(t, true)
+	in.Input.Race.Governor[0].Toggle.AutoLoad = true
+	if err := s.PutRace(in.Input.Race); err != nil {
+		t.Fatal(err)
+	}
+	var err error
+	in.Proposed, err = commandrules.PlanPlanetFactory(in.Input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.Input.Planet.Info[0].Popn++
+	in.Proposed.Planet.Info[0].Popn++
+	if err := s.PutPlanet(in.Input.Planet); err != nil {
+		t.Fatal(err)
+	}
+	before := enrollmentSnapshot(t, s)
+	out, err := s.CommitPlanetFactory(in)
+	var ce *CommandError
+	if out != CommandNotCommitted || !errors.As(err, &ce) || ce.Code != CommandInvalid || before != enrollmentSnapshot(t, s) {
+		t.Fatal("storage admitted construction against miscounted sectors", out, err)
+	}
+}
+
 func TestPlanetFactoryContractLateWriters(t *testing.T) {
 	for _, which := range []string{"planet", "race", "star", "candidate", "free-list", "free-ABA"} {
 		t.Run(which, func(t *testing.T) {

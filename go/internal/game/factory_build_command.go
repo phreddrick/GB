@@ -20,7 +20,7 @@ func (s *State) handlePlanetFactoryBuild(p, g int, args []string, sess net.Respo
 		return false
 	}
 	r := s.raceByNum(p)
-	if r == nil || r.God || r.Governor[g].Toggle.AutoLoad || s.dirs[p-1][g].Level != model.LevelPlan {
+	if r == nil || r.God || s.dirs[p-1][g].Level != model.LevelPlan {
 		return false
 	}
 	count := 1
@@ -106,7 +106,7 @@ func (s *State) factoryBuildStage(p, g int, args []string) (*commandWorkspace, d
 		fmt.Sprintf("Warning: This ship is constructed with a %d%% damage level.\n", f.Damage),
 		"This ship does not need resources to repair.\n",
 		"This factory may not begin repairs until it has been activated.\n",
-		"Loaded with 0 crew and 0.0 fuel.\n",
+		fmt.Sprintf("Loaded with %d crew and 0.0 fuel.\n", f.Popn),
 	} {
 		if e := w.effects.Send(msg); e != nil {
 			return nil, in, false, e

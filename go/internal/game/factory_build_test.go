@@ -246,15 +246,13 @@ func TestPlanetFactoryBuildGrammarAndAuthority(t *testing.T) {
 	}
 }
 func TestPlanetFactoryBuildLegacyClassification(t *testing.T) {
-	for _, which := range []string{"autoload", "God", "multiple", "special", "ship", "info"} {
+	for _, which := range []string{"God", "multiple", "special", "ship", "info"} {
 		t.Run(which, func(t *testing.T) {
 			f := newFactoryBuildFixture(t, false)
 			args := []string{"F", "0,0"}
 			handled := true
 			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
 				switch which {
-				case "autoload":
-					f.state.races[0].Governor[0].Toggle.AutoLoad = true
 				case "God":
 					f.state.races[0].God = true
 				case "multiple":
@@ -438,9 +436,12 @@ func TestPlanetFactoryBuildTurnShutdownAndConcurrency(t *testing.T) {
 }
 
 func TestPlanetFactoryBuildLateWriterAndPostcommitFailures(t *testing.T) {
-	for _, which := range []string{"late-planet", "late-chain", "late-AP", "late-free", "preinstall", "installed", "delivery"} {
+	for _, which := range []string{"late-planet", "late-chain", "late-AP", "late-free", "late-toggle", "late-sector", "preinstall", "installed", "delivery"} {
 		t.Run(which, func(t *testing.T) {
 			f := newFactoryBuildFixture(t, true)
+			if which == "late-toggle" || which == "late-sector" {
+				enableFactoryAutoload(t, f, 7, 0)
+			}
 			in := factoryBuildInput(t, f)
 			before := factoryBuildRecords(t, f)
 			want := factoryBuildExpected(t, before, in)
@@ -467,6 +468,14 @@ func TestPlanetFactoryBuildLateWriterAndPostcommitFailures(t *testing.T) {
 					case "late-planet":
 						q := planetEdit(in.Input.Planet)
 						q.Info[2].Resource++
+						e = f.store.PutPlanet(q)
+					case "late-toggle":
+						q := *in.Input.Race
+						q.Governor[0].Toggle.AutoLoad = false
+						e = f.store.PutRace(&q)
+					case "late-sector":
+						q := planetEdit(in.Input.Planet)
+						q.SectorAt(0, 0).Fert++
 						e = f.store.PutPlanet(q)
 					case "late-AP":
 						q := *in.Input.Star
@@ -566,6 +575,434 @@ func TestPlanetFactoryBuildQuiescedAndFenced(t *testing.T) {
 			}
 			if which == "quiesced" && f.state.Mode() != ModeQuiesced {
 				t.Fatal("quiesced changed mode")
+			}
+		})
+	}
+}
+
+func enableFactoryAutoload(t *testing.T, f *factoryFixture, civilians, troops uint16) {
+	t.Helper()
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		p := f.state.planets[f.star][f.planet]
+		sec := p.SectorAt(0, 0)
+		sec.Popn, sec.Troops, sec.Mobilization = civilians, troops, 3
+		populationTotals(p)
+		r := f.state.races[0]
+		r.Mass = 1.25
+		if err := f.store.PutRace(r); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.PutPlanet(p); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if msg := f.command(t, "toggle autoload"); msg != "autoload is now ON\n" {
+		t.Fatalf("toggle autoload: %q", msg)
+	}
+}
+
+func TestPlanetFactoryBuildAutoloadDispatch(t *testing.T) {
+	t.Parallel()
+	for _, free := range []bool{false, true} {
+		for _, tc := range []struct{ civilians, troops, loaded uint16 }{{7, 0, 7}, {20, 3, 20}, {31, 0, 20}} {
+			t.Run(fmt.Sprintf("free=%t/popn=%d/troops=%d", free, tc.civilians, tc.troops), func(t *testing.T) {
+				f := newFactoryBuildFixture(t, free)
+				enableFactoryAutoload(t, f, tc.civilians, tc.troops)
+				in := factoryBuildInput(t, f)
+				id := uint32(78)
+				if free {
+					id = 70
+				}
+				original := in.Input.Planet
+				want := planetEdit(original)
+				want.Info[0].Resource -= 23
+				want.Ships = id
+				sec := want.SectorAt(0, 0)
+				sec.Popn -= tc.loaded
+				if sec.Popn == 0 && tc.troops == 0 {
+					sec.Owner = 0
+				}
+				populationTotals(want) // independent recount of every sector and owner's totals
+				before := factoryBuildRecords(t, f)
+				var ptr *model.Planet
+				reg := &factoryBuildRegistry{}
+				onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+					ptr = f.state.planets[f.star][f.planet]
+					reg.at = func(string) {
+						planet, err := f.store.GetPlanet(f.star, f.planet)
+						sh, shipErr := f.store.GetShip(id)
+						if err != nil || shipErr != nil || sh == nil || !reflect.DeepEqual(planet, want) ||
+							ptr != f.state.planets[f.star][f.planet] || !reflect.DeepEqual(ptr, planet) ||
+							!reflect.DeepEqual(sh, f.state.ships[id]) {
+							t.Error("build notice before complete durable and actor installation")
+							return
+						}
+						if sh.Popn != tc.loaded || sh.Fuel != 0 || sh.BuildCost != 23 ||
+							sh.Mass != sh.BaseMass+float64(tc.loaded)*1.25 || sh.NextShip != original.Ships {
+							t.Errorf("incorrect factory #%d crew=%d fuel=%g mass=%g cost=%d next=%d", id, sh.Popn, sh.Fuel, sh.Mass, sh.BuildCost, sh.NextShip)
+						}
+					}
+					f.state.SetRegistry(reg)
+				})
+				msg := f.command(t, "build F 0,0")
+				loaded := fmt.Sprintf("Loaded with %d crew and 0.0 fuel.", tc.loaded)
+				if msg != "" || f.state.Mode() != ModeServing || strings.Count(reg.all(), loaded) != 1 || reg.count() != 7 {
+					t.Fatalf("build response %q, notices %q", msg, reg.all())
+				}
+				if !reflect.DeepEqual(factoryBuildExpected(t, before, in), factoryBuildRecords(t, f)) {
+					t.Fatal("unexpected changes to durable records or allocator")
+				}
+			})
+		}
+	}
+}
+
+func TestPlanetFactoryBuildAutoloadScheduledPersistence(t *testing.T) {
+	t.Parallel()
+	f := newFactoryBuildFixture(t, true)
+	enableFactoryAutoload(t, f, 7, 0)
+	if msg := f.command(t, "build F 0,0"); msg != "" {
+		t.Fatal(msg)
+	}
+	check := func() {
+		t.Helper()
+		assertActorStoreAgreement(t, f.actorEnrollmentFixture)
+		p, err := f.store.GetPlanet(f.star, f.planet)
+		if err != nil || p == nil {
+			t.Fatal("missing planet", err)
+		}
+		child, err := f.store.GetShip(70)
+		if err != nil || child == nil || child.Type != model.OtypeFactory || child.Popn != 7 || child.Fuel != 0 ||
+			child.Mass != child.BaseMass+7*1.25 || !child.Docked || child.WhatOrbits != model.LevelPlan || child.StOrbits != f.star || child.PNumOrbits != f.planet {
+			t.Fatal("lost or changed crewed factory", child, err)
+		}
+		seen := map[uint32]bool{}
+		for n := p.Ships; n != 0; {
+			sh, e := f.store.GetShip(n)
+			if e != nil || sh == nil || seen[n] {
+				t.Fatal("broken planet ship chain", n, e)
+			}
+			seen[n] = true
+			n = sh.NextShip
+		}
+		if !seen[70] || !seen[77] || p.SectorAt(0, 0).Owner != 0 || p.SectorAt(0, 0).Popn != 0 || p.Info[0].Resource != 9977 {
+			t.Fatalf("lost construction or evacuation: chain=%v sector=%+v resources=%d", seen, p.SectorAt(0, 0), p.Info[0].Resource)
+		}
+		want := planetEdit(p)
+		populationTotals(want)
+		if p.Popn != want.Popn || p.Troops != want.Troops || p.Info != want.Info {
+			t.Fatal("sector and planet accounting disagree")
+		}
+	}
+	check()
+	scheduledBuildTurnsAndRestart(t, f, check)
+}
+
+// Include all world records and allocation metadata, as well as actor state and notices.
+func assertFactoryBuildRefused(t *testing.T, f *factoryFixture, reason string) {
+	t.Helper()
+	reg := &fakeRegistry{}
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() { f.state.SetRegistry(reg) })
+	before := factoryBuildRecords(t, f)
+	actor := actorEnrollmentSnapshot(t, f.actorEnrollmentFixture)
+	msg := f.command(t, "build F 0,0")
+	if !strings.Contains(msg, reason) || f.state.Mode() != ModeServing || f.store.CommandWriteUncertain() ||
+		reg.count() != 0 || actor != actorEnrollmentSnapshot(t, f.actorEnrollmentFixture) || !reflect.DeepEqual(before, factoryBuildRecords(t, f)) {
+		t.Fatalf("expected safe refusal %q, got %q, mode=%v, notices=%q", reason, msg, f.state.Mode(), reg.all())
+	}
+}
+
+func TestPlanetFactoryBuildAutoloadAfterScrap(t *testing.T) {
+	t.Parallel()
+	f := newFactoryBuildFixture(t, true)
+	enableFactoryAutoload(t, f, 5, 0)
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		sh := f.state.ships[f.factory]
+		sh.Popn = 10
+		sh.Mass = sh.BaseMass + 10*f.state.races[0].Mass
+		st := f.state.stars[f.star]
+		st.AP[0] = 10
+		if err := f.store.PutShip(sh); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.PutStar(st); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if msg := f.command(t, "scrap #77"); !strings.Contains(msg, "Scrapped.") {
+		t.Fatal(msg)
+	}
+	assertFactoryBuildRefused(t, f, "retry after the next persisted turn")
+	updates := f.state.Status().NumUpdates
+	var child uint32
+	scheduledBuildTurnsAndRestart(t, f, func() {
+		assertActorStoreAgreement(t, f.actorEnrollmentFixture)
+		p, err := f.store.GetPlanet(f.star, f.planet)
+		if err != nil || p == nil {
+			t.Fatal("missing home planet", err)
+		}
+		if f.state.Status().NumUpdates == updates { // the first scheduled segment
+			if p.SectorAt(0, 0).Popn != 15 || p.Popn != 15 || p.Info[0].Popn != 5 {
+				t.Fatal("scrap accounting discrepancy was not reproduced")
+			}
+			assertFactoryBuildRefused(t, f, "totals disagree")
+			return
+		}
+		if child == 0 { // the full update recounted the planet; retry manually
+			child = factoryBuildInput(t, f).Allocation.Number
+			if msg := f.command(t, "build F 0,0"); msg != "" {
+				t.Fatal(msg)
+			}
+		}
+		if sh, err := f.store.GetShip(child); err != nil || sh == nil || sh.Type != model.OtypeFactory || sh.Popn == 0 {
+			t.Fatal("lost factory after retry", child, err)
+		}
+	})
+}
+
+// Let a single source spread last. Every random direction from the center
+// reaches an already-visited neutral neighbor with its mobilization intact.
+func TestPlanetFactoryBuildAfterRecolonization(t *testing.T) {
+	t.Parallel()
+	f := newFactoryBuildFixture(t, true)
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		p := f.state.planets[f.star][f.planet]
+		p.MaxX, p.MaxY = 3, 3
+		p.Sectors = make([]model.Sector, 9)
+		for i := range p.Sectors {
+			p.Sectors[i] = model.Sector{Type: model.SectorLand, Condition: model.SectorLand, Fert: 100, Eff: 10, Mobilization: 60}
+		}
+		source := p.SectorAt(1, 1)
+		source.Owner, source.Race, source.Popn, source.Fert = 1, 1, 240, 50
+		p.Info[0].MobSet = 60
+		p.Conditions[model.AtmosToxic] = 0
+		populationTotals(p)
+		r := f.state.races[0]
+		r.Conditions = p.Conditions
+		r.Conditions[model.AtmosTemp] = p.Conditions[model.AtmosRTemp]
+		r.Adventurism, r.BirthRate, r.Fertilize, r.NumberSexes = 1.0/6, 0, 0, 2
+		r.Likes[model.SectorLand] = 1
+		if err := f.store.PutRace(r); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.PutPlanet(p); err != nil {
+			t.Fatal(err)
+		}
+		f.state.testHooks = &testHooks{orderPlanetSectors: func(pl *model.Planet, coords []sectorCoord) {
+			if pl == p {
+				for i, c := range coords {
+					if c.x == 1 && c.y == 1 {
+						last := len(coords) - 1
+						coords[i], coords[last] = coords[last], coords[i]
+						break
+					}
+				}
+			}
+		}}
+	})
+	if msg := f.command(t, "toggle autoload"); msg != "autoload is now ON\n" {
+		t.Fatal(msg)
+	}
+	if err := f.state.TriggerUpdate(ctxT(t, 10*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	assertActorStoreAgreement(t, f.actorEnrollmentFixture)
+	p, err := f.store.GetPlanet(f.star, f.planet)
+	if err != nil || p == nil {
+		t.Fatal(err)
+	}
+	info := p.Info[0]
+	if info.NumSectsOwned != 2 || info.Popn != 240 || p.Popn != 240 || info.ComRead != 30 || info.Guns != 12 {
+		t.Fatalf("expected two sectors and one sector's production: %+v, population %d", info, p.Popn)
+	}
+	for i, sec := range p.Sectors {
+		if sec.Owner != 1 || i == 4 {
+			continue
+		}
+		if sec.Popn == 0 || sec.Popn > 20 || sec.Mobilization != 60 {
+			t.Fatalf("unexpected recolonized sector: %+v", sec)
+		}
+		x, y := i%int(p.MaxX), i/int(p.MaxX)
+		if msg := f.command(t, fmt.Sprintf("build F %d,%d", x, y)); msg != "" {
+			t.Fatalf("build on recolonized sector (%d,%d): %q, prebuild MobPoints=%d, sector sum=120", x, y, msg, info.MobPoints)
+		}
+		if info.MobPoints != 120 {
+			t.Fatalf("full update persisted %d points for two 60-point sectors", info.MobPoints)
+		}
+		want := planetEdit(p)
+		want.Ships = 70
+		want.Sectors[i].Owner, want.Sectors[i].Popn = 0, 0
+		want.Info[0].Resource -= 23
+		populationTotals(want)
+		check := func() {
+			t.Helper()
+			assertActorStoreAgreement(t, f.actorEnrollmentFixture)
+			got, err := f.store.GetPlanet(f.star, f.planet)
+			if err != nil || !reflect.DeepEqual(got, want) || got.Info[0].MobPoints != 60 {
+				t.Fatal("evacuation or persisted planet accounting changed", err)
+			}
+			sh, err := f.store.GetShip(70)
+			if err != nil || sh == nil || sh.Type != model.OtypeFactory || sh.Popn != sec.Popn || sh.NextShip != p.Ships {
+				t.Fatal("lost crewed factory after restart", sh, err)
+			}
+		}
+		check()
+		f.restart(t)
+		check()
+		return
+	}
+	t.Fatal("migration failed to establish a colony")
+}
+
+// Toxic damage removes one sector after every sector has produced. With one
+// initial owner this also exercises the last-sector loss without a build.
+func TestPlanetFactoryBuildUpdateLostMobilization(t *testing.T) {
+	for _, width := range []uint8{1, 2} {
+		t.Run(fmt.Sprint(width), func(t *testing.T) {
+			f := newFactoryBuildFixture(t, false)
+			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+				p := f.state.planets[f.star][f.planet]
+				p.MaxX, p.MaxY = width, 1
+				p.Sectors = make([]model.Sector, width)
+				for i := range p.Sectors {
+					p.Sectors[i] = model.Sector{Owner: 1, Race: 1, Troops: 1, Mobilization: 60}
+				}
+				p.ExplTimer = 4
+				p.Info[0].MobSet = 60
+				p.Conditions[model.AtmosToxic] = 100
+				populationTotals(p)
+				if err := f.store.PutPlanet(p); err != nil {
+					t.Fatal(err)
+				}
+			})
+			if err := f.state.TriggerUpdate(ctxT(t, 10*time.Second)); err != nil {
+				t.Fatal(err)
+			}
+			assertActorStoreAgreement(t, f.actorEnrollmentFixture)
+			p, err := f.store.GetPlanet(f.star, f.planet)
+			if err != nil || p == nil {
+				t.Fatal(err)
+			}
+			remaining := uint16(width - 1)
+			i := p.Info[0]
+			if i.NumSectsOwned != remaining || i.MobPoints != 60*uint64(remaining) || i.Guns != 12*width {
+				t.Fatalf("lost sector: owners=%d points=%d guns=%d", i.NumSectsOwned, i.MobPoints, i.Guns)
+			}
+		})
+	}
+}
+
+func TestPlanetFactoryBuildAutoloadHomeworld(t *testing.T) {
+	f := newFactoryBuildFixture(t, true) // capital and aggregates come from actual enrollment
+	p, err := f.store.GetPlanet(f.star, f.planet)
+	if err != nil || p == nil || p.Sectors[0].Popn == 0 || p.Popn != uint64(p.Sectors[0].Popn) || p.Info[0].Popn != 0 {
+		t.Fatal("expected initial homeworld accounting", err)
+	}
+	if msg := f.command(t, "toggle autoload"); msg != "autoload is now ON\n" {
+		t.Fatal(msg)
+	}
+	assertFactoryBuildRefused(t, f, "totals disagree")
+	if msg := f.command(t, "toggle autoload"); msg != "autoload is now OFF\n" {
+		t.Fatal(msg)
+	}
+	if msg := f.command(t, "build F 0,0"); msg != "" {
+		t.Fatal(msg)
+	}
+	p.Ships, p.Info[0].Resource = 70, p.Info[0].Resource-23
+	got, err := f.store.GetPlanet(f.star, f.planet)
+	if err != nil || !reflect.DeepEqual(got, p) {
+		t.Fatal("empty factory must preserve existing population accounts", err)
+	}
+	assertActorStoreAgreement(t, f.actorEnrollmentFixture)
+}
+
+func TestPlanetFactoryBuildAutoloadAccountingRefusals(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		edit func(*model.Planet)
+	}{
+		{"planet undercount", func(p *model.Planet) { p.Popn-- }},
+		{"player undercount", func(p *model.Planet) { p.Info[0].Popn-- }},
+		{"ownership undercount", func(p *model.Planet) { p.Info[0].NumSectsOwned-- }},
+		{"mobilization undercount", func(p *model.Planet) { p.Info[0].MobPoints-- }},
+		{"planet overcount", func(p *model.Planet) { p.Popn++ }},
+		{"player overcount", func(p *model.Planet) { p.Info[0].Popn++ }},
+		{"ownership overcount", func(p *model.Planet) { p.Info[0].NumSectsOwned++ }},
+		{"mobilization overcount", func(p *model.Planet) { p.Info[0].MobPoints++ }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFactoryBuildFixture(t, true)
+			enableFactoryAutoload(t, f, 7, 0)
+			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+				p := f.state.planets[f.star][f.planet]
+				tc.edit(p)
+				if err := f.store.PutPlanet(p); err != nil {
+					t.Fatal(err)
+				}
+			})
+			assertFactoryBuildRefused(t, f, "totals disagree")
+		})
+	}
+}
+
+func TestPlanetFactoryBuildAutoloadAdmissionAndUncertainty(t *testing.T) {
+	t.Parallel()
+	for _, which := range []string{"pending population", "invalid sector owner", "invalid race mass", "crew mass overflow", "uncertain commit"} {
+		t.Run(which, func(t *testing.T) {
+			f := newFactoryBuildFixture(t, true)
+			enableFactoryAutoload(t, f, 7, 0)
+			reg := &fakeRegistry{}
+			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+				p := f.state.planets[f.star][f.planet]
+				f.state.SetRegistry(reg)
+				switch which {
+				case "pending population":
+					p.SectorAt(0, 0).Popn++
+					populationTotals(p)
+				case "invalid sector owner":
+					p.Sectors[1].Owner = model.MaxPlayers + 1
+					if err := f.store.PutPlanet(p); err != nil {
+						t.Fatal(err)
+					}
+				case "invalid race mass", "crew mass overflow":
+					r := f.state.races[0]
+					r.Mass = -1
+					if which == "crew mass overflow" {
+						r.Mass = math.MaxFloat64
+					}
+					if e := f.store.PutRace(r); e != nil {
+						t.Fatal(e)
+					}
+				}
+			})
+			actor := actorEnrollmentSnapshot(t, f.actorEnrollmentFixture)
+			want := factoryBuildRecords(t, f)
+			if which == "uncertain commit" {
+				want = factoryBuildExpected(t, want, factoryBuildInput(t, f))
+				f.store.SetMetaFault(func(op string) error {
+					if op == "factory-build.commit-error" || op == "command.readback" {
+						return errors.New("injected")
+					}
+					return nil
+				})
+			}
+			msg := f.command(t, "build F 0,0")
+			f.store.SetMetaFault(nil)
+			if !reflect.DeepEqual(want, factoryBuildRecords(t, f)) || actor != actorEnrollmentSnapshot(t, f.actorEnrollmentFixture) || strings.Contains(reg.all(), "gov:") {
+				t.Fatal("unexpected proposal, durable world or success notice", which, msg)
+			}
+			if which == "pending population" {
+				if f.state.Mode() != ModeServing || !strings.Contains(msg, "retry after the next persisted turn") {
+					t.Fatal(msg, f.state.Mode())
+				}
+				return
+			}
+			if f.state.Mode() != ModeHalted || f.store.CommandWriteUncertain() != (which == "uncertain commit") {
+				t.Fatal(msg, f.state.Mode())
+			}
+			if e := f.state.Stop(ctxT(t, 10*time.Second)); !errors.Is(e, ErrHaltedNotFlushed) || !reflect.DeepEqual(want, factoryBuildRecords(t, f)) {
+				t.Fatal("stale shutdown flush", e)
 			}
 		})
 	}

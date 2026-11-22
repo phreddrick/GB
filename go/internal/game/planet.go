@@ -161,6 +161,9 @@ func (s *State) doPlanet(star *model.Star, planet *model.Planet, starNum, planet
 	claims := 0
 
 	coords := permuteSects(planet)
+	if s.testHooks != nil && s.testHooks.orderPlanetSectors != nil {
+		s.testHooks.orderPlanetSectors(planet, coords)
+	}
 	for _, c := range coords {
 		p := planet.SectorAt(c.x, c.y)
 
@@ -332,7 +335,8 @@ func (s *State) doPlanet(star *model.Star, planet *model.Planet, starNum, planet
 	// ---- Resource recovery for conquered planets -------------------------
 	s.doRecover(planet, star, starNum, planetNum)
 
-	// ---- Final population / resource recount -----------------------------
+	// ---- Final ownership, population and resource recount ----------------
+	var sectorMob [model.MaxPlayers]uint64
 	planet.Popn = 0
 	planet.Troops = 0
 	planet.MaxPopn = 0
@@ -348,6 +352,7 @@ func (s *State) doPlanet(star *model.Star, planet *model.Planet, starNum, planet
 		if p.Owner != 0 {
 			idx := p.Owner - 1
 			planet.Info[idx].NumSectsOwned++
+			sectorMob[idx] += uint64(p.Mobilization)
 			planet.Info[idx].Troops += uint32(p.Troops)
 			planet.Info[idx].Popn += uint32(p.Popn)
 			planet.Popn += uint64(p.Popn)
@@ -492,16 +497,17 @@ func (s *State) doPlanet(star *model.Star, planet *model.Planet, starNum, planet
 		s.power[i].SectorsOwned += uint64(planet.Info[i].NumSectsOwned)
 		if planet.Info[i].NumSectsOwned > 0 {
 			s.power[i].PlanetsOwned++
-			// Combat readiness → average mobilization
-			if planet.Info[i].NumSectsOwned > 0 {
-				planet.Info[i].MobPoints = uint64(accum[i].avgMob)
-				avgMob := accum[i].avgMob / int64(planet.Info[i].NumSectsOwned)
-				planet.Info[i].ComRead = uint8(avgMob)
-			}
+			// Preserve C's production-pass basis for combat readiness and guns.
+			planet.Info[i].MobPoints = uint64(accum[i].avgMob)
+			avgMob := accum[i].avgMob / int64(planet.Info[i].NumSectsOwned)
+			planet.Info[i].ComRead = uint8(avgMob)
 		} else {
 			planet.Info[i].ComRead = 0
 		}
 		planet.Info[i].Guns = planetGuns(planet.Info[i].MobPoints)
+		// Commands debit the final owned-sector balance. A sector claimed
+		// after its visit did not produce, but contributes to this balance.
+		planet.Info[i].MobPoints = sectorMob[i]
 	}
 }
 
