@@ -1,17 +1,25 @@
 # CR-17C #44 — One Space Probe built in a Carrier’s hangar
 
-From ship scope, an eligible planet-orbiting Carrier builds one Space Probe
-with `build :`. The ordinary non-God, autoload-off path uses legacy first-letter
-selection and effective-count parsing. The Carrier must be alive, active,
+From ship scope, `build :` constructs one Space Probe inside an eligible
+planet-orbiting Carrier with autoload on or off. The ordinary non-God path uses
+legacy first-letter selection and effective-count parsing. The Carrier must be alive, active,
 undocked, crewed, undamaged, sufficiently advanced and owned by the caller.
 The leader can use any owned Carrier. A subgovernor must be active and assigned
 to the builder. The bounded command also refuses dissolved races and inactive
 leaders. Legacy construction did not enforce all of those authority checks.
 
 The probe costs 24 resources, occupies one hangar unit and costs zero AP. It
-enters at the head of the hold with zero crew and fuel. The Carrier retains
-its previous children, mass, fuel and crew. Other child types, orbits, God
-builds, autoload and multiple builds retain their existing handlers.
+enters at the head of the hold with zero crew. With autoload off, it receives
+zero fuel. With autoload on, it receives the lesser of the Carrier's available
+fuel and the probe's 20-unit capacity, including fractional fuel. The Carrier
+loses exactly the fuel loaded and retains its previous children, mass and crew.
+As in `source/build.c` (`autoload_at_ship` and `initialize_new_ship`), the
+probe's mass is its base mass plus loaded fuel times the fuel mass coefficient.
+With autoload on, a negative or non-finite Carrier fuel balance halts the engine
+before construction writes or success notices. The same safeguard applies if
+floating-point subtraction cannot debit the amount the child would receive.
+Other child types, orbits, God builds and multiple builds retain their existing
+handlers.
 
 ## Atomic construction
 
@@ -19,10 +27,21 @@ The command takes private ship proposals and snapshots of the race, planet,
 star (including AP), complete exterior orbit list and immediate hold. The closed
 bbolt operation recomputes the probe and debits, checks all persisted preimages
 and revalidates the allocation ticket in the writer. It creates the child,
-updates the Carrier’s resource balance, Hanger and Ships head, and consumes
-the precise free-list key on reuse. Append requires an absent ship number.
+updates the Carrier’s resource and fuel balances, Hanger and Ships head, and
+consumes the precise free-list key on reuse. Append requires an absent ship number.
 On confirmed commit, it installs the child and updates the existing Carrier
 object before releasing the four build notices.
+
+## Autoload split save on the PR #90 baseline
+
+On `f4acdc42680f450a4df996eda5f1949b29e82c28`, a real `toggle autoload`
+followed by `build :` bypassed the probe transaction. With 29.375 fuel the
+actor charged the Carrier 24 resources and 20 fuel. It linked the new probe
+and raised occupied space from 4 to 5. The store contained the fueled probe,
+but its Carrier still had 500 resources, 29.375 fuel, occupied space 4 and the
+old head. Both append and free-ID reuse reproduced the split. The corrected
+dispatch uses the existing transaction for either value of the active
+governor's toggle. It preserves the legacy actor result and notices.
 
 | Admission or outcome | Observable result |
 | --- | --- |
@@ -81,8 +100,14 @@ a scheduled segment, full update and restart.
 Late-writer cases change the Carrier, hold child, active governor’s race row,
 or another ship in the exterior orbit between admission and the writer.
 Removing either the race or exterior-witness comparison makes its regression
-fail. The 18 real SIGKILL cases cover **planet-orbit probe construction**,
-with nine boundaries on each allocation path. They verify old-or-new logical
-worlds, including the allocator, after reopening disposable stores. Navigation
+fail. Autoload-specific cases change just the governor's toggle or the Carrier's
+stored fuel. Dispatcher tests compare zero, fractional, exact-capacity and
+excess available fuel on both allocation paths. They check the installed world
+at each notice. Scheduled segment, full update and restart checks retain
+both ships' fuel and the probe's mass and reachability.
+
+The 36 real SIGKILL cases cover **planet-orbit probe construction**,
+with nine boundaries on each allocation path for each toggle setting. They verify
+old-or-new logical worlds, including the allocator, after reopening disposable stores. Navigation
 crashes, physical disk failure, and broader #44 construction remain outside
 this coverage.
