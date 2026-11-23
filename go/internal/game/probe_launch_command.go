@@ -61,7 +61,7 @@ func (s *State) handleProbeLaunch(p, g int, spec string, sess net.Responder) boo
 // A turn can keep a live child in a dead Carrier's hold after dropping the
 // Carrier from the exterior list. Validate this read-only refusal separately;
 // the storage planner still requires a living, exterior-linked Carrier.
-func detachedWreckLaunch(in commandrules.ProbeLaunch, b *model.Ship) error {
+func detachedWreckLaunch(in commandrules.ProbeTransit, b *model.Ship) error {
 	if b.NextShip != 0 || b.Owner == 0 || int(b.Owner) > model.MaxPlayers || int(b.Governor) > model.MaxGovernors ||
 		commandrules.FactoryBuildChain(in.Star, in.Planet, in.Orbit) != nil {
 		return commandrules.ErrFactoryBuildInput
@@ -108,14 +108,14 @@ func (s *State) runProbeLaunch(p, g int, id, parent uint32, sess net.Responder) 
 		return
 	}
 	w.scope = &workspaceScope{p, g, s.dirs[p-1][g]}
-	in := commandrules.ProbeLaunch{PlanetHangar: commandrules.PlanetHangar{Player: p, Governor: g, Scope: w.scope.before, Race: r}, Selected: id, Parent: parent}
+	in := commandrules.ProbeTransit{PlanetHangar: commandrules.PlanetHangar{Player: p, Governor: g, Scope: w.scope.before, Race: r}, Selected: id, Parent: parent}
 	b, err := w.ship(parent)
 	if err != nil || w.capturePlanetHold(b, &in.PlanetHangar) != nil {
 		fail()
 		return
 	}
 	detachedWreck := !b.Alive && !slices.ContainsFunc(in.Orbit, func(sh *model.Ship) bool { return sh.Number == parent })
-	var change commandrules.ProbeLaunchChange
+	var change commandrules.ProbeTransitChange
 	if detachedWreck {
 		err = detachedWreckLaunch(in, b)
 	} else {
@@ -151,26 +151,31 @@ func (s *State) runProbeLaunch(p, g int, id, parent uint32, sess net.Responder) 
 	launched := fmt.Sprintf("%s launched from %s.\n", shipDisplayName(change.Probe), shipDisplayName(b))
 	orbiting := fmt.Sprintf("Orbiting %s/%s.\n", s.starName(int(b.StOrbits)), s.planetName(int(b.StOrbits), int(b.PNumOrbits)))
 	outcome, err = s.store.CommitProbeLaunch(in)
-	if outcome == db.CommandCommitted {
-		if s.testHooks != nil && s.testHooks.beforeCommandInstall != nil {
-			s.testHooks.beforeCommandInstall()
-		}
-		if !w.owns() {
-			fail()
-			return
-		}
-		*w.ships[id].actor = *change.Probe
-		*w.ships[parent].actor = *change.Carrier
-		if pred := change.Predecessor; pred != nil {
-			*w.ships[pred.Number].actor = *pred
-		}
-		*w.planets[[2]uint8{b.StOrbits, b.PNumOrbits}].actor = *change.Planet
-		if s.testHooks != nil && s.testHooks.afterCommandInstall != nil {
-			s.testHooks.afterCommandInstall()
-		}
+	if outcome == db.CommandCommitted && w.installProbeTransit(change) {
 		if err == nil && sess.Send(launched) == nil && sess.Send(orbiting) == nil {
 			return
 		}
 	}
 	fail()
+}
+
+// Install into the same actor-owned objects after the entire graph commits.
+func (w *commandWorkspace) installProbeTransit(change commandrules.ProbeTransitChange) bool {
+	s := w.s
+	if s.testHooks != nil && s.testHooks.beforeCommandInstall != nil {
+		s.testHooks.beforeCommandInstall()
+	}
+	if !w.owns() {
+		return false
+	}
+	*w.ships[change.Probe.Number].actor = *change.Probe
+	*w.ships[change.Carrier.Number].actor = *change.Carrier
+	if pred := change.Predecessor; pred != nil {
+		*w.ships[pred.Number].actor = *pred
+	}
+	w.planets[[2]uint8{change.Planet.StarNum, change.Planet.PlanetNum}].actor.Ships = change.Planet.Ships
+	if s.testHooks != nil && s.testHooks.afterCommandInstall != nil {
+		s.testHooks.afterCommandInstall()
+	}
+	return true
 }

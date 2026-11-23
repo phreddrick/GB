@@ -18,7 +18,7 @@ func (s *State) constructionAdmission(w *commandWorkspace, carrier uint32) (bool
 	return s.shipChainAdmission(w, carrier, false)
 }
 
-func (s *State) shipChainAdmission(w *commandWorkspace, carrier uint32, detachedWreck bool) (bool, error) {
+func (s *State) shipChainAdmission(w *commandWorkspace, carrier uint32, detachedWreck bool, otherHolds ...uint32) (bool, error) {
 	bad := commandrules.ErrFactoryBuildInput
 	pending := false
 	storedShips := map[uint32]*model.Ship{}
@@ -89,6 +89,7 @@ func (s *State) shipChainAdmission(w *commandWorkspace, carrier uint32, detached
 		}
 		pending = pending || !reflect.DeepEqual(q, r.before)
 	}
+	roots := map[walkStoredRoot]map[uint32]bool{}
 	for key, p := range w.planets {
 		q, e := s.store.GetPlanet(key[0], key[1])
 		if e != nil {
@@ -119,6 +120,9 @@ func (s *State) shipChainAdmission(w *commandWorkspace, carrier uint32, detached
 		if e := commandrules.FactoryBuildChain(st, q, chain); e != nil {
 			return false, e
 		}
+		if len(otherHolds) != 0 {
+			roots[walkStoredRoot{level: model.LevelPlan, star: key[0], planet: key[1]}] = seen
+		}
 	}
 	for id, a := range w.ships {
 		sh, e := readShip(id)
@@ -129,10 +133,15 @@ func (s *State) shipChainAdmission(w *commandWorkspace, carrier uint32, detached
 	}
 	// Follow the stored hold even when an older/different head is absent from
 	// the actor's witnesses. A broken stored tail is not an ordinary deferral.
-	roots := map[walkStoredRoot]map[uint32]bool{}
-	var landedInHold map[uint32]bool
-	if carrier != 0 {
-		b, e := readShip(carrier)
+	landedInHold := map[uint32]bool{}
+	// A historical landing refusal can witness multiple distinct holds. Check
+	// their persisted tails and reject shared children before allowing deferral.
+	holdOwners := map[uint32]uint32{}
+	for _, parent := range append(otherHolds, carrier) {
+		if parent == 0 {
+			continue
+		}
+		b, e := readShip(parent)
 		if e != nil {
 			return false, e
 		}
@@ -144,17 +153,25 @@ func (s *State) shipChainAdmission(w *commandWorkspace, carrier uint32, detached
 		if err != nil && err != commandrules.ErrProbeHoldUnsettled {
 			return false, err
 		}
+		for id := range hold {
+			if previous := holdOwners[id]; previous != 0 && previous != parent {
+				return false, bad
+			}
+			holdOwners[id] = parent
+		}
 		if err == commandrules.ErrProbeHoldUnsettled {
 			if err := checkOtherLandingOrbits(b, children, s.store.GetStar, s.store.GetPlanet, readLinked); err != nil {
 				return false, err
 			}
 			// Check the Carrier's own persisted planet chain. A child still
 			// linked there as well as in the hold is structural corruption.
-			if err := s.walkStoredLocation(b, readShip, roots, map[uint32]bool{}, acceptPartial); err != nil {
-				return false, err
+			root := walkStoredRoot{level: model.LevelPlan, star: b.StOrbits, planet: b.PNumOrbits}
+			if roots[root] == nil {
+				if err := s.walkStoredLocation(b, readShip, roots, map[uint32]bool{}, acceptPartial); err != nil {
+					return false, err
+				}
 			}
-			exterior := roots[walkStoredRoot{level: model.LevelPlan, star: b.StOrbits, planet: b.PNumOrbits}]
-			landedInHold = map[uint32]bool{}
+			exterior := roots[root]
 			for _, child := range children {
 				if exterior[child.Number] {
 					return false, bad
@@ -172,6 +189,15 @@ func (s *State) shipChainAdmission(w *commandWorkspace, carrier uint32, detached
 		ids = append(ids, id)
 	}
 	for _, id := range ids {
+		if len(otherHolds) > 0 && holdOwners[id] != 0 {
+			// Each witnessed parent is checked separately below. Following a
+			// nested shuttle's declared orbit through its historically held
+			// Carrier would incorrectly classify the agreed graph as pending.
+			if cyclicHold(holdOwners, id) {
+				return false, bad
+			}
+			continue
+		}
 		if !missing[id] && !landedInHold[id] {
 			if e := s.walkStoredLocation(storedShips[id], readShip, roots, map[uint32]bool{}, acceptPartial); e != nil {
 				return false, e
@@ -190,4 +216,15 @@ func (s *State) shipChainAdmission(w *commandWorkspace, carrier uint32, detached
 		}
 	}
 	return pending, nil
+}
+
+// Check containment between validated lists as well as NextShip cycles within them.
+func cyclicHold(owners map[uint32]uint32, id uint32) bool {
+	for steps := 0; id != 0; steps++ {
+		if steps > len(owners) {
+			return true
+		}
+		id = owners[id]
+	}
+	return false
 }

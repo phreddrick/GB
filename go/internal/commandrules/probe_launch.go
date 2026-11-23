@@ -9,20 +9,20 @@ import (
 
 // The numeric selector is independent of directory level. Scope witnesses the
 // actual caller directory; Carrier identifies the physical hold.
-type ProbeLaunch struct {
+type ProbeTransit struct {
 	PlanetHangar
 	Selected, Parent uint32
 }
 
-type ProbeLaunchChange struct {
+type ProbeTransitChange struct {
 	Probe, Carrier, Predecessor *model.Ship
 	Planet                      *model.Planet
 }
 
 var ErrLaunchRefused = errors.New("cannot launch from this hangar")
 
-func PlanProbeLaunch(in ProbeLaunch) (ProbeLaunchChange, error) {
-	var change ProbeLaunchChange
+func PlanProbeLaunch(in ProbeTransit) (ProbeTransitChange, error) {
+	var change ProbeTransitChange
 	if in.Player < 1 || in.Player > model.MaxPlayers || in.Governor < 0 || in.Governor > model.MaxGovernors ||
 		in.Scope.Level > model.LevelShip || in.Race == nil || in.Race.PlayerNum != in.Player || in.Selected == 0 {
 		return change, ErrFactoryBuildInput
