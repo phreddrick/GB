@@ -112,7 +112,13 @@ func (s *Store) CommitPlanetFactory(in PlanetFactoryBuild) (outcome CommandOutco
 	return s.commitConstruction("CommitPlanetFactory", "factory-build", in.Allocation, func() (preparedFactoryBuild, error) { return prepareFactoryBuild(in) })
 }
 
-func (s *Store) commitConstruction(method, operation string, allocation FactoryAllocation, prepare func() (preparedFactoryBuild, error)) (outcome CommandOutcome, err error) {
+func (s *Store) commitConstruction(method, operation string, allocation FactoryAllocation, prepare func() (preparedFactoryBuild, error)) (CommandOutcome, error) {
+	return s.commitShipRecords(method, operation, &allocation, prepare)
+}
+
+// Only construction consumes an ID. Launch uses the same CAS, maintenance,
+// uncertainty and readback boundaries, without consulting the allocator.
+func (s *Store) commitShipRecords(method, operation string, allocation *FactoryAllocation, prepare func() (preparedFactoryBuild, error)) (outcome CommandOutcome, err error) {
 	outcome = CommandNotCommitted
 	if e := s.writeAllowed(method); e != nil {
 		return outcome, commandError(CommandFenced)
@@ -178,12 +184,14 @@ func (s *Store) commitConstruction(method, operation string, allocation FactoryA
 				return commandError(CommandIO)
 			}
 		}
-		ticket, e := factoryBuildShipTx(tx)
-		if e != nil {
-			return e
-		}
-		if ticket != allocation {
-			return commandError(CommandStale)
+		if allocation != nil {
+			ticket, e := factoryBuildShipTx(tx)
+			if e != nil {
+				return e
+			}
+			if ticket != *allocation {
+				return commandError(CommandStale)
+			}
 		}
 		if e := s.metaFault(operation + ".validated"); e != nil {
 			return commandError(CommandIO)
@@ -196,13 +204,15 @@ func (s *Store) commitConstruction(method, operation string, allocation FactoryA
 				return commandError(CommandIO)
 			}
 		}
-		if allocation.FreeKey != 0 {
-			if e := tx.Bucket(BucketShipFree).Delete(enrollmentFreeKey(allocation.FreeKey)); e != nil {
+		if allocation != nil {
+			if allocation.FreeKey != 0 {
+				if e := tx.Bucket(BucketShipFree).Delete(enrollmentFreeKey(allocation.FreeKey)); e != nil {
+					return commandError(CommandIO)
+				}
+			}
+			if e := s.metaFault(fmt.Sprintf("%s.write:%d", operation, len(prepared.writes)+1)); e != nil {
 				return commandError(CommandIO)
 			}
-		}
-		if e := s.metaFault(fmt.Sprintf("%s.write:%d", operation, len(prepared.writes)+1)); e != nil {
-			return commandError(CommandIO)
 		}
 		if e := s.metaFault(operation + ".before-commit"); e != nil {
 			return commandError(CommandIO)

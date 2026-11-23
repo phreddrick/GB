@@ -382,6 +382,9 @@ func (s *State) cmdLaunch(p, g int, args []string, sess net.Responder) {
 		sess.Send("Launch what?\n")
 		return
 	}
+	if s.handleProbeLaunch(p, g, args[0], sess) {
+		return
+	}
 	ships := s.shipsBySpec(p, g, args[0])
 	for _, sh := range ships {
 		s.doLaunchOne(p, g, sh, sess)

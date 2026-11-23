@@ -48,10 +48,13 @@ func TestPlanetFactoryBuildCrashChild(t *testing.T) {
 				command = "build :"
 			}
 		}
+		if strings.HasPrefix(stage, "probe-launch.") {
+			command = "launch #78"
+		}
 		switch stage {
-		case "factory-build.preinstall", "cargo-build.preinstall", "probe-build.preinstall":
+		case "factory-build.preinstall", "cargo-build.preinstall", "probe-build.preinstall", "probe-launch.preinstall":
 			state.testHooks = &testHooks{beforeCommandInstall: boundary}
-		case "factory-build.installed", "cargo-build.installed", "probe-build.installed":
+		case "factory-build.installed", "cargo-build.installed", "probe-build.installed", "probe-launch.installed":
 			state.testHooks = &testHooks{afterCommandInstall: boundary}
 		}
 	})

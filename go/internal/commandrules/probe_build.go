@@ -7,9 +7,8 @@ import (
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
-// ProbeBuild describes the complete planet chain and the Carrier's immediate
-// contents. Neither the planet head nor the old children change.
-type ProbeBuild struct {
+// PlanetHangar captures a caller and the complete exterior and interior chains.
+type PlanetHangar struct {
 	Player, Governor int
 	Scope            model.Directory
 	Race             *model.Race
@@ -17,6 +16,8 @@ type ProbeBuild struct {
 	Planet           *model.Planet
 	Orbit, Children  []*model.Ship
 }
+
+type ProbeBuild = PlanetHangar
 
 // ErrProbeHoldUnsettled means the chain is structurally accounted for, but
 // cannot supply a reliable insertion point and capacity for a new build.
@@ -70,14 +71,22 @@ func ProbeChildren(b *model.Ship, children []*model.Ship) (map[uint32]bool, erro
 }
 
 func (in ProbeBuild) Carrier() (*model.Ship, error) {
-	if FactoryBuildChain(in.Star, in.Planet, in.Orbit) != nil || in.Scope.Level != model.LevelShip {
+	if in.Scope.Level != model.LevelShip {
 		return nil, ErrFactoryBuildInput
 	}
-	for _, b := range in.Orbit {
-		if b.Number == in.Scope.ShipNo && b.Type == model.StypeCarrier {
-			hold, err := ProbeChildren(b, in.Children)
+	return PlanetCarrierHold(in.Star, in.Planet, in.Orbit, in.Children, in.Scope.ShipNo)
+}
+
+// PlanetCarrierHold validates both complete lists and their disjoint membership.
+func PlanetCarrierHold(st *model.Star, pl *model.Planet, orbit, children []*model.Ship, carrier uint32) (*model.Ship, error) {
+	if FactoryBuildChain(st, pl, orbit) != nil {
+		return nil, ErrFactoryBuildInput
+	}
+	for _, b := range orbit {
+		if b.Number == carrier && b.Type == model.StypeCarrier {
+			hold, err := ProbeChildren(b, children)
 			if err == ErrProbeHoldUnsettled {
-				for _, sh := range in.Orbit {
+				for _, sh := range orbit {
 					if hold[sh.Number] {
 						return nil, ErrFactoryBuildInput
 					}
