@@ -25,6 +25,9 @@ func (s *State) cmdLand(p, g int, args []string, sess net.Responder) {
 		return
 	}
 
+	if s.handleProbeLanding(p, g, args[0], args[1], sess) {
+		return
+	}
 	ships := s.shipsBySpec(p, g, args[0])
 	for _, sh := range ships {
 		s.doLandOne(p, g, sh, args[1], sess)
