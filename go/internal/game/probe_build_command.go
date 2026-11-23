@@ -58,26 +58,7 @@ func (s *State) probeBuildStage(p, g int) (*commandWorkspace, db.CarrierProbeBui
 	if e != nil {
 		return w, in, false, e
 	}
-	if _, e = w.star(b.StOrbits); e != nil {
-		return w, in, false, e
-	}
-	ctx.Star = w.stars[b.StOrbits].before
-	if _, e = w.planet(b.StOrbits, b.PNumOrbits); e != nil {
-		return w, in, false, e
-	}
-	ctx.Planet = w.planets[[2]uint8{b.StOrbits, b.PNumOrbits}].before
-	read := func(n uint32) (*model.Ship, error) {
-		if _, e := w.ship(n); e != nil {
-			return nil, e
-		}
-		return w.ships[n].before, nil
-	}
-	ctx.Orbit, e = constructionChain(ctx.Planet.Ships, read)
-	if e != nil {
-		return w, in, false, e
-	}
-	ctx.Children, e = constructionChain(b.Ships, read)
-	if e != nil {
+	if e := w.capturePlanetHold(b, &ctx); e != nil {
 		return w, in, false, e
 	}
 	_, holdErr := ctx.Carrier()
@@ -85,7 +66,7 @@ func (s *State) probeBuildStage(p, g int) (*commandWorkspace, db.CarrierProbeBui
 		return w, in, false, holdErr
 	}
 	if holdErr == commandrules.ErrProbeHoldUnsettled {
-		if err := checkOtherLandingOrbits(b, ctx.Children, w.star, w.planet, read); err != nil {
+		if err := checkOtherLandingOrbits(b, ctx.Children, w.star, w.planet, w.ship); err != nil {
 			return w, in, false, err
 		}
 	}
@@ -106,6 +87,34 @@ func (s *State) probeBuildStage(p, g int) (*commandWorkspace, db.CarrierProbeBui
 	}
 	in = db.CarrierProbeBuild{Input: ctx, Allocation: ticket, Child: child, Config: s.cfg}
 	return w, in, false, nil
+}
+
+// Capture the same actor-owned physical lists for both building and launching.
+func (w *commandWorkspace) capturePlanetHold(b *model.Ship, ctx *commandrules.PlanetHangar) error {
+	if _, e := w.star(b.StOrbits); e != nil {
+		return e
+	}
+	ctx.Star = w.stars[b.StOrbits].before
+	if _, e := w.planet(b.StOrbits, b.PNumOrbits); e != nil {
+		return e
+	}
+	ctx.Planet = w.planets[[2]uint8{b.StOrbits, b.PNumOrbits}].before
+	read := func(n uint32) (*model.Ship, error) {
+		if _, e := w.ship(n); e != nil {
+			return nil, e
+		}
+		return w.ships[n].before, nil
+	}
+	var e error
+	ctx.Orbit, e = constructionChain(ctx.Planet.Ships, read)
+	if e != nil {
+		return e
+	}
+	ctx.Children, e = constructionChain(b.Ships, read)
+	if e != nil {
+		return e
+	}
+	return nil
 }
 
 func constructionChain(head uint32, read func(uint32) (*model.Ship, error)) ([]*model.Ship, error) {

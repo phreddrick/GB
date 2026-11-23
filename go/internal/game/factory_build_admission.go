@@ -15,6 +15,10 @@ func (s *State) factoryBuildAdmission(w *commandWorkspace) (bool, error) {
 }
 
 func (s *State) constructionAdmission(w *commandWorkspace, carrier uint32) (bool, error) {
+	return s.shipChainAdmission(w, carrier, false)
+}
+
+func (s *State) shipChainAdmission(w *commandWorkspace, carrier uint32, detachedWreck bool) (bool, error) {
 	bad := commandrules.ErrFactoryBuildInput
 	pending := false
 	storedShips := map[uint32]*model.Ship{}
@@ -172,6 +176,17 @@ func (s *State) constructionAdmission(w *commandWorkspace, carrier uint32) (bool
 			if e := s.walkStoredLocation(storedShips[id], readShip, roots, map[uint32]bool{}, acceptPartial); e != nil {
 				return false, e
 			}
+		}
+	}
+	// A rebuilt actor wreck supplies no exterior link to explain an omitted
+	// live stored parent. A stored wreck may still be linked (pre-turn), or
+	// be detached with a cleared NextShip (post-turn). Check the traversed
+	// stored root before returning a deferral for otherwise valid differences.
+	if detachedWreck {
+		b := storedShips[carrier]
+		root := roots[walkStoredRoot{level: model.LevelPlan, star: b.StOrbits, planet: b.PNumOrbits}]
+		if missing[carrier] || (b.WhatOrbits == model.LevelPlan && !root[carrier] && (b.Alive || b.NextShip != 0)) {
+			return false, bad
 		}
 	}
 	return pending, nil
