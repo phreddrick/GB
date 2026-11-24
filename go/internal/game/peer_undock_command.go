@@ -110,7 +110,7 @@ func (s *State) runStarPeerUndock(p, g int, id uint32, sess net.Responder) {
 		fail()
 		return
 	}
-	pending, err := s.peerUndockAdmission(w, in)
+	pending, err := s.starPeerAdmission(w, in.Star, in.Race, in.Orbit, in.DetachedWreck, in.MovedPeer)
 	if err != nil || !w.owns() {
 		fail()
 		return
@@ -127,25 +127,33 @@ func (s *State) runStarPeerUndock(p, g int, id uint32, sess net.Responder) {
 	notice := fmt.Sprintf("%s undocked from %s.\n", shipDisplayName(a), shipDisplayName(named))
 	outcome, err = s.store.CommitStarPeerUndock(in)
 	if outcome == db.CommandCommitted {
-		if s.testHooks != nil && s.testHooks.beforeCommandInstall != nil {
-			s.testHooks.beforeCommandInstall()
-		}
-		if !w.owns() {
+		if !w.installStarPeers(a, b) {
 			fail()
 			return
-		}
-		*w.ships[a.Number].actor = *a
-		if b != nil {
-			*w.ships[b.Number].actor = *b
-		}
-		if s.testHooks != nil && s.testHooks.afterCommandInstall != nil {
-			s.testHooks.afterCommandInstall()
 		}
 		if err == nil && sess.Send(notice) == nil {
 			return
 		}
 	}
 	fail()
+}
+
+func (w *commandWorkspace) installStarPeers(a, b *model.Ship) bool {
+	s := w.s
+	if s.testHooks != nil && s.testHooks.beforeCommandInstall != nil {
+		s.testHooks.beforeCommandInstall()
+	}
+	if !w.owns() {
+		return false
+	}
+	*w.ships[a.Number].actor = *a
+	if b != nil {
+		*w.ships[b.Number].actor = *b
+	}
+	if s.testHooks != nil && s.testHooks.afterCommandInstall != nil {
+		s.testHooks.afterCommandInstall()
+	}
+	return true
 }
 
 // Some historical star-orbit landings inserted the child in a hold but
@@ -160,11 +168,15 @@ func (w *commandWorkspace) absentUndockMember(in commandrules.StarPeerUndock) er
 	if a := members[id]; a != nil {
 		id = a.DestShipNo
 	}
+	return w.absentStarMember(in.Star, members, id)
+}
+
+func (w *commandWorkspace) absentStarMember(st *model.Star, members map[uint32]*model.Ship, id uint32) error {
 	ship, err := w.ship(id)
 	if err != nil {
 		return err
 	}
-	if !ship.Alive && ship.NextShip == 0 || ship.WhatOrbits != model.LevelStar || ship.StOrbits != in.Star.Number {
+	if !ship.Alive && ship.NextShip == 0 || ship.WhatOrbits != model.LevelStar || ship.StOrbits != st.Number {
 		return commandrules.ErrUndockUnsettled
 	}
 	if !ship.Alive {
@@ -205,9 +217,9 @@ func (w *commandWorkspace) absentUndockMember(in commandrules.StarPeerUndock) er
 // Independently walk the durable root, including stored-only tails. A broken
 // stored link is not a pending actor edit. The shared partial-save admission
 // also checks actor members missing from the durable root and any detached peer.
-func (s *State) peerUndockAdmission(w *commandWorkspace, in commandrules.StarPeerUndock) (bool, error) {
-	st, err := s.store.GetStar(in.Star.Number)
-	if err != nil || st == nil || st.Number != in.Star.Number {
+func (s *State) starPeerAdmission(w *commandWorkspace, star *model.Star, raceBefore *model.Race, orbit []*model.Ship, wreck, moved *model.Ship) (bool, error) {
+	st, err := s.store.GetStar(star.Number)
+	if err != nil || st == nil || st.Number != star.Number {
 		return false, commandrules.ErrUndockStructure
 	}
 	readShip := func(id uint32) (*model.Ship, error) {
@@ -225,13 +237,13 @@ func (s *State) peerUndockAdmission(w *commandWorkspace, in commandrules.StarPee
 	if err != nil {
 		return false, err
 	}
-	named := in.DetachedWreck
-	if in.MovedPeer != nil {
-		named = in.MovedPeer
+	named := wreck
+	if moved != nil {
+		named = moved
 	}
 	if named != nil && storedMembers[named.Number] == nil {
 		sh, e := s.store.GetShip(named.Number)
-		if e == nil && sh == nil && in.MovedPeer != nil {
+		if e == nil && sh == nil && moved != nil {
 			return s.factoryBuildAdmission(w)
 		}
 		if e != nil || sh == nil || sh.Number != named.Number {
@@ -241,19 +253,19 @@ func (s *State) peerUndockAdmission(w *commandWorkspace, in commandrules.StarPee
 			if !commandrules.MovedStarPeer(st, storedMembers, sh) {
 				return false, commandrules.ErrUndockStructure
 			}
-		} else if !sh.Alive || in.DetachedWreck != nil {
+		} else if !sh.Alive || wreck != nil {
 			children, e := constructionChain(sh.Ships, readShip)
 			if e != nil || !commandrules.DetachedStarWreck(st, storedMembers, sh, children) {
 				return false, commandrules.ErrUndockStructure
 			}
 		}
 	}
-	race, err := s.store.GetRace(in.Player)
-	if err != nil || race == nil || race.PlayerNum != in.Player {
+	race, err := s.store.GetRace(raceBefore.PlayerNum)
+	if err != nil || race == nil || race.PlayerNum != raceBefore.PlayerNum {
 		return false, commandrules.ErrUndockStructure
 	}
-	sameOrbit := reflect.DeepEqual(st, in.Star) && reflect.DeepEqual(chain, in.Orbit)
-	if sameOrbit && reflect.DeepEqual(race, in.Race) {
+	sameOrbit := reflect.DeepEqual(st, star) && reflect.DeepEqual(chain, orbit)
+	if sameOrbit && reflect.DeepEqual(race, raceBefore) {
 		// Moved peers, detached wrecks and historical holds add off-list witnesses.
 		equal := true
 		if len(w.ships) != len(chain) {
@@ -273,5 +285,5 @@ func (s *State) peerUndockAdmission(w *commandWorkspace, in commandrules.StarPee
 		}
 	}
 	pending, err := s.factoryBuildAdmission(w)
-	return pending || !sameOrbit || !reflect.DeepEqual(race, in.Race), err
+	return pending || !sameOrbit || !reflect.DeepEqual(race, raceBefore), err
 }

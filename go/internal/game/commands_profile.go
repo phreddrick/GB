@@ -498,6 +498,9 @@ func (s *State) cmdDock(p, g int, args []string, sess net.Responder) {
 		return
 	}
 
+	if len(ships) == 1 && s.handleFriendlyDock(p, g, args[0], targetStr, ships[0], target, sess) {
+		return
+	}
 	for _, sh := range ships {
 		s.doDockOne(p, g, sh, target, sess)
 	}

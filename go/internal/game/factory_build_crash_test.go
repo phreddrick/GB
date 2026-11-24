@@ -51,6 +51,9 @@ func TestPlanetFactoryBuildCrashChild(t *testing.T) {
 		if strings.HasPrefix(stage, "probe-launch.") {
 			command = "launch #78"
 		}
+		if strings.HasPrefix(stage, "friendly-dock.") {
+			command = "dock #77 #78"
+		}
 		if strings.HasPrefix(stage, "peer-undock.") {
 			command = "launch #77"
 		}
@@ -58,9 +61,9 @@ func TestPlanetFactoryBuildCrashChild(t *testing.T) {
 			command = "land #78 #77"
 		}
 		switch stage {
-		case "peer-undock.preinstall", "probe-land.preinstall", "factory-build.preinstall", "cargo-build.preinstall", "probe-build.preinstall", "probe-launch.preinstall":
+		case "friendly-dock.preinstall", "peer-undock.preinstall", "probe-land.preinstall", "factory-build.preinstall", "cargo-build.preinstall", "probe-build.preinstall", "probe-launch.preinstall":
 			state.testHooks = &testHooks{beforeCommandInstall: boundary}
-		case "peer-undock.installed", "probe-land.installed", "factory-build.installed", "cargo-build.installed", "probe-build.installed", "probe-launch.installed":
+		case "friendly-dock.installed", "peer-undock.installed", "probe-land.installed", "factory-build.installed", "cargo-build.installed", "probe-build.installed", "probe-launch.installed":
 			state.testHooks = &testHooks{afterCommandInstall: boundary}
 		}
 	})
