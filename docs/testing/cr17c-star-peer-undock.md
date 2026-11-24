@@ -1,0 +1,29 @@
+# CR-17C star-orbit peer undocking (#43)
+
+An explicit numeric `launch #N` releases the selected living ship's outgoing dock link in the exterior list of its star. Two-row release requires same-owner peers in this star. A named ship whose outgoing link no longer docks back is a read-only witness, including after a change of owner. The caller must be the active race leader or the active governor assigned to the selected ship. The target may have a different governor. The command accepts a bare ship number and works from any directory with zero AP and zero fuel cost.
+
+| Named ship | Durable change |
+|---|---|
+| Distinct living same-owner peer docked back in the selected star exterior | Clear both links. Other ships pointing to either member retain their links until individually released. |
+| Living peer now docked to someone else, undocked, or navigating toward the selected ship | Clear only the selected ship. The named ship keeps its current pair or navigation order. |
+| Former peer in a hold, or no longer docked back in a planet orbit, another star or deep space | Clear only the selected ship. A contained ship’s destination number identifies its parent. An undocked ship may have a navigation order to the claimant. Both survive the release. |
+| The selected ship itself | Clear its one row once. |
+| Dead peer still listed, or a named wreck detached by the turn rebuild | Clear only the living survivor. Preserve the complete wreck row, its recycling state and the exterior list. |
+
+Clearing a row sets `Docked=false`, `WhatDest=LevelUniv` and `DestShipNo=0`. No position, fuel, mass, AP or list link changes. The player receives the original single undock notice after confirmed persistence and installation.
+
+## Compatibility
+
+Original C rejects self-docking and docking to an occupied target (`source/dock.c`). C destruction clears the docked survivor's flag and destination level (`source/GB_server.c`, `kill_ship`). Go friendly docking can overwrite the target or create a self-link, and Go's `killShip` leaves the survivor docked. Scheduled turns rebuild the exterior list from living ships and clear wreck list pointers. They can preserve these stale docking fields across restart.
+
+C and the legacy Go launch handler clear both named rows without testing reciprocity. Legacy Go also sends success before its independent writes. For a valid pair this slice preserves the six field changes and the selected-ship authority rule from C. For a stale claim it preserves the named ship's independently held state. For example, after `dock #77 #78` then `dock #79 #78`, selecting #77 leaves #78 and #79 paired. If #79 releases that pair and #78 lands in Carrier #80, a later `launch #77` leaves the hold intact.
+
+## Transaction and admission
+
+The actor follows the complete exterior chain. The store independently derives the permitted row edits, compares the caller race, star, every linked ship, the complete named row if it left this exterior, and any detached named wreck and its remaining hangar members inside one fenced bbolt transaction, then writes the one or two changed rows. A detached wreck must match the named number, star and type constraints, have a cleared exterior next link and be absent from the exterior and its members' hold heads. A turn may relink live children inside the wreck. Their complete, disjoint hold is checked as a read-only witness. The moved row must be absent from the selected exterior. Its list links must be disjoint from that exterior, and any exterior ship naming it as a hold head must agree with its parent identity. The transaction uses the moved row to distinguish a stale outgoing link from a reciprocal dock. The remote lists and their roots remain untouched. The command installs the confirmed edits into the existing actor objects before emitting the notice.
+
+Valid pending actor/store differences defer for manual retry after a persisted turn. An agreed historically held living ship with stale star fields still receives a safe refusal. Broken topology, late compare failures, commit uncertainty and lost installation halt the engine and suppress stale shutdown writes. Friendly docking, reciprocal foreign or cross-star pairs, selections originating at other orbit levels and multi-selection remain outside this transaction. Planet-orbit Carrier probe launch and landing keep their own contracts.
+
+## Verification
+
+The dispatcher tests use real repeated docking, self-docking, navigation orders and scrapping. They check the complete durable state, actual write count and actor objects at the notice. A real dock/overwrite/release/landing sequence checks release both immediately and after a scheduled segment, full update and restart. Alternate orbits are seeded in separate fixtures. A late change to the named row must halt without clearing the claimant. A valid difference at admission must defer. Destruction coverage also calls the game’s kill helper directly to isolate the listed and turn-detached cases. Scheduled segments, full updates and restart verify that stale claimants remain recoverable in either selection order. Fault tests cover concurrent changes to the peers, the preserved pair, the detached wreck, the star and caller race. Real subprocess SIGKILL tests inspect the reopened store immediately for old-or-new persistence on both the one-row and two-row paths.

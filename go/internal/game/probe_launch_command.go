@@ -16,7 +16,7 @@ import (
 // Look for actual membership even if a historical landing retained surface
 // fields. Only a single numeric selection enters this path. Other selectors
 // retain the existing iteration semantics.
-func (s *State) handleProbeLaunch(p, g int, spec string, sess net.Responder) bool {
+func (s *State) handleExplicitLaunch(p, g int, spec string, sess net.Responder) bool {
 	if spec == "" || (spec[0] != '#' && (spec[0] < '0' || spec[0] > '9')) {
 		return false
 	}
@@ -27,9 +27,16 @@ func (s *State) handleProbeLaunch(p, g int, spec string, sess net.Responder) boo
 	}
 	id := uint32(n)
 	sh := s.ships[id]
-	if sh == nil || !sh.Alive || sh.Type != model.OtypeProbe || int(sh.Owner) != p {
+	if sh == nil || !sh.Alive || int(sh.Owner) != p {
 		return false
 	}
+	if sh.Type == model.OtypeProbe && s.handleHeldProbeLaunch(p, g, id, sh, sess) {
+		return true
+	}
+	return s.handleStarPeerUndock(p, g, id, sh, sess)
+}
+
+func (s *State) handleHeldProbeLaunch(p, g int, id uint32, sh *model.Ship, sess net.Responder) bool {
 	var parent uint32
 	for key, b := range s.ships {
 		if b == nil || b.Type != model.StypeCarrier || b.WhatOrbits != model.LevelPlan || b.Docked {
