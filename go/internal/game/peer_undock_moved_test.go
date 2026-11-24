@@ -13,14 +13,12 @@ import (
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
-// Only the Carrier and its landing supplies are fixture setup. Both docks,
-// the reciprocal release and the landing use the normal command dispatcher.
+// Seed the historical overwrite. The original dock, reciprocal release and
+// later Carrier landing still run through dispatch.
 func staleUndockFixture(t *testing.T) *factoryFixture {
 	t.Helper()
 	f := peerUndockFixture(t)
-	if out := f.command(t, "dock #79 #78"); !strings.Contains(out, "docked with") {
-		t.Fatal(out)
-	}
+	seedLegacyDock(t, f, 79, 78)
 	checkPeerRelease(t, f, 2, 79, 78, 79, 78)
 	return f
 }

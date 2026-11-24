@@ -96,6 +96,23 @@ func killUndockPartner(t *testing.T, f *factoryFixture) {
 	})
 }
 
+// Historical Go wrote both outgoing links even if it overwrote a target
+// or docked a ship to itself. Keep these saved worlds recoverable after the
+// explicit friendly dock begins refusing their creation.
+func seedLegacyDock(t *testing.T, f *factoryFixture, source, target uint32) {
+	t.Helper()
+	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
+		a, b := f.state.ships[source], f.state.ships[target]
+		a.Docked, a.WhatDest, a.DestShipNo = true, model.LevelShip, target
+		b.Docked, b.WhatDest, b.DestShipNo = true, model.LevelShip, source
+		for _, ship := range []*model.Ship{a, b} {
+			if e := f.store.PutShip(ship); e != nil {
+				t.Fatal(e)
+			}
+		}
+	})
+}
+
 func TestCR17PeerUndockRecovery(t *testing.T) {
 	t.Parallel()
 	for _, first := range []uint32{77, 78, 80} {
@@ -116,9 +133,7 @@ func TestCR17PeerUndockRecovery(t *testing.T) {
 				}
 			})
 			for _, n := range []uint32{79, 80} {
-				if msg := f.command(t, fmt.Sprintf("dock #%d #78", n)); !strings.Contains(msg, "docked with") {
-					t.Fatal(msg)
-				}
+				seedLegacyDock(t, f, n, 78)
 			}
 			checkRecoveryBoundary(t, f, map[uint32]uint32{77: 78, 78: 80, 79: 78, 80: 78}, 0)
 			if first == 77 {
@@ -138,9 +153,7 @@ func TestCR17PeerUndockRecovery(t *testing.T) {
 	}
 	t.Run("self", func(t *testing.T) {
 		f := peerUndockFixture(t)
-		if out := f.command(t, "dock #79 #79"); !strings.Contains(out, "docked with") {
-			t.Fatal(out)
-		}
+		seedLegacyDock(t, f, 79, 79)
 		checkRecoveryBoundary(t, f, map[uint32]uint32{77: 78, 78: 77, 79: 79}, 0)
 		checkPeerRelease(t, f, 2, 79, 79, 79)
 		checkRecoveryBoundary(t, f, map[uint32]uint32{77: 78, 78: 77, 79: 0}, 0)
@@ -169,9 +182,7 @@ func TestCR17PeerUndockRecoveryConflicts(t *testing.T) {
 				killUndockPartner(t, f)
 				checkRecoveryBoundary(t, f, map[uint32]uint32{77: 78, 78: 77, 79: 0}, 78)
 			default:
-				if out := f.command(t, "dock #79 #78"); !strings.Contains(out, "docked with") {
-					t.Fatal(out)
-				}
+				seedLegacyDock(t, f, 79, 78)
 				if which == "selected" {
 					id = 77
 				}
@@ -238,9 +249,7 @@ func TestCR17PeerUndockSingleWriteCrash(t *testing.T) {
 			t.Run(layout+"/"+stage, func(t *testing.T) {
 				f := peerUndockFixture(t)
 				if layout == "overwritten" {
-					if out := f.command(t, "dock #79 #78"); !strings.Contains(out, "docked with") {
-						t.Fatal(out)
-					}
+					seedLegacyDock(t, f, 79, 78)
 				} else {
 					killUndockPartner(t, f)
 					checkRecoveryBoundary(t, f, map[uint32]uint32{77: 78, 78: 77, 79: 0}, 78)
@@ -254,9 +263,7 @@ func TestCR17PeerUndockSingleWriteCrash(t *testing.T) {
 func TestCR17PeerUndockPreservesNavigationOrder(t *testing.T) {
 	t.Parallel()
 	f := peerUndockFixture(t)
-	if out := f.command(t, "dock #79 #78"); !strings.Contains(out, "docked with") {
-		t.Fatal(out)
-	}
+	seedLegacyDock(t, f, 79, 78)
 	checkPeerRelease(t, f, 2, 78, 79, 78, 79)
 	// An undocked ship may receive a navigation order to the stale claimant.
 	out := f.command(t, "order #78 destination #77")
@@ -279,9 +286,7 @@ func TestCR17PeerUndockAfterScrap(t *testing.T) {
 			t.Fatal(e)
 		}
 	})
-	if out := f.command(t, "dock #79 #78"); !strings.Contains(out, "docked with") {
-		t.Fatal(out)
-	}
+	seedLegacyDock(t, f, 79, 78)
 	if out := f.command(t, "scrap #78"); !strings.Contains(out, "Destroyed.") {
 		t.Fatal(out)
 	}

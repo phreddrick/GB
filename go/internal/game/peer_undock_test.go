@@ -13,8 +13,8 @@ import (
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
-// Set up three flying ships in one star. Dock the pair through normal dispatch.
-func peerUndockFixture(t *testing.T) *factoryFixture {
+// Three living ships in the same star exterior.
+func flyingPeerFixture(t *testing.T) *factoryFixture {
 	t.Helper()
 	f := newCargoBuildFixture(t, false, model.LevelStar)
 	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
@@ -24,6 +24,7 @@ func peerUndockFixture(t *testing.T) *factoryFixture {
 		a.WhatDest = model.LevelUniv
 		a.DestShipNo = 0
 		a.Governor = 1
+		r.Governors = 2
 		r.Governor[1].Active = true
 		r.Governor[2].Active = true
 		st.AP[0] = 0
@@ -44,6 +45,12 @@ func peerUndockFixture(t *testing.T) *factoryFixture {
 			}
 		}
 	})
+	return f
+}
+
+func peerUndockFixture(t *testing.T) *factoryFixture {
+	t.Helper()
+	f := flyingPeerFixture(t)
 	if out := f.command(t, "dock #77 #78"); !strings.Contains(out, "docked with") {
 		t.Fatal(out)
 	}
