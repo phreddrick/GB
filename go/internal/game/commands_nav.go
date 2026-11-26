@@ -620,6 +620,9 @@ func (s *State) cmdScrap(p, g int, args []string, sess net.Responder) {
 		return
 	}
 	ships := s.shipsBySpec(p, g, args[0])
+	if len(ships) == 1 && s.handleProbeScrap(p, g, args[0], ships[0], sess) {
+		return
+	}
 	for _, sh := range ships {
 		s.doScrapOne(p, g, sh, sess)
 	}
