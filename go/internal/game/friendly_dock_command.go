@@ -90,11 +90,9 @@ func (s *State) runFriendlyDock(p, g int, source, target uint32, starNum uint8, 
 			fail()
 			return
 		}
-		for _, id := range []uint32{source, target} {
-			if members[id] == nil && w.absentStarMember(st, members, id) != commandrules.ErrUndockUnsettled {
-				fail()
-				return
-			}
+		if w.absentStarSelections(st, members, source, target) != commandrules.ErrUndockUnsettled {
+			fail()
+			return
 		}
 		planErr = &commandrules.FactoryBuildRefusal{Message: "Cannot dock: star orbit records are unsettled.\n"}
 	}

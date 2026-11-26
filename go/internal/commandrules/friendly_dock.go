@@ -17,6 +17,12 @@ type FriendlyDock struct {
 	DistToDock       float64
 }
 
+// ValidExteriorDockClaim checks a legacy outgoing claim before a read-only
+// refusal. The named ship can have died, moved, or acquired a different peer.
+func ValidExteriorDockClaim(ship, named *model.Ship) bool {
+	return validUndockShip(ship) && validUndockShip(named) && ExteriorDockBack(ship, named.Number)
+}
+
 // PlanFriendlyDock has no caller-supplied after-images. Go's numeric selector
 // requires ownership, but neither ship must be assigned to the logged-in governor.
 func PlanFriendlyDock(in FriendlyDock) (*model.Ship, *model.Ship, error) {
