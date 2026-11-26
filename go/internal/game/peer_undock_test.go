@@ -116,7 +116,7 @@ func TestCR17PeerUndockAdmission(t *testing.T) {
 		{"wrong governor", "not authorized", ModeServing}, {"inactive", "not authorized", ModeServing}, {"dissolved", "not authorized", ModeServing},
 		{"pending star", "deferred", ModeServing}, {"pending sibling", "deferred", ModeServing}, {"stored-only tail", "deferred", ModeServing},
 		{"historical star hold", "unsettled", ModeServing}, {"overlap", "halted", ModeHalted}, {"broken hold", "halted", ModeHalted}, {"stored-only broken tail", "halted", ModeHalted},
-		{"cycle", "halted", ModeHalted}, {"missing member", "halted", ModeHalted}, {"missing peer row", "halted", ModeHalted}, {"wrong orbit", "halted", ModeHalted}, {"wrong partner star", "halted", ModeHalted},
+		{"cycle", "halted", ModeHalted}, {"coherent detached member", "unsettled", ModeServing}, {"missing peer row", "halted", ModeHalted}, {"wrong orbit", "halted", ModeHalted}, {"wrong partner star", "halted", ModeHalted},
 		{"stored exterior overlap", "halted", ModeHalted}, {"stored cycle", "halted", ModeHalted}, {"stored dangling", "halted", ModeHalted}, {"wide selector", "", ModeServing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -164,7 +164,7 @@ func TestCR17PeerUndockAdmission(t *testing.T) {
 					b.StOrbits++
 				case "wrong orbit":
 					c.WhatOrbits = model.LevelPlan
-				case "missing member":
+				case "coherent detached member":
 					c.NextShip = a.Number
 				case "missing peer row":
 					a.DestShipNo = 1234567
