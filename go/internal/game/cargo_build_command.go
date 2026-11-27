@@ -136,11 +136,12 @@ func (s *State) cargoBuildStage(p, g int) (*commandWorkspace, db.CargoCarrierBui
 	return w, in, false, nil
 }
 
-// The actor can install either kind of ship construction through the same
+// The actor installs the complete set through the same
 // commit-outcome path. The store entry points themselves stay closed and typed.
 type stagedShipBuild struct {
 	workspace *commandWorkspace
-	child     *model.Ship
+	children  []*model.Ship
+	notice    string
 	commit    func() (db.CommandOutcome, error)
 }
 
@@ -158,7 +159,7 @@ func (s *State) stageCargoCarrier(p, g int) (stagedShipBuild, bool, error) {
 	if e != nil || pending {
 		return stagedShipBuild{}, pending, e
 	}
-	return stagedShipBuild{w, in.Child, func() (db.CommandOutcome, error) { return s.store.CommitCargoCarrier(in) }}, false, nil
+	return stagedShipBuild{workspace: w, children: []*model.Ship{in.Child}, commit: func() (db.CommandOutcome, error) { return s.store.CommitCargoCarrier(in) }}, false, nil
 }
 
 func (s *State) runShipConstruction(p, g int, sess net.Responder, stage func(int, int) (stagedShipBuild, bool, error)) {
@@ -181,6 +182,7 @@ func (s *State) runShipConstruction(p, g int, sess net.Responder, stage func(int
 		return
 	}
 	if s.store.CommandWriteUncertain() {
+		outcome = db.CommandUncertain
 		fail()
 		return
 	}
@@ -198,28 +200,55 @@ func (s *State) runShipConstruction(p, g int, sess net.Responder, stage func(int
 		_ = sess.Send("Construction deferred: actor and stored records differ or allocation is pending; retry after the next persisted turn.\n")
 		return
 	}
-	w, c := build.workspace, build.child
+	w := build.workspace
 	if !w.owns() {
 		fail()
 		return
 	}
 	outcome, e = build.commit()
-	if outcome == db.CommandCommitted {
-		if s.testHooks != nil && s.testHooks.beforeCommandInstall != nil {
-			s.testHooks.beforeCommandInstall()
+	if outcome != db.CommandCommitted || !build.install() {
+		fail()
+		return
+	}
+	if s.testHooks != nil && s.testHooks.afterCommandInstall != nil {
+		s.testHooks.afterCommandInstall()
+	}
+	if e != nil {
+		fail()
+		return
+	}
+	for _, c := range build.children {
+		s.reportShipConstruction(p, g, c, w.races[p].before.God)
+	}
+	if build.notice != "" {
+		_ = sess.Send(build.notice)
+	}
+}
+
+func (build stagedShipBuild) install() bool {
+	w := build.workspace
+	s := w.s
+	if s.testHooks != nil && s.testHooks.beforeCommandInstall != nil {
+		s.testHooks.beforeCommandInstall()
+	}
+	if !w.owns() {
+		return false
+	}
+	for _, c := range build.children {
+		if s.ships[c.Number] != nil {
+			return false
 		}
-		if !w.owns() || s.ships[c.Number] != nil {
-			fail()
-			return
-		}
-		// One actor: no callbacks or fallible gameplay between installs. Existing
-		// objects retain addresses; the new identity has never been published.
-		builder := w.ships[w.scope.before.ShipNo].actor
+	}
+	// The actor publishes every row and the owning list before any callback.
+	// Existing records keep their addresses.
+	builder := w.ships[w.scope.before.ShipNo].actor
+	r := w.races[w.scope.player].before
+	for _, c := range build.children {
 		if c.WhatOrbits == model.LevelShip {
 			commandrules.InstallProbeDebits(builder, c)
 		} else {
 			builder.Resource -= c.BuildCost
-			if !w.races[p].before.God {
+			if !r.God {
 				builder.Popn -= c.Popn
 				builder.Fuel -= c.Fuel
 			}
@@ -233,27 +262,24 @@ func (s *State) runShipConstruction(p, g int, sess net.Responder, stage func(int
 			w.data.actor.Ships = c.Number
 		}
 		s.ships[c.Number] = c
-		if s.testHooks != nil && s.testHooks.afterCommandInstall != nil {
-			s.testHooks.afterCommandInstall()
-		}
-		if e == nil {
-			s.notify(p, g, fmt.Sprintf("%c%d built at a cost of %d resources.\n", model.ShipLetters[c.Type], c.Number, c.BuildCost))
-			s.notify(p, g, fmt.Sprintf("Technology %.1f.\n", c.Tech))
-			if c.Damage > 0 {
-				s.notify(p, g, fmt.Sprintf("Warning: This ship is constructed with a %d%% damage level.\n", c.Damage))
-			}
-			if c.Type == model.OtypeProbe {
-				s.notify(p, g, "This ship is robotic, and may not repair itself.\n")
-			} else {
-				s.notify(p, g, "This ship does not need resources to repair.\n")
-			}
-			crew, fuel := c.Popn, c.Fuel
-			if w.races[p].before.God {
-				crew, fuel = 0, 0
-			}
-			s.notify(p, g, fmt.Sprintf("Loaded with %d crew and %.1f fuel.\n", crew, fuel))
-			return
-		}
 	}
-	fail()
+	return true
+}
+
+func (s *State) reportShipConstruction(p, g int, c *model.Ship, god bool) {
+	s.notify(p, g, fmt.Sprintf("%c%d built at a cost of %d resources.\n", model.ShipLetters[c.Type], c.Number, c.BuildCost))
+	s.notify(p, g, fmt.Sprintf("Technology %.1f.\n", c.Tech))
+	if c.Damage > 0 {
+		s.notify(p, g, fmt.Sprintf("Warning: This ship is constructed with a %d%% damage level.\n", c.Damage))
+	}
+	if c.Type == model.OtypeProbe {
+		s.notify(p, g, "This ship is robotic, and may not repair itself.\n")
+	} else {
+		s.notify(p, g, "This ship does not need resources to repair.\n")
+	}
+	crew, fuel := c.Popn, c.Fuel
+	if god {
+		crew, fuel = 0, 0
+	}
+	s.notify(p, g, fmt.Sprintf("Loaded with %d crew and %.1f fuel.\n", crew, fuel))
 }

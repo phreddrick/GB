@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 
 	"github.com/phreddrick/GB/go/internal/commandrules"
@@ -24,16 +25,28 @@ type FactoryAllocation struct {
 }
 
 func (s *Store) PlanetFactoryCandidate() (FactoryAllocation, error) {
-	var ticket FactoryAllocation
-	e := s.db.View(func(tx *bolt.Tx) error { var e error; ticket, e = factoryBuildShipTx(tx); return e })
+	tickets, e := s.constructionShipCandidates(1)
+	if e != nil {
+		return FactoryAllocation{}, e
+	}
+	return tickets[0], nil
+}
+
+func (s *Store) constructionShipCandidates(count int) ([]FactoryAllocation, error) {
+	var tickets []FactoryAllocation
+	e := s.db.View(func(tx *bolt.Tx) error {
+		var err error
+		tickets, err = constructionShipCandidatesTx(tx, count)
+		return err
+	})
 	if e != nil {
 		var ce *CommandError
 		if errors.As(e, &ce) {
-			return FactoryAllocation{}, e
+			return nil, e
 		}
-		return FactoryAllocation{}, commandError(CommandIO)
+		return nil, commandError(CommandIO)
 	}
-	return ticket, nil
+	return tickets, nil
 }
 
 // PlanetFactoryBuild is closed to one new ordinary factory, its planet debit
@@ -113,12 +126,12 @@ func (s *Store) CommitPlanetFactory(in PlanetFactoryBuild) (outcome CommandOutco
 }
 
 func (s *Store) commitConstruction(method, operation string, allocation FactoryAllocation, prepare func() (preparedFactoryBuild, error)) (CommandOutcome, error) {
-	return s.commitShipRecords(method, operation, &allocation, prepare)
+	return s.commitShipRecords(method, operation, []FactoryAllocation{allocation}, prepare)
 }
 
 // Only construction consumes an ID. Launch uses the same CAS, maintenance,
 // uncertainty and readback boundaries, without consulting the allocator.
-func (s *Store) commitShipRecords(method, operation string, allocation *FactoryAllocation, prepare func() (preparedFactoryBuild, error)) (outcome CommandOutcome, err error) {
+func (s *Store) commitShipRecords(method, operation string, allocations []FactoryAllocation, prepare func() (preparedFactoryBuild, error)) (outcome CommandOutcome, err error) {
 	outcome = CommandNotCommitted
 	if e := s.writeAllowed(method); e != nil {
 		return outcome, commandError(CommandFenced)
@@ -184,12 +197,12 @@ func (s *Store) commitShipRecords(method, operation string, allocation *FactoryA
 				return commandError(CommandIO)
 			}
 		}
-		if allocation != nil {
-			ticket, e := factoryBuildShipTx(tx)
+		if len(allocations) != 0 {
+			tickets, e := constructionShipCandidatesTx(tx, len(allocations))
 			if e != nil {
 				return e
 			}
-			if ticket != *allocation {
+			if !slices.Equal(tickets, allocations) {
 				return commandError(CommandStale)
 			}
 		}
@@ -204,13 +217,13 @@ func (s *Store) commitShipRecords(method, operation string, allocation *FactoryA
 				return commandError(CommandIO)
 			}
 		}
-		if allocation != nil {
+		for i, allocation := range allocations {
 			if allocation.FreeKey != 0 {
 				if e := tx.Bucket(BucketShipFree).Delete(enrollmentFreeKey(allocation.FreeKey)); e != nil {
 					return commandError(CommandIO)
 				}
 			}
-			if e := s.metaFault(fmt.Sprintf("%s.write:%d", operation, len(prepared.writes)+1)); e != nil {
+			if e := s.metaFault(fmt.Sprintf("%s.write:%d", operation, len(prepared.writes)+i+1)); e != nil {
 				return commandError(CommandIO)
 			}
 		}

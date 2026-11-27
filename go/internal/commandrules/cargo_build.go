@@ -8,7 +8,7 @@ import (
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
-// CargoBuild is one externally built carrier (X). Ships is the complete
+// CargoBuild supplies the witnesses for exterior cargo construction. Ships is the complete
 // orbital chain in traversal order, including the selected cargo ship.
 type CargoBuild struct {
 	Player, Governor int
@@ -102,6 +102,14 @@ func PlanCargoBuild(in CargoBuild, number uint32, cfg *config.Config) (*model.Sh
 	if b.Resource < child.BuildCost {
 		return nil, &FactoryBuildRefusal{fmt.Sprintf("You need %dr to construct the ship.\n", child.BuildCost)}
 	}
+	return loadExteriorConstruction(cfg, r, p, g, b, child, number, in.Ships[0].Number)
+}
+
+func loadExteriorConstruction(cfg *config.Config, r *model.Race, p, g int, b, child *model.Ship, number, head uint32) (*model.Ship, error) {
+	if p < 1 || p > model.MaxPlayers || g < 0 || g > model.MaxGovernors {
+		return nil, ErrFactoryBuildInput
+	}
+	sd := model.Shipdata[child.Type]
 	child.Number = number
 	child.Owner = uint8(p)
 	child.Governor = uint8(g)
@@ -109,7 +117,7 @@ func PlanCargoBuild(in CargoBuild, number uint32, cfg *config.Config) (*model.Sh
 	child.Class = "Standard"
 	child.Alive = true
 	child.Active = true
-	child.NextShip = in.Ships[0].Number
+	child.NextShip = head
 	child.WhatOrbits = b.WhatOrbits
 	child.StOrbits = b.StOrbits
 	child.PNumOrbits = b.PNumOrbits
