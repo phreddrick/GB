@@ -9,8 +9,21 @@ import (
 	"github.com/phreddrick/GB/go/internal/net"
 )
 
-func (s *State) handleCargoStations(p, g int, args []string, sess net.Responder) bool {
-	if len(args) < 1 || len(args) > 2 || args[0] != "S" || p < 1 || p > model.MaxPlayers || g < 0 || g > model.MaxGovernors {
+func (s *State) handleStarCargoBuild(p, g int, args []string, sess net.Responder) bool {
+	if len(args) < 1 || len(args) > 2 || p < 1 || p > model.MaxPlayers || g < 0 || g > model.MaxGovernors {
+		return false
+	}
+	var kind model.ShipType
+	switch args[0] {
+	case "S":
+		kind = model.StypeStation
+	case "H":
+		kind = model.StypeHabitat
+	case "O":
+		kind = model.StypeOAP
+	case "M":
+		kind = model.StypeMirror
+	default:
 		return false
 	}
 	count := 1
@@ -36,12 +49,12 @@ func (s *State) handleCargoStations(p, g int, args []string, sess net.Responder)
 		return false
 	}
 	s.runShipConstruction(p, g, sess, func(p, g int) (stagedShipBuild, bool, error) {
-		return s.stageCargoStations(p, g, count)
+		return s.stageStarCargoBuild(p, g, kind, count)
 	})
 	return true
 }
 
-func (s *State) stageCargoStations(p, g, count int) (stagedShipBuild, bool, error) {
+func (s *State) stageStarCargoBuild(p, g int, kind model.ShipType, count int) (stagedShipBuild, bool, error) {
 	w := newCommandWorkspace(s)
 	dir := s.dirs[p-1][g]
 	w.scope = &workspaceScope{p, g, dir}
@@ -61,8 +74,9 @@ func (s *State) stageCargoStations(p, g, count int) (stagedShipBuild, bool, erro
 	if err != nil {
 		return stagedShipBuild{}, false, err
 	}
-	in := commandrules.CargoStations{
+	in := commandrules.StarCargoBuild{
 		CargoBuild: commandrules.CargoBuild{Player: p, Governor: g, Scope: dir, Race: r, Star: star, Ships: orbit},
+		Kind:       kind,
 		Count:      count,
 	}
 	affordable, err := in.Affordable(s.cfg)
@@ -76,7 +90,7 @@ func (s *State) stageCargoStations(p, g, count int) (stagedShipBuild, bool, erro
 	var tickets []db.FactoryAllocation
 	var numbers []uint32
 	if affordable != 0 {
-		tickets, err = s.store.CargoStationCandidates(affordable)
+		tickets, err = s.store.StarCargoBuildCandidates(affordable)
 		var ce *db.CommandError
 		if errors.As(err, &ce) && ce.Code == db.CommandStale {
 			return stagedShipBuild{}, true, nil
@@ -91,7 +105,7 @@ func (s *State) stageCargoStations(p, g, count int) (stagedShipBuild, bool, erro
 			numbers = append(numbers, ticket.Number)
 		}
 	}
-	change, err := commandrules.PlanCargoStations(in, numbers, s.cfg)
+	change, err := commandrules.PlanStarCargoBuild(in, numbers, s.cfg)
 	if err != nil {
 		return stagedShipBuild{}, false, err
 	}
@@ -101,7 +115,7 @@ func (s *State) stageCargoStations(p, g, count int) (stagedShipBuild, bool, erro
 	return stagedShipBuild{
 		workspace: w, children: change.Ships, notice: change.Notice,
 		commit: func() (db.CommandOutcome, error) {
-			return s.store.CommitCargoStations(db.CargoStationBuild{Input: in, Allocations: tickets, Ships: change.Ships, Config: s.cfg})
+			return s.store.CommitStarCargoBuild(db.StarCargoBuild{Input: in, Allocations: tickets, Ships: change.Ships, Config: s.cfg})
 		},
 	}, false, nil
 }

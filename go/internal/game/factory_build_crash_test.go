@@ -48,10 +48,10 @@ func TestPlanetFactoryBuildCrashChild(t *testing.T) {
 				command = "build :"
 			}
 		}
-		if strings.HasPrefix(stage, "cargo-stations.") {
+		if strings.HasPrefix(stage, "star-cargo-build.") {
 			state.dirs[0][0].Level = model.LevelShip
 			state.dirs[0][0].ShipNo = 77
-			command = "build S 2"
+			command = os.Getenv("GB_FACTORY_BUILD_STAR_CARGO_COMMAND")
 		}
 		if strings.HasPrefix(stage, "probe-launch.") {
 			command = "launch #78"
@@ -69,9 +69,9 @@ func TestPlanetFactoryBuildCrashChild(t *testing.T) {
 			command = "land #78 #77"
 		}
 		switch stage {
-		case "cargo-stations.preinstall", "probe-scrap.preinstall", "friendly-dock.preinstall", "peer-undock.preinstall", "probe-land.preinstall", "factory-build.preinstall", "cargo-build.preinstall", "probe-build.preinstall", "probe-launch.preinstall":
+		case "star-cargo-build.preinstall", "probe-scrap.preinstall", "friendly-dock.preinstall", "peer-undock.preinstall", "probe-land.preinstall", "factory-build.preinstall", "cargo-build.preinstall", "probe-build.preinstall", "probe-launch.preinstall":
 			state.testHooks = &testHooks{beforeCommandInstall: boundary}
-		case "cargo-stations.installed", "probe-scrap.installed", "friendly-dock.installed", "peer-undock.installed", "probe-land.installed", "factory-build.installed", "cargo-build.installed", "probe-build.installed", "probe-launch.installed":
+		case "star-cargo-build.installed", "probe-scrap.installed", "friendly-dock.installed", "peer-undock.installed", "probe-land.installed", "factory-build.installed", "cargo-build.installed", "probe-build.installed", "probe-launch.installed":
 			state.testHooks = &testHooks{afterCommandInstall: boundary}
 		}
 	})
@@ -153,6 +153,11 @@ func checkPlanetFactoryCrashes(t *testing.T, autoload bool) {
 
 func killConstructionAt(t *testing.T, f *factoryFixture, stage string, saved time.Time) {
 	t.Helper()
+	killConstructionCommandAt(t, f, stage, saved, "")
+}
+
+func killConstructionCommandAt(t *testing.T, f *factoryFixture, stage string, saved time.Time, command string) {
+	t.Helper()
 	if e := f.store.Close(); e != nil {
 		t.Fatal(e)
 	}
@@ -163,7 +168,7 @@ func killConstructionAt(t *testing.T, f *factoryFixture, stage string, saved tim
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	child := exec.CommandContext(ctx, exe, "-test.run=^TestPlanetFactoryBuildCrashChild$", "-test.v") //nolint:gosec // own Go test executable and fixed arguments
-	child.Env = append(os.Environ(), "GB_FACTORY_BUILD_CHILD=1", "GB_FACTORY_BUILD_PATH="+f.path, "GB_FACTORY_BUILD_STAGE="+stage, "GB_FACTORY_BUILD_NOW="+saved.Format(time.RFC3339Nano))
+	child.Env = append(os.Environ(), "GB_FACTORY_BUILD_CHILD=1", "GB_FACTORY_BUILD_PATH="+f.path, "GB_FACTORY_BUILD_STAGE="+stage, "GB_FACTORY_BUILD_NOW="+saved.Format(time.RFC3339Nano), "GB_FACTORY_BUILD_STAR_CARGO_COMMAND="+command)
 	stdout, e := child.StdoutPipe()
 	if e != nil {
 		t.Fatal(e)
