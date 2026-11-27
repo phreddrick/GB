@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -16,11 +17,17 @@ import (
 
 func stationFixture(t *testing.T, budgets uint16, autoload bool, free ...uint32) *factoryFixture {
 	t.Helper()
+	return starCargoFixture(t, budgets*427+23, autoload, free...)
+}
+
+func starCargoFixture(t *testing.T, resources uint16, autoload bool, free ...uint32) *factoryFixture {
+	t.Helper()
 	f := newCargoBuildFixture(t, false, model.LevelStar)
 	onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
 		r, b := f.state.races[0], f.state.ships[77]
 		r.Governor[0].Toggle.AutoLoad = autoload
-		b.Resource = budgets*427 + 23
+		b.Resource = resources
+		b.MaxResource = max(b.MaxResource, resources)
 		b.Popn, b.Fuel = 58, 899.5
 		b.DestStar, b.DestPNum, b.LandX, b.LandY = 2, 1, 3, 4
 		for _, e := range []error{f.store.PutRace(r), f.store.PutShip(b)} {
@@ -46,6 +53,11 @@ func stationFixture(t *testing.T, budgets uint16, autoload bool, free ...uint32)
 // and all database records the command must leave alone, including AP.
 func stationExpected(t *testing.T, f *factoryFixture, before map[string]string, ids ...uint32) map[string]string {
 	t.Helper()
+	return starCargoExpected(t, f, before, model.StypeStation, 427, ids)
+}
+
+func starCargoExpected(t *testing.T, f *factoryFixture, before map[string]string, kind model.ShipType, cost uint16, ids []uint32) map[string]string {
+	t.Helper()
 	expected := maps.Clone(before)
 	if len(ids) == 0 {
 		return expected
@@ -60,8 +72,8 @@ func stationExpected(t *testing.T, f *factoryFixture, before map[string]string, 
 	put := func(bucket, key []byte, v any) { expected[fmt.Sprintf("%x/%x", bucket, key)] = factoryBuildJSON(t, v) }
 	for _, id := range ids {
 		var child model.Ship
-		legacy.getshipDefaults(&child, model.StypeStation, r)
-		if child.BuildCost != 427 {
+		legacy.getshipDefaults(&child, kind, r)
+		if child.BuildCost != cost {
 			t.Fatal("fixture cost changed", child.BuildCost)
 		}
 		child.Number, child.Tech, child.Class = id, r.Tech, "Standard"
@@ -202,7 +214,7 @@ func TestCR17CargoStationAdmission(t *testing.T) {
 			})
 			before, actor := factoryBuildRecords(t, f), actorEnrollmentSnapshot(t, f.actorEnrollmentFixture)
 			f.store.SetMetaFault(func(op string) error {
-				if strings.HasPrefix(op, "cargo-stations.") {
+				if strings.HasPrefix(op, "star-cargo-build.") {
 					t.Errorf("unexpected write boundary: %s", op)
 				}
 				return nil
@@ -233,7 +245,7 @@ func TestCR17CargoStationLateChanges(t *testing.T) {
 			f := stationFixture(t, 2, true, 88)
 			var after map[string]string
 			f.store.SetMetaFault(func(op string) error {
-				if op != "cargo-stations.before" {
+				if op != "star-cargo-build.before" {
 					return nil
 				}
 				var err error
@@ -309,11 +321,11 @@ func TestCR17CargoStationFailures(t *testing.T) {
 			})
 			reached := stage == "lost actor slot"
 			f.store.SetMetaFault(func(op string) error {
-				if stage == "fence" && op == "cargo-stations.before" {
+				if stage == "fence" && op == "star-cargo-build.before" {
 					f.store.SetWriteFence(true)
 					reached = true
 				}
-				if op == "cargo-stations.before" {
+				if op == "star-cargo-build.before" {
 					switch stage {
 					case "maintenance":
 						reached = true
@@ -326,7 +338,7 @@ func TestCR17CargoStationFailures(t *testing.T) {
 						return f.store.PutMeta(db.KeyMaintenance, []byte("null"))
 					}
 				}
-				if op == "cargo-stations."+stage {
+				if op == "star-cargo-build."+stage {
 					reached = true
 					return errors.New("injected")
 				}
@@ -381,30 +393,7 @@ func TestCR17CargoStationCrash(t *testing.T) {
 			for _, stage := range stages {
 				t.Run(stage, func(t *testing.T) {
 					f := stationFixture(t, tc.budget, true, tc.free...)
-					if err := f.state.Stop(ctxT(t, 10*time.Second)); err != nil {
-						t.Fatal(err)
-					}
-					schedule, err := f.store.GetSchedule()
-					if err != nil || schedule == nil {
-						t.Fatal(schedule, err)
-					}
-					before := factoryBuildRecords(t, f)
-					want := before
-					switch stage {
-					case "after-commit", "preinstall", "installed":
-						want = stationExpected(t, f, before, tc.ids...)
-					}
-					killConstructionAt(t, f, "cargo-stations."+stage, schedule.SavedAt)
-					// The first read after SIGKILL is from a newly opened bbolt
-					// handle, before the engine or a turn can repair the image.
-					if got := factoryBuildRecords(t, f); !reflect.DeepEqual(got, want) {
-						t.Fatal("partial construction or unrelated records after process death")
-					}
-					f.open(t)
-					if f.state.Mode() != ModeServing {
-						t.Fatal(f.state.Mode())
-					}
-					assertActorStoreAgreement(t, f.actorEnrollmentFixture)
+					checkStarCargoCrash(t, f, stage, "build S 2", model.StypeStation, 427, tc.ids)
 					if stage == "after-commit" && (tc.name == "mixed" || tc.budget == 1) {
 						checkStationTurnsAndNavigation(t, f, tc.budget, tc.ids)
 					}
@@ -412,6 +401,33 @@ func TestCR17CargoStationCrash(t *testing.T) {
 			}
 		})
 	}
+}
+
+func checkStarCargoCrash(t *testing.T, f *factoryFixture, stage, command string, kind model.ShipType, cost uint16, ids []uint32) {
+	t.Helper()
+	if err := f.state.Stop(ctxT(t, 10*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	schedule, err := f.store.GetSchedule()
+	if err != nil || schedule == nil {
+		t.Fatal(schedule, err)
+	}
+	before := factoryBuildRecords(t, f)
+	want := before
+	switch stage {
+	case "after-commit", "preinstall", "installed":
+		want = starCargoExpected(t, f, before, kind, cost, ids)
+	}
+	killConstructionCommandAt(t, f, "star-cargo-build."+stage, schedule.SavedAt, command)
+	// Compare the newly opened bbolt image before any engine startup or turn.
+	if got := factoryBuildRecords(t, f); !reflect.DeepEqual(got, want) {
+		t.Fatal("partial construction or unrelated records after process death")
+	}
+	f.open(t)
+	if f.state.Mode() != ModeServing {
+		t.Fatal(f.state.Mode())
+	}
+	assertActorStoreAgreement(t, f.actorEnrollmentFixture)
 }
 
 func TestCR17CargoStationTurnsAndNavigation(t *testing.T) {
@@ -442,6 +458,15 @@ func TestCR17CargoStationTurnsAndNavigation(t *testing.T) {
 
 func checkStationTurnsAndNavigation(t *testing.T, f *factoryFixture, budget uint16, ids []uint32) {
 	t.Helper()
+	var free []uint32
+	if budget == 1 {
+		free = []uint32{40}
+	}
+	checkStarCargoTurnsAndNavigation(t, f, model.StypeStation, free, ids)
+}
+
+func checkStarCargoTurnsAndNavigation(t *testing.T, f *factoryFixture, kind model.ShipType, wantFree, ids []uint32) {
+	t.Helper()
 	check := func() {
 		assertActorStoreAgreement(t, f.actorEnrollmentFixture)
 		seen := map[uint32]bool{}
@@ -457,12 +482,12 @@ func checkStationTurnsAndNavigation(t *testing.T, f *factoryFixture, budget uint
 			t.Fatal("Cargo debit or membership changed across turn/restart")
 		}
 		for _, id := range ids {
-			if !seen[id] || landingShip(t, f, id).Type != model.StypeStation {
+			if !seen[id] || landingShip(t, f, id).Type != kind {
 				t.Fatal("Station detached or lost", id)
 			}
 		}
 		free, err := f.store.FreeShipNums()
-		if err != nil || (budget == 1 && !reflect.DeepEqual(free, []uint32{40})) || (budget == 2 && len(free) != 0) {
+		if err != nil || !slices.Equal(free, wantFree) {
 			t.Fatal("turn/restart changed allocator consumption", free, err)
 		}
 	}
@@ -485,7 +510,7 @@ func TestCR17CargoStationOtherRouting(t *testing.T) {
 		cmd  string
 		edit func(*factoryFixture)
 	}{
-		{"other type", "build M", func(*factoryFixture) {}},
+		{"other type", "build X 2", func(*factoryFixture) {}},
 		{"beyond two", "build S 3", func(*factoryFixture) {}},
 		{"God", "build S", func(f *factoryFixture) { f.state.races[0].God = true }},
 	} {
@@ -493,7 +518,7 @@ func TestCR17CargoStationOtherRouting(t *testing.T) {
 			f := stationFixture(t, 2, true)
 			onEnrollmentActor(t, f.actorEnrollmentFixture, func() { tc.edit(f) })
 			f.store.SetMetaFault(func(op string) error {
-				if strings.HasPrefix(op, "cargo-stations.") {
+				if strings.HasPrefix(op, "star-cargo-build.") {
 					t.Errorf("Station path intercepted %s", tc.name)
 				}
 				return nil
@@ -508,7 +533,7 @@ func TestCR17CargoStationOtherRouting(t *testing.T) {
 
 func TestCR17CargoStationStorageContract(t *testing.T) {
 	t.Parallel()
-	for _, which := range []string{"duplicate IDs", "incomplete prefix", "changed placement", "changed cost", "wrong ticket order", "invalid free digest"} {
+	for _, which := range []string{"duplicate IDs", "incomplete prefix", "changed placement", "changed cost", "wrong ticket order", "invalid free digest", "unsupported design", "wrong child type"} {
 		t.Run(which, func(t *testing.T) {
 			f := stationFixture(t, 2, true, 41, 55)
 			b, st := landingShip(t, f, 77), scrapStar(t, f)
@@ -516,22 +541,23 @@ func TestCR17CargoStationStorageContract(t *testing.T) {
 			if err != nil || r == nil {
 				t.Fatal(r, err)
 			}
-			tickets, err := f.store.CargoStationCandidates(2)
+			tickets, err := f.store.StarCargoBuildCandidates(2)
 			if err != nil || len(tickets) != 2 {
 				t.Fatal(tickets, err)
 			}
-			ctx := commandrules.CargoStations{
+			ctx := commandrules.StarCargoBuild{
 				CargoBuild: commandrules.CargoBuild{
 					Player: 1, Scope: model.Directory{Level: model.LevelShip, ShipNo: 77},
 					Race: r, Star: st, Ships: []*model.Ship{b},
 				},
+				Kind:  model.StypeStation,
 				Count: 2,
 			}
-			change, err := commandrules.PlanCargoStations(ctx, []uint32{tickets[0].Number, tickets[1].Number}, f.cfg)
+			change, err := commandrules.PlanStarCargoBuild(ctx, []uint32{tickets[0].Number, tickets[1].Number}, f.cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
-			in := db.CargoStationBuild{Input: ctx, Allocations: tickets, Ships: change.Ships, Config: f.cfg}
+			in := db.StarCargoBuild{Input: ctx, Allocations: tickets, Ships: change.Ships, Config: f.cfg}
 			switch which {
 			case "duplicate IDs":
 				in.Allocations[1] = in.Allocations[0]
@@ -543,16 +569,23 @@ func TestCR17CargoStationStorageContract(t *testing.T) {
 				in.Ships[1].BuildCost--
 			case "wrong ticket order":
 				tickets[0], tickets[1] = tickets[1], tickets[0]
-				change, err = commandrules.PlanCargoStations(ctx, []uint32{tickets[0].Number, tickets[1].Number}, f.cfg)
+				change, err = commandrules.PlanStarCargoBuild(ctx, []uint32{tickets[0].Number, tickets[1].Number}, f.cfg)
 				if err != nil {
 					t.Fatal(err)
 				}
 				in.Ships = change.Ships
 			case "invalid free digest":
 				in.Allocations[1].FreeDigest = ""
+			case "unsupported design":
+				in.Input.Kind = model.StypeCarrier
+				if _, err = commandrules.PlanStarCargoBuild(in.Input, []uint32{tickets[0].Number, tickets[1].Number}, f.cfg); !errors.Is(err, commandrules.ErrFactoryBuildInput) {
+					t.Fatal("planner accepted an otherwise eligible Carrier outside the allowlist", err)
+				}
+			case "wrong child type":
+				in.Ships[1].Type = model.StypeHabitat
 			}
 			before := factoryBuildRecords(t, f)
-			outcome, err := f.store.CommitCargoStations(in)
+			outcome, err := f.store.CommitStarCargoBuild(in)
 			var ce *db.CommandError
 			code := db.CommandInvalid
 			if which == "wrong ticket order" || which == "invalid free digest" {

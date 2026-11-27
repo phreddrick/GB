@@ -7,17 +7,23 @@ import (
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
-// CargoStations limits the command to at most two Stations from an ordinary
-// Cargo ship in star orbit. The caller witnesses the entire exterior chain.
-type CargoStations struct {
+// StarCargoBuild describes an ordinary Cargo ship building one or two ships
+// of an allowed design in star orbit. Ships witnesses the entire exterior chain.
+type StarCargoBuild struct {
 	CargoBuild
+	Kind  model.ShipType
 	Count int
 }
 
-func (in CargoStations) design(cfg *config.Config) (builder, design *model.Ship, err error) {
+func (in StarCargoBuild) design(cfg *config.Config) (builder, design *model.Ship, err error) {
 	r, p, g := in.Race, in.Player, in.Governor
 	if cfg == nil || in.Count < 1 || in.Count > 2 || p < 1 || p > model.MaxPlayers || g < 0 || g > model.MaxGovernors ||
 		r == nil || r.PlayerNum != p || r.God || in.Scope.Level != model.LevelShip || in.Planet != nil || in.Universe != nil {
+		return nil, nil, ErrFactoryBuildInput
+	}
+	switch in.Kind {
+	case model.StypeStation, model.StypeHabitat, model.StypeOAP, model.StypeMirror:
+	default:
 		return nil, nil, ErrFactoryBuildInput
 	}
 	orbit, err := StarExterior(in.Star, in.Ships)
@@ -33,7 +39,7 @@ func (in CargoStations) design(cfg *config.Config) (builder, design *model.Ship,
 	if int(b.Owner) != p || !b.Alive || !b.Active || b.Docked || b.Popn == 0 || b.Damage != 0 {
 		return nil, nil, &FactoryBuildRefusal{"You can't build here.\n"}
 	}
-	sd := model.Shipdata[model.StypeStation]
+	sd := model.Shipdata[in.Kind]
 	if sd[model.AbilBuild]&model.Shipdata[b.Type][model.AbilConstruct] == 0 {
 		return nil, nil, &FactoryBuildRefusal{fmt.Sprintf("This ship type cannot be built by a %s.\n", model.ShipNames[b.Type])}
 	}
@@ -41,14 +47,14 @@ func (in CargoStations) design(cfg *config.Config) (builder, design *model.Ship,
 	if r.Tech < tech {
 		return nil, nil, &FactoryBuildRefusal{fmt.Sprintf("You are not advanced enough to build this ship.\n%.1f engineering technology needed. You have %.1f.\n", tech, r.Tech)}
 	}
-	sh, err := constructionDesign(cfg, r, model.StypeStation)
+	sh, err := constructionDesign(cfg, r, in.Kind)
 	if err != nil || sh.BuildCost == 0 || !finiteCargoMass(b.Fuel) {
 		return nil, nil, ErrFactoryBuildInput
 	}
 	return b, sh, nil
 }
 
-func (in CargoStations) Affordable(cfg *config.Config) (int, error) {
+func (in StarCargoBuild) Affordable(cfg *config.Config) (int, error) {
 	b, sh, err := in.design(cfg)
 	if err != nil {
 		return 0, err
@@ -56,16 +62,16 @@ func (in CargoStations) Affordable(cfg *config.Config) (int, error) {
 	return min(in.Count, int(b.Resource/sh.BuildCost)), nil
 }
 
-type CargoStationChange struct {
+type StarCargoChange struct {
 	Builder *model.Ship
 	Ships   []*model.Ship
 	Notice  string
 }
 
-// PlanCargoStations preserves the affordable prefix and the existing exterior
+// PlanStarCargoBuild preserves the affordable prefix and the existing exterior
 // placement. Each child loads from the remaining builder inventory in order.
-func PlanCargoStations(in CargoStations, numbers []uint32, cfg *config.Config) (CargoStationChange, error) {
-	var out CargoStationChange
+func PlanStarCargoBuild(in StarCargoBuild, numbers []uint32, cfg *config.Config) (StarCargoChange, error) {
+	var out StarCargoChange
 	b, design, err := in.design(cfg)
 	if err != nil {
 		return out, err
@@ -85,13 +91,13 @@ func PlanCargoStations(in CargoStations, numbers []uint32, cfg *config.Config) (
 	}
 	for _, id := range numbers {
 		if used[id] {
-			return CargoStationChange{}, ErrFactoryBuildInput
+			return StarCargoChange{}, ErrFactoryBuildInput
 		}
 		used[id] = true
 		template := *design
 		child, err := loadExteriorConstruction(cfg, in.Race, in.Player, in.Governor, &next, &template, id, head)
 		if err != nil {
-			return CargoStationChange{}, err
+			return StarCargoChange{}, err
 		}
 		out.Ships = append(out.Ships, child)
 		next.Resource -= child.BuildCost

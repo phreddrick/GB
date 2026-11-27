@@ -8,26 +8,26 @@ import (
 	"github.com/phreddrick/GB/go/internal/model"
 )
 
-// CargoStationBuild accepts only the complete affordable prefix of the
+// StarCargoBuild accepts only the complete affordable prefix of the
 // requested build. Allocation tickets are checked again in the write Tx.
-type CargoStationBuild struct {
-	Input       commandrules.CargoStations
+type StarCargoBuild struct {
+	Input       commandrules.StarCargoBuild
 	Allocations []FactoryAllocation
 	Ships       []*model.Ship
 	Config      *config.Config
 }
 
-func (s *Store) CargoStationCandidates(count int) ([]FactoryAllocation, error) {
+func (s *Store) StarCargoBuildCandidates(count int) ([]FactoryAllocation, error) {
 	return s.constructionShipCandidates(count)
 }
 
-func (s *Store) CommitCargoStations(in CargoStationBuild) (CommandOutcome, error) {
-	return s.commitShipRecords("CommitCargoStations", "cargo-stations", in.Allocations, func() (preparedFactoryBuild, error) {
-		return prepareCargoStations(in)
+func (s *Store) CommitStarCargoBuild(in StarCargoBuild) (CommandOutcome, error) {
+	return s.commitShipRecords("CommitStarCargoBuild", "star-cargo-build", in.Allocations, func() (preparedFactoryBuild, error) {
+		return prepareStarCargoBuild(in)
 	})
 }
 
-func prepareCargoStations(in CargoStationBuild) (out preparedFactoryBuild, err error) {
+func prepareStarCargoBuild(in StarCargoBuild) (out preparedFactoryBuild, err error) {
 	if len(in.Allocations) < 1 || len(in.Allocations) > 2 {
 		return out, commandError(CommandInvalid)
 	}
@@ -35,7 +35,7 @@ func prepareCargoStations(in CargoStationBuild) (out preparedFactoryBuild, err e
 	for _, ticket := range in.Allocations {
 		numbers = append(numbers, ticket.Number)
 	}
-	change, err := commandrules.PlanCargoStations(in.Input, numbers, in.Config)
+	change, err := commandrules.PlanStarCargoBuild(in.Input, numbers, in.Config)
 	if err != nil || !reflect.DeepEqual(change.Ships, in.Ships) {
 		return out, commandError(CommandInvalid)
 	}

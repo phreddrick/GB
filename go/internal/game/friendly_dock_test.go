@@ -450,9 +450,10 @@ func pendingDockBuild(t *testing.T, builderType model.ShipType, autoload bool, c
 		}
 	})
 	for _, cmd := range commands {
-		if builderType == model.StypeCargo && (cmd == "build S" || cmd == "build S 2") {
-			// Recreate the old producer for #43 compatibility tests. Only the
-			// producer bypasses the new router; dock and launch still dispatch.
+		// These fixtures describe worlds saved before the atomic exterior
+		// builder. Their dock and launch commands still use real dispatch.
+		legacyCargo := cmd == "build S" || cmd == "build S 2" || cmd == "build H" || cmd == "build O" || cmd == "build M"
+		if builderType == model.StypeCargo && legacyCargo {
 			resp := &recordingResponder{}
 			onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
 				f.state.buildFromShip(1, 0, f.state.races[0], strings.Fields(cmd)[1:], resp)
