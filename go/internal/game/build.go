@@ -690,7 +690,7 @@ func (s *State) deductAPs(playerNum, governor, n, starNum int, sdataLevel bool) 
 // cmdBuild handles the "build" player command.
 // Mirrors build() in build.c.
 func (s *State) cmdBuild(p, g int, args []string, sess net.Responder) {
-	if s.handleCarrierProbe(p, g, args, sess) || s.handleCargoBuild(p, g, args, sess) || s.handlePlanetFactoryBuild(p, g, args, sess) {
+	if s.handleCarrierProbe(p, g, args, sess) || s.handleCargoBuild(p, g, args, sess) || s.handleCargoStations(p, g, args, sess) || s.handlePlanetFactoryBuild(p, g, args, sess) {
 		return
 	}
 	race := s.raceByNum(p)

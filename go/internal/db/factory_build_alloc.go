@@ -14,63 +14,74 @@ import (
 // Preserve free-list integrity/sequence and append/absence checks, but only
 // structural references reserve an identity. Stale advisory orders must not
 // globally block construction. Enrollment's stricter policy is unchanged.
-func factoryBuildShipTx(tx *bolt.Tx) (FactoryAllocation, error) {
-	var ticket FactoryAllocation
-	b := tx.Bucket(BucketShipFree)
+func constructionShipCandidatesTx(tx *bolt.Tx, count int) ([]FactoryAllocation, error) {
+	if count < 1 || count > 2 {
+		return nil, commandError(CommandInvalid)
+	}
+	free, ships := tx.Bucket(BucketShipFree), tx.Bucket(BucketShips)
+	if free == nil || ships == nil {
+		return nil, commandError(CommandCorrupt)
+	}
 	h := sha256.New()
-	_, _ = h.Write(enrollmentFreeKey(b.Sequence()))
+	_, _ = h.Write(enrollmentFreeKey(free.Sequence()))
 	seen := map[uint32]bool{}
-	e := b.ForEach(func(k, v []byte) error {
+	e := free.ForEach(func(k, v []byte) error {
 		if len(k) != 8 || len(v) != 4 {
 			return commandError(CommandCorrupt)
 		}
 		seq := binary.BigEndian.Uint64(k)
 		n := binary.BigEndian.Uint32(v)
-		if seq == 0 || seq > b.Sequence() || n == 0 || seen[n] {
+		if seq == 0 || seq > free.Sequence() || n == 0 || seen[n] {
 			return commandError(CommandCorrupt)
 		}
 		seen[n] = true
 		_, _ = h.Write(k)
 		_, _ = h.Write(v)
-		ticket.Number = n
-		ticket.FreeKey = seq
 		return nil
 	})
 	if e != nil {
-		return ticket, e
+		return nil, e
 	}
-	ticket.FreeDigest = hex.EncodeToString(h.Sum(nil))
-	var max uint32
-	e = tx.Bucket(BucketShips).ForEach(func(k, v []byte) error {
-		if len(k) != 4 {
+	digest := hex.EncodeToString(h.Sum(nil))
+	var high uint32
+	e = ships.ForEach(func(k, v []byte) error {
+		if len(k) != 4 || binary.BigEndian.Uint32(k) == 0 {
 			return commandError(CommandCorrupt)
 		}
-		n := binary.BigEndian.Uint32(k)
-		if n == 0 {
-			return commandError(CommandCorrupt)
-		}
-		if n > max {
-			max = n
-		}
+		high = max(high, binary.BigEndian.Uint32(k))
 		return nil
 	})
 	if e != nil {
-		return ticket, e
+		return nil, e
 	}
-	if ticket.Number == 0 {
-		if max == math.MaxUint32 {
-			return ticket, commandError(CommandStale)
+	tickets := make([]FactoryAllocation, 0, count)
+	cursor := free.Cursor()
+	k, v := cursor.Last()
+	for range count {
+		ticket := FactoryAllocation{FreeDigest: digest}
+		if k != nil {
+			ticket.Number, ticket.FreeKey = binary.BigEndian.Uint32(v), binary.BigEndian.Uint64(k)
+			k, v = cursor.Prev()
+		} else {
+			if high == math.MaxUint32 {
+				return nil, commandError(CommandStale)
+			}
+			ticket.Number = high + 1
 		}
-		ticket.Number = max + 1
+		if ships.Get(ShipKey(ticket.Number)) != nil {
+			return nil, commandError(CommandStale)
+		}
+		if e = factoryBuildReferences(tx, ticket.Number); e != nil {
+			return nil, e
+		}
+		// Legacy construction inserts each new row before the next allocation.
+		// A reused ID above the existing maximum must also advance the next append.
+		high = max(high, ticket.Number)
+		tickets = append(tickets, ticket)
 	}
-	if tx.Bucket(BucketShips).Get(ShipKey(ticket.Number)) != nil {
-		return ticket, commandError(CommandStale)
-	}
-	if e = factoryBuildReferences(tx, ticket.Number); e != nil {
-		return ticket, e
-	}
-	return ticket, nil
+	return tickets, nil
 }
+
 func factoryBuildReferences(tx *bolt.Tx, n uint32) error {
 	conflict := func(ref uint32) error {
 		if ref == n {

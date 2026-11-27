@@ -40,7 +40,7 @@ func (s *State) stageCarrierProbe(p, g int) (stagedShipBuild, bool, error) {
 	if e != nil || pending {
 		return stagedShipBuild{}, pending, e
 	}
-	return stagedShipBuild{w, in.Child, func() (db.CommandOutcome, error) { return s.store.CommitCarrierProbe(in) }}, false, nil
+	return stagedShipBuild{workspace: w, children: []*model.Ship{in.Child}, commit: func() (db.CommandOutcome, error) { return s.store.CommitCarrierProbe(in) }}, false, nil
 }
 
 func (s *State) probeBuildStage(p, g int) (*commandWorkspace, db.CarrierProbeBuild, bool, error) {
