@@ -23,6 +23,11 @@ func (s *State) handleStarCargoBuild(p, g int, args []string, sess net.Responder
 		kind = model.StypeOAP
 	case "M":
 		kind = model.StypeMirror
+	case "X":
+		if len(args) != 2 || args[1] != "2" {
+			return false
+		}
+		kind = model.StypeCarrier
 	default:
 		return false
 	}

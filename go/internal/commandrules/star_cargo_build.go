@@ -23,6 +23,12 @@ func (in StarCargoBuild) design(cfg *config.Config) (builder, design *model.Ship
 	}
 	switch in.Kind {
 	case model.StypeStation, model.StypeHabitat, model.StypeOAP, model.StypeMirror:
+	case model.StypeCarrier:
+		// A request for two may commit an affordable prefix of one. A
+		// request for one uses the separate single-Carrier rules.
+		if in.Count != 2 {
+			return nil, nil, ErrFactoryBuildInput
+		}
 	default:
 		return nil, nil, ErrFactoryBuildInput
 	}

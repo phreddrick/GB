@@ -49,7 +49,7 @@ func TestCR17StarCargoExteriorDispatch(t *testing.T) {
 					t.Run(fmt.Sprintf("%s/autoload=%t", tc.name, load), func(t *testing.T) {
 						f := starCargoFixture(t, tc.budget*d.cost+23, load, tc.free...)
 						addStarCargoSibling(t, f)
-						want := starCargoExpected(t, f, factoryBuildRecords(t, f), d.kind, d.cost, tc.ids)
+						want := starCargoExpected(t, f, factoryBuildRecords(t, f), d.kind, d.cost, 0, tc.ids)
 						var output []string
 						onEnrollmentActor(t, f.actorEnrollmentFixture, func() {
 							s := f.state
@@ -77,7 +77,7 @@ func TestCR17StarCargoExteriorDispatch(t *testing.T) {
 						if err := f.state.HandleCommand(ctxT(t, 10*time.Second), 1, 0, cmd, resp); err != nil {
 							t.Fatal(err)
 						}
-						wantOutput := d.notices(tc.ids, load, tc.short)
+						wantOutput := d.notices(tc.ids, load, tc.short, 75)
 						if f.state.Mode() != ModeServing || !reflect.DeepEqual(want, factoryBuildRecords(t, f)) || !reflect.DeepEqual(output, wantOutput) {
 							t.Fatalf("mode %v, actual output %q, expected %q (and exact durable records)", f.state.Mode(), output, wantOutput)
 						}
@@ -105,7 +105,7 @@ func addStarCargoSibling(t *testing.T, f *factoryFixture) {
 	})
 }
 
-func (d exteriorCargoDesign) notices(ids []uint32, load, short bool) []string {
+func (d exteriorCargoDesign) notices(ids []uint32, load, short bool, damage uint8) []string {
 	var output []string
 	var remainingCrew uint16 = 58
 	remainingFuel := 899.5
@@ -118,7 +118,7 @@ func (d exteriorCargoDesign) notices(ids []uint32, load, short bool) []string {
 		}
 		output = append(output,
 			fmt.Sprintf("%s%d built at a cost of %d resources.\n", d.letter, id, d.cost),
-			"Technology 1000.0.\n", "Warning: This ship is constructed with a 75% damage level.\n",
+			"Technology 1000.0.\n", fmt.Sprintf("Warning: This ship is constructed with a %d%% damage level.\n", damage),
 			"This ship does not need resources to repair.\n", fmt.Sprintf("Loaded with %d crew and %.1f fuel.\n", crew, fuel))
 	}
 	if short {
@@ -179,7 +179,7 @@ func TestCR17StarCargoExteriorTechnology(t *testing.T) {
 				t.Fatal("tech refusal changed or wrote records", msg)
 			}
 			setTech(d.requiredTech)
-			want = starCargoExpected(t, f, factoryBuildRecords(t, f), d.kind, d.cost, []uint32{78})
+			want = starCargoExpected(t, f, factoryBuildRecords(t, f), d.kind, d.cost, 0, []uint32{78})
 			if msg = f.command(t, "build "+d.letter+" 1"); msg != "" || !reflect.DeepEqual(want, factoryBuildRecords(t, f)) {
 				t.Fatal("exact tech boundary did not permit build", msg)
 			}
@@ -207,6 +207,21 @@ func TestCR17StarCargoExteriorLateWitnesses(t *testing.T) {
 		}},
 		{"M second candidate appeared", "build M 2", func(_ *testing.T, f *factoryFixture) error {
 			return f.store.PutShip(&model.Ship{Number: 89})
+		}},
+		{"X issuing race changed", "build X 2", func(_ *testing.T, f *factoryFixture) error {
+			r, err := f.store.GetRace(1)
+			if err != nil {
+				return err
+			}
+			r.Governor[0].Toggle.AutoLoad = false
+			return f.store.PutRace(r)
+		}},
+		{"X allocator sequence changed", "build X 2", func(_ *testing.T, f *factoryFixture) error {
+			if err := f.store.DeleteShip(42); err != nil {
+				return err
+			}
+			_, err := f.store.AllocShipNum()
+			return err
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -253,6 +268,12 @@ func TestCR17StarCargoExteriorAdmission(t *testing.T) {
 		{"M cycle in actor orbit", "build M", "halted", ModeHalted, func(f *factoryFixture) {
 			f.state.ships[77].NextShip = 77
 		}},
+		{"X pending builder debit", "build X 2", "deferred", ModeServing, func(f *factoryFixture) {
+			f.state.ships[77].Resource--
+		}},
+		{"X cycle in actor orbit", "build X 2", "halted", ModeHalted, func(f *factoryFixture) {
+			f.state.ships[77].NextShip = 77
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := starCargoFixture(t, 700, true)
@@ -288,6 +309,7 @@ func TestCR17StarCargoExteriorReferencedFreeIDDefers(t *testing.T) {
 		{"build O 2", 2},
 		{"build M 2", 2},
 		{"build S 2", 2},
+		{"build X 2", 2},
 	} {
 		t.Run(tc.cmd, func(t *testing.T) {
 			const freed = 50
@@ -380,6 +402,13 @@ func TestCR17StarCargoExteriorLegacyRoutes(t *testing.T) {
 		{"God", "build H", model.LevelStar, false, true},
 		{"planet orbit", "build H 1", model.LevelPlan, false, false},
 		{"universe", "build O 2", model.LevelUniv, false, false},
+		{"Carrier type alias", "build Xyz 2", model.LevelStar, false, false},
+		{"Carrier count alias", "build X +2", model.LevelStar, false, false},
+		{"Carrier trailing argument", "build X 2 extra", model.LevelStar, false, false},
+		{"Carrier Shuttle", "build X 2", model.LevelStar, true, false},
+		{"Carrier God", "build X 2", model.LevelStar, false, true},
+		{"Carrier planet orbit", "build X 2", model.LevelPlan, false, false},
+		{"Carrier universe", "build X 2", model.LevelUniv, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newCargoBuildFixture(t, false, tc.level)

@@ -53,10 +53,10 @@ func starCargoFixture(t *testing.T, resources uint16, autoload bool, free ...uin
 // and all database records the command must leave alone, including AP.
 func stationExpected(t *testing.T, f *factoryFixture, before map[string]string, ids ...uint32) map[string]string {
 	t.Helper()
-	return starCargoExpected(t, f, before, model.StypeStation, 427, ids)
+	return starCargoExpected(t, f, before, model.StypeStation, 427, 0, ids)
 }
 
-func starCargoExpected(t *testing.T, f *factoryFixture, before map[string]string, kind model.ShipType, cost uint16, ids []uint32) map[string]string {
+func starCargoExpected(t *testing.T, f *factoryFixture, before map[string]string, kind model.ShipType, cost uint16, governor int, ids []uint32) map[string]string {
 	t.Helper()
 	expected := maps.Clone(before)
 	if len(ids) == 0 {
@@ -84,10 +84,10 @@ func starCargoExpected(t *testing.T, f *factoryFixture, before map[string]string
 		b.Resource -= child.BuildCost
 		var crew int
 		var fuel float64
-		if r.Governor[0].Toggle.AutoLoad {
+		if r.Governor[governor].Toggle.AutoLoad {
 			autoloadAtShip(1, &child, b, &crew, &fuel)
 		}
-		legacy.initializeNewShip(1, 0, r, &child, fuel, crew)
+		legacy.initializeNewShip(1, governor, r, &child, fuel, crew)
 		put(db.BucketShips, db.ShipKey(id), &child)
 		for k, v := range expected {
 			if strings.HasPrefix(k, fmt.Sprintf("%x/", db.BucketShipFree)) && v == string(db.ShipKey(id)) {
@@ -416,7 +416,7 @@ func checkStarCargoCrash(t *testing.T, f *factoryFixture, stage, command string,
 	want := before
 	switch stage {
 	case "after-commit", "preinstall", "installed":
-		want = starCargoExpected(t, f, before, kind, cost, ids)
+		want = starCargoExpected(t, f, before, kind, cost, 0, ids)
 	}
 	killConstructionCommandAt(t, f, "star-cargo-build."+stage, schedule.SavedAt, command)
 	// Compare the newly opened bbolt image before any engine startup or turn.
@@ -510,7 +510,7 @@ func TestCR17CargoStationOtherRouting(t *testing.T) {
 		cmd  string
 		edit func(*factoryFixture)
 	}{
-		{"other type", "build X 2", func(*factoryFixture) {}},
+		{"other type", "build X +2", func(*factoryFixture) {}},
 		{"beyond two", "build S 3", func(*factoryFixture) {}},
 		{"God", "build S", func(f *factoryFixture) { f.state.races[0].God = true }},
 	} {
@@ -533,7 +533,7 @@ func TestCR17CargoStationOtherRouting(t *testing.T) {
 
 func TestCR17CargoStationStorageContract(t *testing.T) {
 	t.Parallel()
-	for _, which := range []string{"duplicate IDs", "incomplete prefix", "changed placement", "changed cost", "wrong ticket order", "invalid free digest", "unsupported design", "wrong child type"} {
+	for _, which := range []string{"duplicate IDs", "incomplete prefix", "changed placement", "changed cost", "wrong ticket order", "invalid free digest", "unsupported design", "single Carrier request", "wrong child type"} {
 		t.Run(which, func(t *testing.T) {
 			f := stationFixture(t, 2, true, 41, 55)
 			b, st := landingShip(t, f, 77), scrapStar(t, f)
@@ -577,9 +577,17 @@ func TestCR17CargoStationStorageContract(t *testing.T) {
 			case "invalid free digest":
 				in.Allocations[1].FreeDigest = ""
 			case "unsupported design":
-				in.Input.Kind = model.StypeCarrier
-				if _, err = commandrules.PlanStarCargoBuild(in.Input, []uint32{tickets[0].Number, tickets[1].Number}, f.cfg); !errors.Is(err, commandrules.ErrFactoryBuildInput) {
-					t.Fatal("planner accepted an otherwise eligible Carrier outside the allowlist", err)
+				in.Input.Kind = model.StypeTanker
+			case "single Carrier request":
+				in.Input.Kind, in.Input.Count = model.StypeCarrier, 1
+				in.Allocations = in.Allocations[:1]
+				child, planErr := commandrules.PlanCargoBuild(ctx.CargoBuild, tickets[0].Number, f.cfg)
+				if planErr != nil {
+					t.Fatal("the separate single-Carrier planner should accept this input", planErr)
+				}
+				in.Ships = []*model.Ship{child}
+				if _, err = commandrules.PlanStarCargoBuild(in.Input, []uint32{tickets[0].Number}, f.cfg); !errors.Is(err, commandrules.ErrFactoryBuildInput) {
+					t.Fatal("batch planner accepted a request for one Carrier", err)
 				}
 			case "wrong child type":
 				in.Ships[1].Type = model.StypeHabitat
