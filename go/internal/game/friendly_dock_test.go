@@ -493,7 +493,8 @@ func TestCR17FriendlyDockLegacyExteriorBuild(t *testing.T) {
 		{"Cargo Habitat", model.StypeCargo, true, []string{"build H"}, []model.ShipType{model.StypeHabitat}},
 		{"Cargo Mirror", model.StypeCargo, true, []string{"build M"}, []model.ShipType{model.StypeMirror}},
 		{"Cargo Platform then Station", model.StypeCargo, false, []string{"build O", "build S"}, []model.ShipType{model.StypeOAP, model.StypeStation}},
-		{"Cargo two Carriers", model.StypeCargo, false, []string{"build X 2"}, []model.ShipType{model.StypeCarrier, model.StypeCarrier}},
+		// The noncanonical count still exercises the real legacy producer.
+		{"Cargo two Carriers", model.StypeCargo, false, []string{"build X +2"}, []model.ShipType{model.StypeCarrier, model.StypeCarrier}},
 		{"Shuttle Carrier", model.StypeShuttle, true, []string{"build X"}, []model.ShipType{model.StypeCarrier}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1,0 +1,19 @@
+# CR-17c atomic two-Carrier Cargo construction
+
+[Issue #44](https://github.com/phreddrick/GB/issues/44) tracks the remaining construction and allocator work. This slice admits only the exact X 2 build arguments for an eligible ordinary Cargo Ship in star orbit. One-Carrier requests continue through [the existing checked single-Carrier path](cr17c-cargo-carrier-construction.md). Other builders, orbits, counts, aliases and God builds keep their prior routes. The batch planner independently requires a requested count of two for a Carrier, including when only one is affordable.
+
+## Baseline and compatibility
+
+On base 6880ff95eaca2e9ecb0956b832dfebe0c93fa190, real dispatch with 708 or 354 resources popped reusable IDs and reported construction before saving each child. A cold reopen without a shutdown flush retained the resulting Carrier rows and allocator pops while the Cargo still had its original resources, crew and fuel and the saved star head still pointed at the builder. The one-affordable case finished its first Carrier's notices before the shortage.
+
+The same baseline accepted governor 1 building two Carriers from a same-race Cargo assigned to governor 2, while the one-Carrier path refused governor 1. The batch preserves the current Go race-ownership check and gives the new ships to the issuing governor. It uses that governor's autoload toggle. Original C [testship](../../source/getplace.c) also checks governor assignment. Current Go single-build authorization, multi-build authorization and refusal text are preserved separately.
+
+The Carrier costs 354 resources, requires technology 250, starts at 50% damage, has capacity for 30 crew and 1,000 fuel, and can repair without resources. The default design is derived from the existing table and construction functions, as in [the C reference](../../source/build.c). Loading is sequential, the builder's mass is unchanged, and there is no AP charge. Built ships prepend to the existing exterior list and retain the legacy placement and notice order. If only one is affordable, success and load notices for that Carrier precede the shortage. If neither is affordable, the store receives no write.
+
+## Transaction and verification
+
+The shared star-Cargo transaction checks the whole exterior chain, race and store preimages, and revalidates the allocation tickets and free-list state. One bbolt transaction writes the affordable children, builder debits and loads, star head and allocator effects together. Each child preserves the legacy LIFO or fresh-ID order. The actor installs the complete confirmed batch before reporting success. A still-referenced freed ID defers in SERVING. Structural corruption, a late conflict, or an uncertain commit halts without a legacy retry or stale shutdown flush.
+
+Dispatcher tests check the complete logical store and actor installation at first success, both autoload settings and the legacy issuing-governor rule, zero/partial/full affordability, fresh/reused/mixed IDs, and exact notices. Tests exercise typed single-count rejection, existing single-Carrier routing, the still-referenced ID, late witness and free-list drift, and an injected uncertain commit result. Historical detached-list tests retain a real legacy two-Carrier producer using the noncanonical X +2 form.
+
+The subprocess harness kills the process before writes, between the individual record and allocator writes, just before commit, and after commit before output. On the first bbolt open it compares the complete logical old or new image, including the free-list entries and sequence, before engine startup or turn repair. Committed fresh, mixed and partial cases then pass a scheduled segment, full update, restart, and numeric dock/undock. These are process-death tests at known boundaries. Physical I/O faults and power-loss durability remain outside the evidence.
